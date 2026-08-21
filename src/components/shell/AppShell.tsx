@@ -52,12 +52,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
+        <Link
+          href="/settings"
+          aria-current={pathname === "/settings" ? "page" : undefined}
+          className="ml-auto rounded-input px-2.5 py-1.5 text-[13px] font-semibold text-ink/70 transition-colors hover:bg-paper-0/50 hover:text-ink"
+        >
+          Settings
+        </Link>
+
         <button
           type="button"
           onClick={() => setChatOpen((open) => !open)}
           aria-expanded={chatOpen}
           aria-controls="tutor-drawer"
-          className="ml-auto rounded-input border-[1.5px] border-ink bg-paper-0 px-3 py-1.5 text-[14px] font-semibold text-ink transition-transform active:translate-y-px"
+          className="rounded-input border-[1.5px] border-ink bg-paper-0 px-3 py-1.5 text-[14px] font-semibold text-ink transition-transform active:translate-y-px"
         >
           Tutor
         </button>

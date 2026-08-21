@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ChatComposer } from "./ChatComposer";
 import { ChatMessageList, type ChatTurn } from "./ChatMessageList";
@@ -31,6 +31,7 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   const [focusKey, setFocusKey] = useState(0);
   const [sessionsKey, setSessionsKey] = useState(0);
   const abort = useRef<AbortController | null>(null);
+  const panel = useRef<HTMLElement>(null);
 
   const busy = streaming !== null;
 
@@ -156,6 +157,54 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
     void send(message);
   }, [draft, send, streaming]);
 
+  /**
+   * Focus management for the drawer (docs/06 §7).
+   *
+   * Opening moves focus into the composer, Escape closes, and Tab cycles
+   * within the panel while it is open. The drawer overlays the page rather
+   * than replacing it, so without this a keyboard user tabs straight out of an
+   * open drawer into content they cannot see the top of.
+   */
+  useEffect(() => {
+    if (!open) return;
+
+    const element = panel.current;
+    element?.querySelector<HTMLTextAreaElement>("#tutor-composer")?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !element) return;
+
+      const focusable = [
+        ...element.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ].filter((node) => node.offsetParent !== null);
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeNode = document.activeElement;
+
+      if (!event.shiftKey && activeNode === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && activeNode === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (activeNode instanceof Node && !element.contains(activeNode)) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
   const contextChip = [
     context.tab === "practice" ? "Practice" : "Learn",
     topicLabel,
@@ -178,6 +227,7 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
 
   return (
     <aside
+      ref={panel}
       id="tutor-drawer"
       aria-label="Tutor"
       aria-hidden={!open}

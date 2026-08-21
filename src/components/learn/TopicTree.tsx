@@ -28,8 +28,59 @@ function useActiveTopicId(): string | undefined {
 export function TopicTree({ topics }: Props) {
   const activeTopicId = useActiveTopicId();
 
+  /**
+   * Arrow-key navigation over the tree (docs/06 §7).
+   *
+   * Operates on the rendered links rather than on the topic data, so it
+   * naturally skips collapsed branches: an item that is not in the DOM is not
+   * reachable, which is the behaviour a tree is supposed to have. Left and
+   * right delegate to the branch's own expander button.
+   */
+  function onKeyDown(event: React.KeyboardEvent<HTMLUListElement>) {
+    const keys = ["ArrowDown", "ArrowUp", "Home", "End", "ArrowRight", "ArrowLeft"];
+    if (!keys.includes(event.key)) return;
+
+    const root = event.currentTarget;
+    const links = [...root.querySelectorAll<HTMLAnchorElement>("a[data-topic-link]")];
+    if (links.length === 0) return;
+
+    const active = document.activeElement as HTMLElement | null;
+    const index = links.findIndex((link) => link === active);
+
+    if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+      if (index === -1) return;
+      const row = links[index].closest("li");
+      const expander = row?.querySelector<HTMLButtonElement>("button[data-expander]");
+      if (!expander) return;
+      const expanded = row?.getAttribute("aria-expanded") === "true";
+      // Right opens a closed branch, left closes an open one. Anything else
+      // is a no-op rather than a surprise jump.
+      if ((event.key === "ArrowRight") !== expanded) {
+        event.preventDefault();
+        expander.click();
+      }
+      return;
+    }
+
+    event.preventDefault();
+    const next =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? links.length - 1
+          : event.key === "ArrowDown"
+            ? Math.min(links.length - 1, index + 1)
+            : Math.max(0, index === -1 ? 0 : index - 1);
+    links[next]?.focus();
+  }
+
   return (
-    <ul className="flex flex-col gap-0.5" role="tree" aria-label="Topics">
+    <ul
+      className="flex flex-col gap-0.5"
+      role="tree"
+      aria-label="Topics"
+      onKeyDown={onKeyDown}
+    >
       {topics.map((topic) => (
         <TopicBranch
           key={topic.id}
@@ -92,6 +143,8 @@ function TopicBranch({
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-label={open ? `Collapse ${topic.name}` : `Expand ${topic.name}`}
+            data-expander
+            tabIndex={-1}
             className="flex w-5 shrink-0 items-center justify-center text-ink-faint transition-colors hover:text-ink"
           >
             <span className={`text-[10px] transition-transform ${open ? "rotate-90" : ""}`}>
@@ -105,12 +158,13 @@ function TopicBranch({
         <Link
           href={`/learn/${topic.id}`}
           aria-current={active ? "page" : undefined}
+          data-topic-link
           className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-2"
           style={{ paddingLeft: depth * 10 }}
         >
           <span
             className={`min-w-0 flex-1 truncate text-[13.5px] ${
-              active ? "font-semibold text-ink" : muted ? "text-ink-soft/70" : "text-ink"
+              active ? "font-semibold text-ink" : muted ? "text-ink-soft" : "text-ink"
             }`}
           >
             {topic.name}

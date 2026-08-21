@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 
 import { DocCard } from "@/components/learn/DocCard";
 import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
+import { ModelMissList } from "@/components/learn/ModelMissList";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { modelMissCounts } from "@/lib/attempts";
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
 import { getTopicDetail } from "@/lib/topics";
@@ -49,17 +51,28 @@ export default async function TopicPage({
     if (!doc) notFound();
 
     const index = deserializeModelIndex(doc.modelIndexJson);
+    const misses = await modelMissCounts(doc.id);
 
     return (
       <article className="flex justify-center gap-8 px-8 py-10">
         <div className="min-w-0 max-w-[68ch] flex-1">
           <Breadcrumb path={topic.path} topicId={topic.id} hasSiblings={topic.docCount > 1} />
 
-          {doc.isExemplar && (
-            <span className="meta-caps mb-3 inline-block rounded-chip bg-brand-tint px-2 py-0.5 text-[10px] text-brand-deep">
-              Exemplar
-            </span>
-          )}
+          <div className="mb-3 flex items-center gap-2">
+            {doc.isExemplar && (
+              <span className="meta-caps inline-block rounded-chip bg-brand-tint px-2 py-0.5 text-[10px] text-brand-deep">
+                Exemplar
+              </span>
+            )}
+            <Link
+              href={`/learn/${topic.id}/history`}
+              className="text-[12px] text-cobalt hover:underline"
+            >
+              Attempt history
+            </Link>
+          </div>
+
+          <ModelMissList misses={misses} topicId={topic.id} docId={doc.id} />
 
           <div className="rounded-card bg-paper-0 px-8 py-8 shadow-sheet">
             <MarkdownMath>{doc.contentMd}</MarkdownMath>

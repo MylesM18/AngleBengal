@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { ProblemSkeleton } from "@/components/ui/Skeleton";
 import { snapshotSketch } from "@/components/sketchpad/Sketchpad";
 import {
   clearActiveProblem,
@@ -265,7 +266,7 @@ export function PracticePanel({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
         {loading ? (
-          <p className="text-[13px] text-ink-soft">Loading a problem...</p>
+          <ProblemSkeleton />
         ) : !problem ? (
           <PoolEmptyState
             difficulty={difficulty}

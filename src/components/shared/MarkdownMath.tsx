@@ -59,6 +59,15 @@ function Heading2({ children, ...rest }: ComponentPropsWithoutRef<"h2">) {
   );
 }
 
+/**
+ * GFM tables render header cells without a `scope`, which leaves assistive
+ * tech to guess the association and fails the `td-has-header` audit on a
+ * large table. Every markdown header cell is a column header.
+ */
+function TableHeader(props: ComponentPropsWithoutRef<"th">) {
+  return <th scope="col" {...props} />;
+}
+
 export type MarkdownMathProps = {
   children: string;
   /** Extra classes on the wrapper. The `doc-prose` base is always applied. */
@@ -71,7 +80,7 @@ export function MarkdownMath({ children, className }: MarkdownMathProps) {
       <Markdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[[rehypeKatex, REHYPE_KATEX_OPTIONS]]}
-        components={{ h2: Heading2 }}
+        components={{ h2: Heading2, th: TableHeader }}
       >
         {normalizeMathDelimiters(children)}
       </Markdown>

@@ -391,3 +391,57 @@ explanations: they quoted the student's work as `` `t + 45` `` which renders as
 monospace rather than math. Every prompt that injects the document now carries
 the counter-instruction. Measured after the change: 0 backticks, 10 dollar
 delimiters in the same explanation.
+
+### D-033. Attempt history lives under /learn, not /practice
+
+docs/07 asks for "attempt history view per topic" without saying where. It sits
+at `/learn/[topicId]/history` because its job is reflective rather than active:
+it is what the per-model miss counts on a document link to, and reading about
+your own misses belongs beside the models that explain them. Practice stays the
+place you work.
+
+### D-034. Undiagnosed misses are counted against no model
+
+A wrong attempt that produced no confident attribution is excluded from the
+per-model miss counts entirely. Spreading it across models, or attaching it to
+a best guess, would undo the restraint the diagnosis pass deliberately
+exercises (D-003 in spirit, docs/04 on suppression). The topic summary still
+reports the honest totals: "10 attempts, 2 correct, 4 diagnosed to a model"
+makes the gap visible rather than hiding it.
+
+### D-035. Cost readout reports tokens, not dollars
+
+docs/07 asks for a readout "summing AiCallLog tokens by promptName". It stops
+at tokens deliberately: prices change independently of this code, and a
+hardcoded rate would quietly go stale and mislead. The page says so on the
+page rather than only here.
+
+### D-036. No raw SQL, even where it would be convenient
+
+The attempt list needs to know which attempts have a sketch without loading
+the blobs. A raw join was the obvious approach and was written first, then
+replaced: unquoted identifiers fold to lowercase in Postgres, so
+`FROM Attempt` would break the connection-string swap docs/02 keeps the schema
+ready for. A second lean Prisma query costs one round trip and stays portable.
+
+### D-037. Accessibility fixes found by the Lighthouse gate
+
+The audit surfaced two real defects, both mine:
+
+1. **Contrast 2.87:1** on muted topic rows in the tree. `text-ink-soft/70`
+   washed the token down to #93897b on paper, well under the 4.5:1 floor
+   docs/08 sets for every text pair. Muted rows now use the full `--ink-soft`
+   token, which is the pair the design doc actually verified.
+2. **`td-has-header`** on the exemplar's tables. react-markdown emits `<th>`
+   without a `scope`, leaving assistive tech to infer the association across a
+   large table. `MarkdownMath` now renders header cells with `scope="col"`.
+
+After both: Learn 100, Practice 100, against a required floor of 90.
+
+### D-038. The POOL_EMPTY 404 stays, and costs a Best Practices point
+
+Lighthouse flags `errors-in-console` on the Practice page because a browser
+logs every non-2xx fetch, and `GET /api/problems/next` answers an empty pool
+with `404 POOL_EMPTY` exactly as docs/04 specifies. Returning 200 with a null
+body would silence it and deviate from the contract. The status is semantically
+right, so the spec wins and Best Practices sits at 96 rather than 100.
