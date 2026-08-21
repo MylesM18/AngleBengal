@@ -3,6 +3,8 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { usePracticeSession } from "@/lib/practiceSession";
+
 /**
  * What the tutor can currently see, derived from the route rather than held in
  * drawer state. docs/06 §5 requires the context object to be captured at send
@@ -14,18 +16,23 @@ export type ChatContext = {
   tab: "learn" | "practice";
   topicId: string | null;
   problemId: string | null;
+  /** True once the student solved or revealed it: drops the DO NOT REVEAL guard. */
+  revealed: boolean;
 };
 
 export function useChatContext(): ChatContext {
   const pathname = usePathname();
+  const session = usePracticeSession();
   const tab: "learn" | "practice" = pathname.startsWith("/practice") ? "practice" : "learn";
   const match = /^\/(?:learn|practice)\/([^/?#]+)/.exec(pathname);
 
   return {
     tab,
     topicId: match ? decodeURIComponent(match[1]) : null,
-    // Phase 3 supplies this from the practice session's active problem.
-    problemId: null,
+    // Only while actually on the practice tab: a problem left open in another
+    // tab is not what the student is looking at.
+    problemId: tab === "practice" ? session.problemId : null,
+    revealed: session.revealed,
   };
 }
 

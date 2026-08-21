@@ -17,12 +17,14 @@ export type ChatContextInput = {
   tab: "learn" | "practice";
   topicId?: string | null;
   problemId?: string | null;
+  /** Client-reported: the student has solved or revealed this problem. */
+  revealed?: boolean;
 };
 
 export async function buildTutorContext(input: ChatContextInput): Promise<TutorContext> {
   const [docsPart, problemPart] = await Promise.all([
     loadTopicDocs(input.topicId),
-    loadActiveProblem(input.problemId),
+    loadActiveProblem(input.problemId, Boolean(input.revealed)),
   ]);
 
   return {
@@ -59,15 +61,19 @@ async function loadTopicDocs(topicId: string | null | undefined) {
 }
 
 /**
- * Returns the problem only while the attempt is still open. Once the student
- * has answered it correctly the guard is dropped, which is what lets the tutor
- * discuss the full solution afterwards (docs/05 §6).
+ * Loads the problem and marks whether it is still guarded.
  *
- * Phase 3 adds the "revealed via Show solution" case; there is no column for
- * it yet, so an unsolved problem currently stays guarded.
+ * docs/05 §6 drops the DO NOT REVEAL block once the problem is solved or
+ * revealed, NOT the problem itself: the tutor still needs it in context to
+ * discuss the solution afterwards.
+ *
+ * A correct attempt settles "solved" from the database. "Revealed via Show
+ * solution" has no column in the schema, so the client reports it
+ * (DECISIONS.md D-022); either signal drops the guard.
  */
 async function loadActiveProblem(
   problemId: string | null | undefined,
+  clientReportedRevealed: boolean,
 ): Promise<TutorContext["activeProblem"]> {
   if (!problemId) return null;
 
@@ -81,7 +87,7 @@ async function loadActiveProblem(
     where: { problemId, correct: true },
     select: { id: true },
   });
-  if (solved) return null;
+  const revealed = clientReportedRevealed || Boolean(solved);
 
   const lastAttempt = await prisma.attempt.findFirst({
     where: { problemId },
@@ -97,6 +103,7 @@ async function loadActiveProblem(
   return {
     statementMd: problem.statementMd,
     solutionMd: problem.solutionMd,
+    revealed,
     lastAttempt: lastAttempt
       ? {
           submittedAnswer: lastAttempt.submittedAnswer,

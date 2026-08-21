@@ -1,7 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PracticePanel } from "@/components/practice/PracticePanel";
+import { poolCounts } from "@/lib/problems/serve";
 import { getTopicDetail } from "@/lib/topics";
+
+export const dynamic = "force-dynamic";
 
 export default async function PracticeTopicPage({
   params,
@@ -9,27 +12,27 @@ export default async function PracticeTopicPage({
   params: Promise<{ topicId: string }>;
 }) {
   const { topicId } = await params;
-  const topic = await getTopicDetail(topicId);
+  const [topic, counts] = await Promise.all([
+    getTopicDetail(topicId),
+    poolCounts(topicId),
+  ]);
   if (!topic) notFound();
 
   return (
-    <div className="mx-auto max-w-[640px] px-8 py-16">
-      <p className="mb-3 text-[12px] text-ink-soft">{topic.path.join("  ›  ")}</p>
-      <h1 className="font-expanded text-[30px] leading-tight text-ink">{topic.name}</h1>
+    <div className="flex h-full min-h-0">
+      <div className="flex min-w-0 flex-[45] flex-col border-r border-ink-faint/40">
+        <PracticePanel topicId={topic.id} topicPath={topic.path} initialCounts={counts} />
+      </div>
 
-      <div className="stock-textured mt-6 rounded-card bg-kraft p-6">
-        <p className="font-expanded mb-1 text-[16px] text-ink">Not built yet</p>
-        <p className="max-w-[50ch] text-[13.5px] leading-relaxed text-ink">
-          Problem generation, verification and diagnosis arrive in Phase 3. This topic has{" "}
-          {topic.verifiedProblemCount} verified{" "}
-          {topic.verifiedProblemCount === 1 ? "problem" : "problems"} so far.
-        </p>
-        <Link
-          href={`/learn/${topic.id}`}
-          className="mt-4 inline-block rounded-input border-[1.5px] border-ink bg-paper-0 px-3 py-1.5 text-[13px] font-semibold text-ink"
-        >
-          Back to the models
-        </Link>
+      {/* The sketchpad lands here in Phase 4 (docs/06 §4). */}
+      <div className="stock-textured hidden min-w-0 flex-[55] items-center justify-center bg-desk p-8 lg:flex">
+        <div className="max-w-[34ch] text-center">
+          <p className="font-expanded mb-1 text-[15px] text-ink">Sketchpad</p>
+          <p className="text-[12.5px] leading-relaxed text-ink-soft">
+            Graph paper, pen and eraser, and handwriting cleanup arrive in Phase 4. Until
+            then, work on paper and type the answer.
+          </p>
+        </div>
       </div>
     </div>
   );

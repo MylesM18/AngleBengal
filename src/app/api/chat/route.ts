@@ -32,6 +32,7 @@ const bodySchema = z.object({
     topicId: z.string().nullish(),
     problemId: z.string().nullish(),
     lastAttemptId: z.string().nullish(),
+    revealed: z.boolean().nullish(),
   }),
 });
 
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
       tab: body.context.tab,
       topicId: body.context.topicId,
       problemId: body.context.problemId,
+      revealed: Boolean(body.context.revealed),
     });
 
     const encoder = new TextEncoder();

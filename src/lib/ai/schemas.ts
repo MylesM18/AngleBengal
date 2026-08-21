@@ -15,6 +15,8 @@
 
 import { z } from "zod";
 
+import { answerSchema } from "@/lib/math/answer";
+
 /** docs/05 §3: topic classification. */
 export const classifierSchema = z.object({
   isMath: z.boolean(),
@@ -37,11 +39,82 @@ export function classifierResultIsCoherent(result: ClassifierResult): boolean {
   return hasExisting !== hasNew;
 }
 
+/**
+ * Rewrites `oneOf` to `anyOf` in place, recursively.
+ *
+ * Zod emits `oneOf` for a discriminated union, but OpenAI strict mode accepts
+ * only `anyOf`. The two mean different things in JSON Schema generally (`oneOf`
+ * demands exactly one match), but for a discriminated union they coincide: the
+ * discriminant makes at most one branch matchable anyway.
+ */
+function oneOfToAnyOf(node: unknown): void {
+  if (Array.isArray(node)) {
+    for (const item of node) oneOfToAnyOf(item);
+    return;
+  }
+  if (!node || typeof node !== "object") return;
+
+  const record = node as Record<string, unknown>;
+  if (Array.isArray(record.oneOf)) {
+    record.anyOf = record.oneOf;
+    delete record.oneOf;
+  }
+  for (const value of Object.values(record)) oneOfToAnyOf(value);
+}
+
 /** JSON Schema for the model, derived from the zod schema above. */
 export function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {
   const generated = z.toJSONSchema(schema) as Record<string, unknown>;
   // The response_format wrapper carries its own $schema; leaving this in is
   // harmless but noisy.
   delete generated.$schema;
+  oneOfToAnyOf(generated);
   return generated;
 }
+
+/* ------------------------------------------------------------------ */
+/* Problems and diagnosis (docs/05 §4, §5)                             */
+/* ------------------------------------------------------------------ */
+
+/** docs/05 §4.1: a batch of generated problems. */
+export const problemBatchSchema = z.object({
+  problems: z.array(
+    z.object({
+      statementMd: z.string(),
+      answer: answerSchema,
+      solutionMd: z.string(),
+      /** 1-based model numbers from the topic's document. */
+      modelTags: z.array(z.number().int()),
+      difficulty: z.number().int().min(1).max(5),
+    }),
+  ),
+});
+
+/** docs/05 §4.2: the verifier solving the statement cold. */
+export const verifierSchema = z.object({
+  solvable: z.boolean(),
+  reasonIfNot: z.string().nullable(),
+  answer: answerSchema.nullable(),
+});
+
+/** docs/05 §4.3 fallback when normalization cannot settle equivalence. */
+export const equivalenceSchema = z.object({
+  equivalent: z.boolean(),
+});
+
+/** docs/05 §5: which model failed. */
+export const diagnosticSchema = z.object({
+  /** 0 with title "Arithmetic slip" means the setup was right. */
+  failedModelNumber: z.number().int(),
+  failedModelTitle: z.string(),
+  symptom: z.string(),
+  explanationMd: z.string(),
+  confidence: z.number().min(0).max(1),
+});
+
+export type ProblemBatch = z.infer<typeof problemBatchSchema>;
+export type VerifierResult = z.infer<typeof verifierSchema>;
+export type DiagnosticResult = z.infer<typeof diagnosticSchema>;
+
+/** Below this the app suppresses the attribution rather than guess (docs/04). */
+export const MIN_DIAGNOSIS_CONFIDENCE = 0.4;

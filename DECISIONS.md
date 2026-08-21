@@ -270,3 +270,63 @@ A `ChatSession` row is created before the first turn is persisted, so a request
 that fails before the model responds can leave an empty shell. The sessions
 list filters to sessions with at least one message rather than showing untitled
 empty rows the student cannot open usefully.
+
+### D-021. GET /api/problems/[id]/solution exists
+
+docs/04 returns the solution only alongside an attempt, but docs/06 §3 has a
+"Show solution" action that does not submit one. Rather than ship every
+solution to the browser with the problem (where it would sit in memory next to
+the unanswered question), the solution is fetched on demand when the student
+confirms the dialog that already tells them it counts as unsolved.
+
+### D-022. "Revealed" is client-reported, not a schema column
+
+docs/05 §6 drops the DO NOT REVEAL guard once a problem is "answered correctly
+or revealed via Show solution". A correct answer is recoverable from `Attempt`,
+but a reveal writes nothing, and docs/03 has no column for it.
+
+Adding one would mean a migration to record a purely presentational fact. The
+client already knows, so the chat context carries a `revealed` boolean and the
+server honours it. A correct attempt is still detected server-side regardless,
+so the guard cannot be bypassed by a client that simply omits the flag.
+
+Worth revisiting in Phase 5 if reveals need to appear in attempt history.
+
+### D-023. GET /api/problems/pool exists
+
+The difficulty selector shows which levels have problems ready. Nothing in
+docs/04 returns that, and the alternative was five speculative `/next` calls on
+every render. One grouped count query is cheaper and does not consume problems.
+
+### D-024. The DO NOT REVEAL guard drops, but the problem stays
+
+Caught in testing. The first implementation dropped the whole problem from the
+tutor's context once revealed, so asking about a solved problem got "Please
+paste the problem" instead of a discussion.
+
+docs/05 §6 says the *block* is dropped, not the problem. The context now always
+includes the problem and carries a `revealed` flag; the prompt emits either the
+guarded block or an unguarded one that explicitly invites discussing the whole
+solution. Verified in both directions: guarded refuses and offers the next
+step, unguarded gives the answer.
+
+### D-025. LaTeX delimiters are normalized at the render boundary
+
+Caught in testing. remark-math parses `$...$` and `$$...$$` only, but the tutor
+sometimes emits `\(...\)` and `\[...\]`. Those rendered as literal text, so the
+student saw "(x^2 + 1)" where an equation belonged, violating non-negotiable 5.
+
+Prompt instructions alone cannot guarantee this, so `normalizeMathDelimiters`
+rewrites the paren and bracket forms to dollar forms inside `MarkdownMath`,
+skipping code spans and fenced blocks. Applying it there covers every surface
+at once: model docs, problem statements, solutions, diagnoses and chat.
+Measured on a probe message: 2 of 4 expressions rendered before, 4 of 4 after.
+
+### D-026. Practice state crosses the tree via a module store, not Zustand
+
+The tutor drawer and the practice panel are siblings under the app shell, so
+the active problem has to reach the drawer somehow. CLAUDE.md reserves Zustand
+for the Phase 4 sketchpad, and a context provider would mean wrapping the shell
+for one value. `src/lib/practiceSession.ts` is a module-level store read
+through `useSyncExternalStore`: no dependency, no provider, and it serves a
+stable empty snapshot on the server.

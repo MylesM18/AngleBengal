@@ -5,6 +5,7 @@ import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 
+import { normalizeMathDelimiters } from "@/lib/mathDelimiters";
 import { anchorForModel } from "@/lib/modelIndex";
 
 /**
@@ -14,6 +15,10 @@ import { anchorForModel } from "@/lib/modelIndex";
  * Bad LaTeX must never crash a page, so KaTeX runs with `throwOnError: false`
  * and renders the offending source in a subtle mono style instead
  * (docs/06 §7).
+ *
+ * Delimiters are normalized first: remark-math only understands `$`, and a
+ * model that emits `\(...\)` would otherwise show the student raw LaTeX,
+ * which non-negotiable 5 forbids.
  */
 
 const REHYPE_KATEX_OPTIONS = {
@@ -68,7 +73,7 @@ export function MarkdownMath({ children, className }: MarkdownMathProps) {
         rehypePlugins={[[rehypeKatex, REHYPE_KATEX_OPTIONS]]}
         components={{ h2: Heading2 }}
       >
-        {children}
+        {normalizeMathDelimiters(children)}
       </Markdown>
     </div>
   );

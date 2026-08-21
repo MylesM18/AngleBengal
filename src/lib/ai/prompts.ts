@@ -207,10 +207,12 @@ export type TutorContext = {
   topicPath: string[] | null;
   /** Model docs for the current topic, already token-budgeted. */
   docs: { title: string; contentMd: string }[];
-  /** Present only while an attempt is open (Phase 3 wires this up). */
+  /** The problem the student is looking at, if any. */
   activeProblem: {
     statementMd: string;
     solutionMd: string;
+    /** Solved or revealed: the tutor may discuss the whole solution. */
+    revealed: boolean;
     lastAttempt: {
       submittedAnswer: string;
       modelNumber: number | null;
@@ -247,8 +249,18 @@ No em-dashes. No emoji.`,
   ];
 
   if (context.activeProblem) {
-    const { statementMd, solutionMd, lastAttempt } = context.activeProblem;
-    let block = `ACTIVE PRACTICE PROBLEM (the student is mid-attempt):
+    const { statementMd, solutionMd, revealed, lastAttempt } = context.activeProblem;
+
+    // docs/05 §6: once the problem is solved or revealed, the DO NOT REVEAL
+    // block is dropped. The problem itself stays in context, or the tutor
+    // would have nothing to discuss.
+    let block = revealed
+      ? `PRACTICE PROBLEM (the student has already solved or revealed this one):
+${statementMd}
+SOLUTION: ${solutionMd}
+They have seen the solution, so you may discuss it fully: walk through it,
+explain any step, and name the models that fire at each stage.`
+      : `ACTIVE PRACTICE PROBLEM (the student is mid-attempt):
 ${statementMd}
 SOLUTION (for your eyes only): ${solutionMd}
 The student has not solved this yet. DO NOT reveal the final answer or the
@@ -289,3 +301,158 @@ example.`,
 export const TITLE_SYSTEM = `Write a title of at most six words for a math tutoring conversation that
 opens with the message you are given. Return the title only: no quotes, no
 trailing period, no em-dashes. Use plain words the student would recognize.`;
+
+/* ------------------------------------------------------------------ */
+/* PROBLEM GENERATION and VERIFICATION (docs/05 §4)                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * docs/05 §4.1. The topic's model document is supplied so problems can be
+ * tagged to the models they exercise, which is what makes diagnosis possible
+ * later.
+ *
+ * Carries the same LaTeX counter-instruction as the doc generator (D-009):
+ * the model doc injected below may write math as code spans, and problem
+ * statements must not.
+ */
+export function problemGeneratorSystem(
+  doc: { title: string; contentMd: string },
+  count: number,
+  difficulty: number,
+): string {
+  return `You are writing practice problems for a specific mathematics topic, targeted
+at specific mental models the student is training. You will receive the
+topic's mental model document.
+
+Write ${count} problems at difficulty ${difficulty} on a 1-5 scale, where
+1 = single direct application of one model, 3 = requires 2-3 models and a
+translation step, 5 = a problem that would trap someone who memorized
+procedures (include the topic's classic traps at 4-5).
+
+For each problem:
+- statementMd: the full problem in markdown/LaTeX. Word problems use concrete
+  named people/objects and realistic numbers. Never reference the models in
+  the statement.
+- answer: {type: "numeric", value, unit, tolerance} preferred wherever the
+  answer is a number. Use "expression" only when the asked-for object is an
+  equation or expression. Use "multi" with named parts when two values are
+  asked (label parts clearly, e.g. "boatSpeed", "current").
+- solutionMd: a full worked solution that explicitly names which mental
+  model (by number and name) fires at each step.
+- modelTags: the model numbers this problem exercises (1-based, from the
+  provided document).
+- Recompute all arithmetic before finalizing. An arithmetic slip makes the
+  problem worthless.
+
+Vary surface features across the batch (contexts, number ranges, which
+quantity is unknown) so no two problems are template-identical. No em-dashes.
+
+ANSWER FIELD RULES:
+- "unit" and "tolerance" must always be present. Use null when not applicable.
+- For "multi", every part needs name (machine name, camelCase), label (shown
+  to the student), value, unit, tolerance.
+- The answer is a single final value, not a restatement of the question.
+
+NOTATION: write all mathematics as LaTeX delimited by $ or $$, in the problem
+statement and the solution alike. The document below may write formulas as
+markdown code spans; do not copy that habit.
+
+THE TOPIC'S MENTAL MODEL DOCUMENT:
+
+--- ${doc.title} ---
+${doc.contentMd}`;
+}
+
+export function problemGeneratorUser(topicPath: string[], count: number, difficulty: number): string {
+  return `Topic: ${topicPath[topicPath.length - 1]}
+Taxonomy path: ${topicPath.join(" > ")}
+Write ${count} problems at difficulty ${difficulty}.`;
+}
+
+/**
+ * docs/05 §4.2. Deliberately receives ONLY the statement: the verifier must
+ * never see the generator's answer or solution, because independence is the
+ * entire point of the pass (docs/05 §1).
+ */
+export const VERIFIER_SYSTEM = `You are a careful mathematician solving a problem cold. You receive ONLY the
+problem statement. Solve it completely, showing your reasoning, then state
+your final answer in the requested JSON shape. If the problem is ambiguous,
+under-specified, or has no consistent answer, set solvable to false and
+explain why in one sentence.
+
+Answer shape rules:
+- Use {type:"numeric", value, unit, tolerance} for a numeric answer. Set
+  tolerance to null unless the problem demands a specific precision.
+- Use {type:"expression", value} only when the problem asks for an equation
+  or expression rather than a value.
+- Use {type:"multi", parts:[{name,label,value,unit,tolerance}]} when the
+  problem asks for two or more named values.
+- "unit" and "tolerance" must always be present; use null when not applicable.
+- When solvable is false, set answer to null.`;
+
+export function verifierUser(statementMd: string): string {
+  return `Problem:\n\n${statementMd}`;
+}
+
+/** docs/05 §4.3 fallback when normalization cannot settle equivalence. */
+export const EQUIVALENCE_SYSTEM = `You judge whether two mathematical expressions or equations are equivalent.
+Consider algebraic equivalence, not textual similarity: "2x = 4" and "x = 2"
+are equivalent. Return only the boolean.`;
+
+export function equivalenceUser(a: string, b: string): string {
+  return `Expression A: ${a}\nExpression B: ${b}\nAre they mathematically equivalent?`;
+}
+
+/* ------------------------------------------------------------------ */
+/* DIAGNOSTIC (docs/05 §5)                                             */
+/* ------------------------------------------------------------------ */
+
+export const DIAGNOSTIC_SYSTEM = `You are diagnosing WHY a student got a math problem wrong, using the mental
+model framework they are learning. You receive: the problem, the correct
+solution, the student's submitted answer, optionally a transcription of
+their handwritten work, and the topic's mental model document including its
+diagnostic table.
+
+Determine which single mental model most likely failed. Use the document's
+own diagnostic table first: match the observable symptom. The handwritten
+work, when present, is your best evidence; the wrong answer's specific value
+is second best (e.g., off by exactly 60 implies a unit conversion failure).
+
+Return:
+- failedModelNumber, failedModelTitle: from the document
+- symptom: one line, in the style of the diagnostic table, describing what
+  observably went wrong
+- explanationMd: 2-5 sentences to the student. Name the model. Show the
+  specific moment their work departed from it. Do not re-teach the whole
+  model; point at it. Warm, direct, zero condescension. No em-dashes.
+- confidence: 0-1. Below 0.4 means you are guessing; be honest, the app
+  suppresses low-confidence diagnoses rather than mislead.
+
+If the error is purely arithmetic (right setup, slipped a computation), say
+so: use failedModelNumber 0, failedModelTitle "Arithmetic slip".`;
+
+export function diagnosticUser(input: {
+  statementMd: string;
+  solutionMd: string;
+  submittedAnswer: string;
+  ocrText: string | null;
+  doc: { title: string; contentMd: string } | null;
+}): string {
+  const parts = [
+    `PROBLEM:\n${input.statementMd}`,
+    `CORRECT SOLUTION:\n${input.solutionMd}`,
+    `STUDENT'S SUBMITTED ANSWER:\n${input.submittedAnswer}`,
+  ];
+
+  if (input.ocrText) {
+    parts.push(`TRANSCRIPTION OF THEIR HANDWRITTEN WORK:\n${input.ocrText}`);
+  }
+
+  parts.push(
+    input.doc
+      ? `THE TOPIC'S MENTAL MODEL DOCUMENT:\n\n--- ${input.doc.title} ---\n${input.doc.contentMd}`
+      : "No mental model document is available for this topic. If you cannot attribute the error to a specific named model, return confidence below 0.4.",
+  );
+
+  return parts.join("\n\n");
+}
