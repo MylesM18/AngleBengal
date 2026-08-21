@@ -2023,3 +2023,211 @@ git commit -m "Restyle the attempt history on a hairline sheet with icons and ch
 `git status --short` before the commit lists exactly that file as ` M`.
 
 ---
+
+### Task 8: Stage B acceptance passes (spec 6b, 6c, 7)
+
+**Files:**
+- Read only (unless a pass fails): the thirteen B files: `src/components/shell/TopBar.tsx src/components/shell/AppShell.tsx src/components/chat/ChatDrawer.tsx "src/app/(tabs)/settings/page.tsx" src/lib/topics.ts src/components/learn/TopicCoverCard.tsx src/components/learn/GenerateTopicInput.tsx "src/app/(tabs)/learn/[topicId]/layout.tsx" "src/app/(tabs)/learn/page.tsx" src/components/learn/TopicRail.tsx src/components/learn/DocCard.tsx "src/app/(tabs)/learn/[topicId]/page.tsx" "src/app/(tabs)/learn/[topicId]/history/page.tsx"`
+- Test: none (no runner, D-054). The passes below are the acceptance check for the whole stage.
+
+**Interfaces:**
+- Consumes: the six seed URLs from "How verification works" (`/learn`, `/learn/<drtId>`, `/learn/<drtId>?doc=<docId>`, `/learn/<drtId>/history`, `/settings`, `/practice/<drtId>`); the Tutor chip `button[aria-controls="tutor-drawer"]` (Task 1); the drawer `#tutor-drawer` (Task 2); the rail's `[role="tree"]` and its `[data-topic-link]` links with the collapsed branches under `[inert]` (Task 5).
+- Produces: nothing. This task has no commit of its own. A failed pass produces one fix commit in the owning file (Step 8) with a message naming the task that owns it.
+
+Behaviour contract (read before starting): every pass is a statement about the running app, checked with `javascript_tool`, `read_page`, `computer` screenshots and `read_console_messages`, not a statement about the source. Record each result (pass or fail, with the expression and its value) in the final message of this task; the reviewer reads that list, not the screenshots.
+
+- [ ] **Step 1: Preflight and ids**
+
+```bash
+git status --short
+git log --oneline -8
+npm run typecheck && npm run lint
+```
+
+`git status --short` prints nothing; the log shows the seven task commits of Tasks 1 to 7 (plus any fix commits) on top of stage A; both gates print no errors. In the dev preview (launch config `anglebengal-dev`, http://localhost:3010) run `resize_window` preset `desktop`, then `resize_window` with `width: 1440, height: 900`. Open `/learn`, `read_page`, and copy the DRT cover card's `href` (`/learn/<drtId>`). Open it, `read_page`, and copy the exemplar doc card's `href` (`/learn/<drtId>?doc=<docId>`). Keep both ids for every step below.
+
+- [ ] **Step 2: Render pass, drawer closed (spec 6b)**
+
+Open each URL in turn. On every one: `read_console_messages` with `onlyErrors: true` is clean, a `computer` screenshot shows the Swatch Book paper on the desk with no raw LaTeX, and `document.querySelector('main').getBoundingClientRect().width === window.innerWidth` is `true` (the drawer no longer reserves width). Then the page-specific checks:
+
+- `/learn`: `document.querySelector('h1').textContent.trim()` is "Learn"; `document.querySelector('[role="tree"]')` is `null` (the index has no rail, spec 3a); `document.querySelectorAll('main a[href^="/learn/"]:not([href*="?doc="])').length` equals the number of root rows the rail shows on `/learn/<drtId>` (`document.querySelectorAll('[role="tree"] > *').length` there); the generate field exists (`document.querySelector('form input')` is not `null`); the Recent sheet lists at most 8 links with `?doc=` (`document.querySelectorAll('main a[href*="?doc="]').length <= 8`).
+- `/learn/<drtId>`: `document.querySelector('[role="tree"]')` is not `null`; `document.querySelector('h1').textContent.trim()` equals the DRT topic name shown in the rail's current row; exactly one practice affordance exists, and because the seed gives DRT 12 verified problems it is the link: `document.querySelectorAll('a[href="/practice/<drtId>"], span[aria-disabled="true"]').length` is `1` and `document.querySelector('a[href="/practice/<drtId>"]')` is not `null`; the doc grid holds the exemplar (`document.querySelector('a[href*="?doc="]')` is not `null`); the "arrives in Phase 1" copy is gone (`document.body.textContent.includes('arrives in Phase 1')` is `false`).
+- `/learn/<drtId>?doc=<docId>`: the rail is still present (`[role="tree"]` is not `null`); the reader renders math (`document.querySelector('.katex')` is not `null`); the page column scrolls, not the window (`getComputedStyle(document.querySelector('[role="tree"]').closest('div').nextElementSibling).overflowY` is `"auto"`). Nothing else is asserted about the reader (stage D).
+- `/learn/<drtId>/history`: `document.querySelector('h1').textContent.trim()` is "Attempt history"; `document.querySelectorAll('[class*="border-l-"]').length` is `0`; either `section[aria-label="Nothing here yet"]` exists or `ul.divide-y > li` has at least one row.
+- `/settings`: `document.querySelector('h1')` is not `null`; either the usage `table` exists or the `EmptyState` `section[aria-label]` does; `document.querySelectorAll('[class*="stock-textured"]').length` is `0`.
+- `/practice/<drtId>`: the page renders (the problem panel or its loading state and, once a problem is shown, the sketchpad `canvas`); no layout shift from the shell change (`document.querySelector('main').getBoundingClientRect().width === window.innerWidth`). Nothing about the practice surface is restyled here (stage C); the pass is "still renders, console clean".
+
+- [ ] **Step 3: Drawer open pass (spec 2b, 2c, 6b)**
+
+On `/learn/<drtId>` and on `/practice/<drtId>`:
+
+1. `const w0 = document.querySelector('main').getBoundingClientRect().width;` (keep it).
+2. `computer` click on the Tutor chip (`button[aria-controls="tutor-drawer"]`). Then: `document.querySelector('button[aria-controls="tutor-drawer"]').getAttribute('aria-expanded')` is `"true"`; `document.querySelector('#tutor-drawer').getAttribute('aria-hidden')` is `"false"` or `null`; `document.querySelector('#tutor-drawer').hasAttribute('inert')` is `false`; `Math.round(document.querySelector('#tutor-drawer').getBoundingClientRect().right) === window.innerWidth` is `true`; `document.querySelector('#tutor-drawer').getBoundingClientRect().width <= 420` is `true`; `document.querySelector('main').getBoundingClientRect().width === w0` is `true` (overlay, the page does not reflow); `document.activeElement.closest('#tutor-drawer')` is not `null` (focus moved into the drawer).
+3. `computer` key `Escape`. Then: `aria-expanded` is `"false"`; `document.querySelector('#tutor-drawer').hasAttribute('inert')` is `true`; `document.activeElement === document.querySelector('button[aria-controls="tutor-drawer"]')` is `true` (focus returned to the Tutor chip, spec 2b).
+4. Open it again and Tab past the drawer's last control: focus leaves the drawer (no trap): `document.activeElement.closest('#tutor-drawer')` becomes `null` after enough Tabs. Close with Escape.
+5. `read_console_messages` with `onlyErrors: true` is clean after the open/close cycle.
+
+- [ ] **Step 4: Reduced motion (spec 6c)**
+
+Turn on reduced motion (DevTools rendering emulation `prefers-reduced-motion: reduce` where the browser tools expose it; otherwise macOS System Settings, Accessibility, Display, Reduce motion) and reload `/learn/<drtId>`. Then: `matchMedia('(prefers-reduced-motion: reduce)').matches` is `true`; the rail expand wrapper does not animate (pick a collapsed root row, read `getComputedStyle(row.nextElementSibling).transitionDuration`, expected `"0s"`); `getComputedStyle(document.querySelector('#tutor-drawer')).transitionDuration` is `"0s"`; on `/learn` the main sheet's `animationDuration` is `"0s"` or its `animationName` is `"none"` (`getComputedStyle(document.querySelector('main .animate-enter-sheet') || document.querySelector('main'))`). If any of these is not `0s`, the fault is the global reduced-motion rule stage A owns (`grep -n "prefers-reduced-motion" src/app/globals.css`): record it in the task's final message as a stage A follow-up; do not edit `globals.css` here. Turn reduced motion back off afterwards and reload.
+
+- [ ] **Step 5: Keyboard pass (spec 6b, 6c)**
+
+On `/learn/<drtId>` after a fresh load, press Tab from the top of the document with `computer` key presses and read `document.activeElement` after each:
+
+- The nav chips come first and the current one is marked: `document.querySelector('a[aria-current="page"]').textContent.trim()` is "Learn"; each chip shows the focus ring (screenshot).
+- The Tutor chip is reachable and Space/Enter opens the drawer (then Escape closes it and focus returns, Step 3).
+- In the rail: the back chip, then the search field (`document.activeElement.type` is `"search"`), then the tree. Arrow Down and Arrow Up move between visible rows; Arrow Right on a collapsed root sets its `aria-expanded` to `"true"` and Arrow Left sets it back to `"false"`.
+- Reachability of topic links: every visible link is focusable and no hidden one is:
+
+```js
+(() => {
+  const all = [...document.querySelectorAll('[data-topic-link]')];
+  const shown = all.filter(a => a.closest('[inert]') === null);
+  const hidden = all.filter(a => a.closest('[inert]') !== null);
+  const okShown = shown.every(a => { a.focus(); return document.activeElement === a; });
+  const okHidden = hidden.every(a => { a.focus(); return document.activeElement !== a; });
+  return { shown: shown.length, hidden: hidden.length, okShown, okHidden };
+})()
+```
+
+`okShown` and `okHidden` are both `true`; `shown` is at least 1. Tabbing through the whole rail, `document.activeElement.closest('[inert]')` is `null` at every stop.
+
+- Rail search: `const n0 = [...document.querySelectorAll('[data-topic-link]')].filter(a => !a.closest('[inert]')).length;` then type the first word of the DRT name into the search field; the same count is smaller than `n0` and the DRT link is still among the shown ones; clear the field (select all, Backspace): the count equals `n0` again and the roots return to their default expansion (only the root containing the current topic has `aria-expanded="true"`).
+- `read_console_messages` with `onlyErrors: true` is clean.
+
+- [ ] **Step 6: Contrast spot check (spec 7)**
+
+On `/learn/<drtId>` run:
+
+```js
+(() => {
+  const lum = (c) => { const [r,g,b] = c.match(/\d+(\.\d+)?/g).slice(0,3).map(Number).map(v => { v/=255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); }); return 0.2126*r + 0.7152*g + 0.0722*b; };
+  const ratio = (a, b) => { const [l1, l2] = [lum(a), lum(b)].sort((x, y) => y - x); return (l1 + 0.05) / (l2 + 0.05); };
+  const meta = document.querySelector('main .text-meta');
+  const sheet = meta.closest('[class*="bg-paper-1"]') || meta.closest('main');
+  return { meta: ratio(getComputedStyle(meta).color, getComputedStyle(sheet).backgroundColor), body: ratio(getComputedStyle(document.querySelector('h1')).color, getComputedStyle(sheet).backgroundColor) };
+})()
+```
+
+`meta` (ink-soft on paper-1) is at least `4.5`; `body` (ink on paper-1) is at least `7`. If `meta` is below 4.5 the colour tokens are at fault (spec 7 freezes them), so record the number for the owner and do not change a token.
+
+- [ ] **Step 7: Banned-pattern grep over every B file, and the texture audit**
+
+```bash
+grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|stock-textured|border-l-" src/components/shell/TopBar.tsx src/components/shell/AppShell.tsx src/components/chat/ChatDrawer.tsx "src/app/(tabs)/settings/page.tsx" src/lib/topics.ts src/components/learn/TopicCoverCard.tsx src/components/learn/GenerateTopicInput.tsx "src/app/(tabs)/learn/[topicId]/layout.tsx" "src/app/(tabs)/learn/page.tsx" src/components/learn/TopicRail.tsx src/components/learn/DocCard.tsx "src/app/(tabs)/learn/[topicId]/page.tsx" "src/app/(tabs)/learn/[topicId]/history/page.tsx"
+grep -n $'\xe2\x80\x94' src/components/shell/TopBar.tsx src/components/shell/AppShell.tsx src/components/chat/ChatDrawer.tsx "src/app/(tabs)/settings/page.tsx" src/lib/topics.ts src/components/learn/TopicCoverCard.tsx src/components/learn/GenerateTopicInput.tsx "src/app/(tabs)/learn/[topicId]/layout.tsx" "src/app/(tabs)/learn/page.tsx" src/components/learn/TopicRail.tsx src/components/learn/DocCard.tsx "src/app/(tabs)/learn/[topicId]/page.tsx" "src/app/(tabs)/learn/[topicId]/history/page.tsx"
+grep -rn "stock-textured" src
+```
+
+The first two print nothing. The third lists only: the desk (`src/app/layout.tsx`, the body), the kraft chips, toasts and the kraft `Sheet` tone inside `src/components/ui/`, and the doc reader's meta strip (the `?doc=` reader component, a stage D file). Any other line is a stage B regression: fix it in that file (Step 8).
+
+- [ ] **Step 8: Fix protocol (only if a pass failed)**
+
+Fix in the owning file: Task 1 owns `TopBar.tsx`/`AppShell.tsx`; Task 2 `ChatDrawer.tsx`/`AppShell.tsx`; Task 3 `settings/page.tsx`; Task 4 `topics.ts`, `TopicCoverCard.tsx`, `GenerateTopicInput.tsx`, `[topicId]/layout.tsx`, `learn/page.tsx`; Task 5 `TopicRail.tsx`; Task 6 `DocCard.tsx`, `[topicId]/page.tsx`, `topics.ts`; Task 7 `history/page.tsx`. Then `npm run typecheck && npm run lint`, re-run the failed pass and Step 7, and commit by explicit path:
+
+```bash
+GIT_LITERAL_PATHSPECS=1 git add <the owning file(s)>
+git commit -m "Fix <what the pass found> (stage B, Task <N> follow-up)"
+```
+
+If nothing failed, this task ends with no commit and `git status --short` empty.
+
+---
+
+### Task 9: D-055 and the build gate
+
+**Files:**
+- Modify: `DECISIONS.md` (append one entry at the end)
+
+**Interfaces:**
+- Consumes: the decisions Tasks 4, 5 and 6 implemented (rail under `[topicId]/layout.tsx`, `learn/layout.tsx` deleted, Recent = 8, substring search, `git mv` rename, `getDescendantCounts()` with React `cache`, disabled Practice button).
+- Produces: the D-055 entry later plans cite; stage B is complete at the end of this task.
+
+- [ ] **Step 1: Look at the tail of the file**
+
+```bash
+tail -6 DECISIONS.md
+grep -c "D-055" DECISIONS.md
+```
+
+The count is `0` (if it is not, D-055 already exists; stop and compare its text with the paragraph below instead of appending). Note the form of the last entry (a plain `D-0nn.` paragraph or a heading per decision) so the new entry matches it.
+
+- [ ] **Step 2: Append D-055 verbatim**
+
+Append exactly this paragraph, preceded by one blank line, without reflowing it (if the existing entries carry a heading per decision, put the matching heading with the number D-055 above the paragraph and keep the paragraph itself unchanged):
+
+```bash
+cat >> DECISIONS.md <<'EOF'
+
+D-055. Stage B choices: the topic rail lives in `src/app/(tabs)/learn/[topicId]/layout.tsx` (so it also frames the history page) and `learn/layout.tsx` is deleted, since the index has no rail (spec 3a); the index Recent list shows the 8 most recent docs; rail search is a case-insensitive name substring match that keeps ancestors and auto-expands matching roots; `TopicTree` is renamed `TopicRail` with `git mv` to keep its history; descendant counts come from one memoized `getDescendantCounts()` (React `cache`) and the `/learn/[topicId]` Practice button disables when no verified problem exists beneath the topic.
+EOF
+tail -3 DECISIONS.md | grep -c $'\xe2\x80\x94'
+```
+
+The count is `0`.
+
+- [ ] **Step 3: The full gate, including the production build**
+
+```bash
+npm run typecheck && npm run lint && npm run build
+```
+
+All three finish without errors; the build's route list includes `/learn`, `/learn/[topicId]`, `/learn/[topicId]/history`, `/settings` and `/practice/[topicId]`, and `/learn` no longer has a `layout.tsx` segment of its own (`ls "src/app/(tabs)/learn"` lists `page.tsx` and `[topicId]` only).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add DECISIONS.md
+git status --short
+git commit -m "Record the stage B decisions as D-055 (stage B)"
+```
+
+`git status --short` before the commit lists exactly `DECISIONS.md` as ` M`.
+
+- [ ] **Step 5: Stage B done check**
+
+```bash
+git log --oneline <stageA-head>..HEAD
+git status --short
+```
+
+Replace `<stageA-head>` with the last stage A commit on `main`. The log shows the eight task commits (Tasks 1 to 7 and this one) plus any Task 8 fix commits, nothing else; the status is empty. Stage B is complete; stage C's plan follows.
+
+---
+
+## Self-review against the spec
+
+**1. Spec coverage** (sections the header names as this stage's contract):
+
+| Spec | Requirement | Task |
+|---|---|---|
+| 2a | 48px `paper-1` `TopBar`: mark + wordmark, `ChipLink variant="nav"` with `aria-current`, Tutor chip with `aria-expanded` / `aria-controls` | Task 1 |
+| 2b | Drawer is an overlay; `main` keeps its width; focus moves in on open and returns to the Tutor chip on close; Escape closes | Task 2 (AppShell `closeChat`), verified in Task 8 Step 3 |
+| 2c | Drawer positioning and focus effect without the Tab trap; `inert` / `aria-hidden` kept | Task 2 |
+| 2d | Settings on one `Sheet paper-1`, `divide-hairline` usage rows, "Models in use", `EmptyState` when nothing is logged | Task 3 |
+| 2e | Shell layout split: `TopBar.tsx` chrome, `AppShell.tsx` layout and drawer state | Task 1 |
+| 3a | Learn index without a rail: `text-display` title, intro, `GenerateTopicInput`, cover grid of roots in seed order, Recent (8), rail-list fallback past 12 roots | Task 4 |
+| 3b | `TopicRail` (320px, sticky, `hidden lg:flex`) under `learn/[topicId]/layout.tsx`: back chip, search, `meta-caps` roots with accent tab and chevron, child rows with counts, current topic on `paper-0`, `role="tree"` + arrows, animated expand | Task 4 (frame, counts) + Task 5 (rail) |
+| 3c | Topic page: `text-h1` title, descendant counts, Practice `ButtonLink` or disabled span, `DocCard` on primitives, Subtopics `TopicCoverCard` grid, prefilled `EmptyState`, no "arrives in Phase 1" box | Task 4 (`getDescendantCounts`, `TopicCoverCard`) + Task 6 |
+| 3e | History on one `Sheet paper-1` of `divide-hairline` rows, `Icon check`/`cross`, `MarkdownMath variant="ui"`, model chip, meta time, `EmptyState` | Task 7 |
+| 6b | Per-task render and keyboard checks, banned-pattern grep, texture audit | every task's check steps; Task 8 Steps 2, 3, 5, 7 |
+| 6c | Reduced motion and keyboard reachability | Task 8 Steps 4, 5 |
+| 7 | Tokens, fonts and radii untouched; contrast holds | Global Constraints; Task 8 Step 6 |
+
+Not in this plan by design: 3d (doc reader) and 5a to 5f (tutor drawer band, starters, composer) are stage D; 4a to 4e (Practice) are stage C. No gap found against the sections the header claims.
+
+**2. Placeholder scan:** the writing-plans red-flag grep (the five banned phrases from its No Placeholders section) over this file prints nothing; every code step carries its code, every check step carries its expressions and expected values.
+
+**3. Type consistency** (names used across tasks, checked against the task that defines them):
+
+- `TopBarProps = { chatOpen: boolean; onToggleChat: () => void; tutorRef: RefObject<HTMLButtonElement | null> }` (Task 1) is what `AppShell.tsx` passes in Task 1 and Task 2; `closeChat` is the `useCallback` in `AppShell.tsx` (Task 1) that Task 2's drawer effect and the Escape handler call; its name is the same in both tasks.
+- `DescendantCounts = { docs: number; verifiedProblems: number }`, `rollUpCounts(topics, own)` and `getDescendantCounts(): Promise<Map<string, DescendantCounts>>` (Task 4, `src/lib/topics.ts`) are imported under exactly those names by `[topicId]/layout.tsx` (Task 4), `TopicRail.tsx` (Task 5, optional `counts`) and `[topicId]/page.tsx` (Task 6); the `ZERO = { docs: 0, verifiedProblems: 0 }` fallback in Task 6 matches the shape.
+- `TopicCoverCardProps = { href: string; name: string; numeral: number; meta: string; accent: AccentName }` (Task 4) is what the index (Task 4) and the Subtopics grid (Task 6) pass, Task 6 with `meta` built from `plural(docs, "model")` and `plural(verifiedProblems, "problem")`.
+- `GenerateTopicInput` gains `initialValue?: string` and `compact?: boolean` (Task 4); Task 6's `EmptyState` action renders `<GenerateTopicInput initialValue={topic.name} compact />` with those names.
+- `TopicRail` props are `{ topics: TopicNode[] }` plus the optional `counts`; its row component receives `reachable: boolean` and `forceOpen: boolean` (Task 5), the names Task 8 Step 5 relies on indirectly through `[inert]` and `[data-topic-link]`.
+- `TopicDetail.children: { id: string; name: string }[]` (Task 6, `getTopicDetail`) is read only by Task 6's page; Task 7 consumes `getTopicDetail` for `path` and does not touch `children`.
+- `DocCard` props `{ topicId, doc: { id, title, isExemplar, modelCount, createdAt }, accent }` are unchanged by Task 6's rewrite, so Task 6's page call site and any other importer keep compiling.
+- `chipClasses({ variant, active?, className? }): string` (plan A) is used once, in Task 7's `span` branch with `variant: "meta"`; `ChipLink` in the same file uses `variant: "action"`, the two variants plan A's `ChipLink` signature allows.
+
+No mismatches found. The one known uncertainty is plan A's final `ChipLink` signature (`title` pass-through), and Task 7's notes already give the fallback.
