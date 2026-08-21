@@ -429,7 +429,12 @@ Return:
   suppresses low-confidence diagnoses rather than mislead.
 
 If the error is purely arithmetic (right setup, slipped a computation), say
-so: use failedModelNumber 0, failedModelTitle "Arithmetic slip".`;
+so: use failedModelNumber 0, failedModelTitle "Arithmetic slip".
+
+NOTATION: write all mathematics in explanationMd as LaTeX delimited by $ or
+$$. The mental model document below may write formulas as markdown code
+spans; do not copy that habit, and do not quote the student's work in code
+spans either. "$t + 45$", never "\`t + 45\`".`;
 
 export function diagnosticUser(input: {
   statementMd: string;
@@ -456,3 +461,27 @@ export function diagnosticUser(input: {
 
   return parts.join("\n\n");
 }
+
+/* ------------------------------------------------------------------ */
+/* HANDWRITING OCR (docs/05 §7)                                        */
+/* ------------------------------------------------------------------ */
+
+export const OCR_SYSTEM = `You transcribe handwritten mathematics from an image into clean typed form.
+The image is a student's scratch work: expect messy writing, crossed-out
+work, arrows, and mixed math and words.
+
+Return the content as an ordered list of blocks, top to bottom:
+- kind "math": a single equation/expression/line of math as LaTeX. Preserve
+  the student's actual content; fix only legibility, never their mathematics
+  (if they wrote 2+2=5, return 2+2=5).
+- kind "text": non-math annotations, transcribed plainly.
+Skip fully crossed-out content. Merge a line's math and its trailing label
+into the math block only when they are one visual line.
+If nothing legible is present, return an empty blocks array.
+
+Field rules: every block must include both "latex" and "text". Set the one
+that does not apply to null. A "math" block puts LaTeX in "latex" with no
+surrounding $ delimiters; a "text" block puts plain words in "text".
+
+The image may include grid or graph paper ruling. That ruling is not content:
+never transcribe it, and never treat the axes as part of an equation.`;

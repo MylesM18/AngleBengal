@@ -31,7 +31,29 @@ export type StructuredCallOptions<T> = CallOptions & {
   schema: z.ZodType<T>;
   /** Name the model sees for the schema. Snake or kebab, no spaces. */
   schemaName: string;
+  /** A data: URL. Only OCR uses this, and only a vision model accepts it. */
+  imageDataUrl?: string;
 };
+
+/**
+ * Builds the user turn, attaching an image when one is supplied. The
+ * Responses API wants a content array for multimodal turns and accepts a
+ * plain string otherwise, so both shapes stay valid.
+ */
+function userContent(
+  text: string,
+  imageDataUrl: string | undefined,
+):
+  | string
+  | ({ type: "input_text"; text: string } | { type: "input_image"; image_url: string; detail: "high" })[] {
+  if (!imageDataUrl) return text;
+  return [
+    { type: "input_text", text },
+    // "high" detail: handwriting is exactly the case where downsampling
+    // loses the strokes that distinguish a 4 from a 9.
+    { type: "input_image", image_url: imageDataUrl, detail: "high" },
+  ];
+}
 
 type Usage = { inputTokens: number; outputTokens: number };
 
@@ -118,7 +140,7 @@ export async function callStructured<T>(options: StructuredCallOptions<T>): Prom
         model: options.model,
         input: [
           { role: "system", content: options.system },
-          { role: "user", content: user },
+          { role: "user", content: userContent(user, options.imageDataUrl) },
         ],
         text: {
           format: {

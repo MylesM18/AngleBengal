@@ -118,3 +118,16 @@ export type DiagnosticResult = z.infer<typeof diagnosticSchema>;
 
 /** Below this the app suppresses the attribution rather than guess (docs/04). */
 export const MIN_DIAGNOSIS_CONFIDENCE = 0.4;
+
+/** docs/05 §7: handwriting transcription blocks. */
+export const ocrSchema = z.object({
+  blocks: z.array(
+    z.object({
+      kind: z.enum(["math", "text"]),
+      latex: z.string().nullable(),
+      text: z.string().nullable(),
+    }),
+  ),
+});
+
+export type OcrResult = z.infer<typeof ocrSchema>;

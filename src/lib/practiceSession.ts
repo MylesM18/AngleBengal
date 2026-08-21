@@ -20,9 +20,11 @@ export type PracticeSession = {
   problemId: string | null;
   /** True once solved correctly or revealed via Show solution. */
   revealed: boolean;
+  /** Shapes how a clean-copy block is inserted into the answer input. */
+  answerType: "numeric" | "expression" | "multi" | null;
 };
 
-const EMPTY: PracticeSession = { problemId: null, revealed: false };
+const EMPTY: PracticeSession = { problemId: null, revealed: false, answerType: null };
 
 let state: PracticeSession = EMPTY;
 const listeners = new Set<() => void>();
@@ -31,9 +33,14 @@ function emit(): void {
   for (const listener of listeners) listener();
 }
 
-export function setActiveProblem(problemId: string | null): void {
-  if (state.problemId === problemId && !state.revealed) return;
-  state = { problemId, revealed: false };
+export function setActiveProblem(
+  problemId: string | null,
+  answerType: PracticeSession["answerType"] = null,
+): void {
+  if (state.problemId === problemId && !state.revealed && state.answerType === answerType) {
+    return;
+  }
+  state = { problemId, revealed: false, answerType };
   emit();
 }
 

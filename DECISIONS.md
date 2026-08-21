@@ -330,3 +330,64 @@ for the Phase 4 sketchpad, and a context provider would mean wrapping the shell
 for one value. `src/lib/practiceSession.ts` is a module-level store read
 through `useSyncExternalStore`: no dependency, no provider, and it serves a
 stable empty snapshot on the server.
+
+### D-027. Grid spacing is 19px
+
+docs/06 §4 asks for 5mm squares. A CSS pixel is defined as 1/96 inch, so 5mm
+is 5/25.4 x 96 = 18.9px, rounded to 19 for crisp hairlines. On a real display
+the physical size depends on the panel's actual DPI, so this is "5mm as the
+CSS pixel definition intends", not a promise about millimetres on glass.
+
+### D-028. Canvas size is measured in a callback ref, not only a ResizeObserver
+
+Found in testing. A `<canvas>` is a replaced element, so `absolute inset-0`
+does NOT stretch it: it keeps its intrinsic 300x150 until code sets an explicit
+size. The whole sketchpad therefore depends on getting one real measurement.
+
+Relying only on a ResizeObserver made that a single point of failure, and the
+observer was observed not firing at all in an embedded browser view, leaving a
+300x150 canvas and a "Could not capture the canvas" error on Clean up. The
+wrapper is now measured directly in a callback ref the moment it mounts, with
+the observer and a window-resize listener handling later changes.
+
+Measuring in a callback ref also keeps the first `setSize` out of an effect
+body, which React's `set-state-in-effect` rule flags.
+
+### D-029. Pointer capture is best effort
+
+`setPointerCapture` throws NotFoundError when the pointer id has no active
+pointer, which happens when a pointer is released between event dispatch and
+handling. An uncaught throw aborted the handler before any ink was recorded,
+so the stroke silently vanished. It is now wrapped: losing capture means a
+stroke can end early if the pointer leaves the canvas, which is much better
+than losing the stroke.
+
+### D-030. The live stroke is not React state
+
+Committing every pointer sample to the store would re-render the tree at
+pointer frequency, which is the obvious way to fail the "no visible lag"
+criterion. The in-progress stroke accumulates in a ref, paints itself on a
+third overlay canvas inside a requestAnimationFrame, and reaches the store
+once on pointer-up. `getCoalescedEvents` recovers samples the browser batched,
+so a fast stroke stays smooth rather than polygonal.
+
+### D-031. Insert into answer adapts to the answer type
+
+docs/06 §4 says the clean-copy insert copies "the LaTeX-stripped value into the
+answer input where sensible; for expression answers, inserts LaTeX". A numeric
+input holding `\frac{5}{2}` would fail to grade, and one holding `d = 27` is
+not an answer either.
+
+So an expression target receives the LaTeX, and a numeric target receives the
+stripped value with any equation reduced to its right-hand side: a student who
+wrote `d = 27` means to answer 27. The answer type reaches the workspace
+through the practice-session store.
+
+### D-032. The diagnostic prompt carries the LaTeX counter-instruction too
+
+Same root cause as D-009, found late. The diagnostic prompt injects the mental
+model document, so the exemplar's code-span habit leaked into diagnosis
+explanations: they quoted the student's work as `` `t + 45` `` which renders as
+monospace rather than math. Every prompt that injects the document now carries
+the counter-instruction. Measured after the change: 0 backticks, 10 dollar
+delimiters in the same explanation.

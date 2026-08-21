@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { snapshotSketch } from "@/components/sketchpad/Sketchpad";
 import {
   clearActiveProblem,
   markRevealed,
   setActiveProblem,
 } from "@/lib/practiceSession";
+import { useSketchStore } from "@/lib/sketch/store";
 
 import {
   AnswerInput,
@@ -53,10 +55,15 @@ export function PracticePanel({
   topicId,
   topicPath,
   initialCounts,
+  answer,
+  onAnswerChange,
 }: {
   topicId: string;
   topicPath: string[];
   initialCounts: Record<number, number>;
+  /** Controlled by the workspace: the sketchpad can insert into it. */
+  answer: AnswerValue;
+  onAnswerChange: (value: AnswerValue) => void;
 }) {
   const [difficulty, setDifficulty] = useState(2);
   const [counts, setCounts] = useState(initialCounts);
@@ -70,7 +77,6 @@ export function PracticePanel({
   const [loaded, setLoaded] = useState<{ key: string; problem: ServedProblem | null } | null>(
     null,
   );
-  const [answer, setAnswer] = useState<AnswerValue>(emptyAnswer);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [revealedSolution, setRevealedSolution] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -98,13 +104,15 @@ export function PracticePanel({
 
   /** Asks for a fresh problem. Safe to call from an event handler. */
   const loadProblem = useCallback(() => {
+    // docs/06 §4: strokes are per attempt, cleared on problem change.
+    useSketchStore.getState().resetForNewProblem();
     setError(null);
     setOutcome(null);
     setRevealedSolution(null);
     setConfirmReveal(false);
-    setAnswer(emptyAnswer);
+    onAnswerChange(emptyAnswer);
     setReloadKey((key) => key + 1);
-  }, []);
+  }, [onAnswerChange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,7 +126,7 @@ export function PracticePanel({
       .then((next) => {
         if (cancelled) return;
         setLoaded({ key: requestKey, problem: next });
-        if (next) setActiveProblem(next.id);
+        if (next) setActiveProblem(next.id, next.answerType);
         else clearActiveProblem();
       })
       .catch((loadError: unknown) => {
@@ -150,7 +158,14 @@ export function PracticePanel({
       const response = await fetch(`/api/problems/${problem.id}/attempt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submittedAnswer: serializeAnswer(shape, answer) }),
+        body: JSON.stringify({
+          submittedAnswer: serializeAnswer(shape, answer),
+          // Silently composited at submit time, skipped when the canvas is
+          // untouched (docs/06 §4). The OCR blocks ride along so the
+          // diagnostic can see the student's written work.
+          sketchPngBase64: snapshotSketch(),
+          ocrBlocks: useSketchStore.getState().ocrBlocks,
+        }),
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -229,9 +244,12 @@ export function PracticePanel({
           counts={counts}
           disabled={generating || submitting}
           onChange={(level) => {
+            // A difficulty switch loads a different problem, so the canvas is
+            // stale work for a question no longer on screen (docs/06 §4).
+            useSketchStore.getState().resetForNewProblem();
             setOutcome(null);
             setRevealedSolution(null);
-            setAnswer(emptyAnswer);
+            onAnswerChange(emptyAnswer);
             setDifficulty(level);
           }}
         />
@@ -292,7 +310,7 @@ export function PracticePanel({
                 value={answer}
                 disabled={submitting || locked}
                 partResults={outcome && !outcome.correct ? outcome.parts : null}
-                onChange={setAnswer}
+                onChange={onAnswerChange}
                 onSubmit={() => void submit()}
               />
 
