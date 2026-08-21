@@ -83,26 +83,18 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
 
       applySize(element);
 
-      // Three triggers, deliberately redundant. In a real browser the
-      // ResizeObserver alone is enough: verified in Chrome that crossing the
-      // `lg` breakpoint (pane display:none -> flex) re-measures on its own.
-      // The other two are insurance, because a canvas that never gets measured
-      // is not a degraded sketchpad, it is no sketchpad at all, and observers
-      // have been seen inert in embedded browser views.
+      // The ResizeObserver does the real work: verified in Chrome that
+      // crossing the `lg` breakpoint (pane display:none -> flex) re-measures
+      // on its own. The window listener covers the case where the observer is
+      // unavailable, which costs one line.
       const resizeObserver = new ResizeObserver(() => applySize(element));
       resizeObserver.observe(element);
-
-      const visibilityObserver = new IntersectionObserver((entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) applySize(element);
-      });
-      visibilityObserver.observe(element);
 
       const onWindowResize = () => applySize(element);
       window.addEventListener("resize", onWindowResize);
 
       cleanup.current = () => {
         resizeObserver.disconnect();
-        visibilityObserver.disconnect();
         window.removeEventListener("resize", onWindowResize);
       };
     },

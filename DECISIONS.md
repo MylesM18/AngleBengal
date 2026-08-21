@@ -491,9 +491,12 @@ type the answer.
 
 While verifying it, the canvas appeared not to re-measure when the viewport
 crossed the breakpoint. That turned out to be environmental, not a defect:
-neither ResizeObserver nor IntersectionObserver fires at all inside the
-embedded browser pane, while in real Chrome both fire and the canvas recovers
-on its own. An IntersectionObserver was added anyway as redundancy, and its
-comment says plainly that the ResizeObserver alone is sufficient in a real
-browser. A canvas that never gets measured is not a degraded sketchpad, it is
-no sketchpad at all.
+neither ResizeObserver nor IntersectionObserver fires at all inside the embedded
+browser pane, while in real Chrome both fire and the canvas recovers on its own.
+
+An IntersectionObserver was briefly added as redundancy and then removed. It was
+introduced while chasing what looked like a bug and was never load-bearing:
+Chrome was measured re-measuring correctly through the ResizeObserver alone.
+Carrying a second observer to guard a case that does not occur is cost without
+benefit, and the honest record of the episode is this entry rather than a spare
+observer nobody can explain later.
