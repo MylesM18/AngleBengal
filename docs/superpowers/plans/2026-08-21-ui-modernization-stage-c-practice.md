@@ -1102,3 +1102,215 @@ git commit -m "Restyle the clean copy slip and move the sketchpad toast to the T
 `git status --short` before the commit lists exactly those two files (both ` M`).
 
 ---
+### Task 4: Difficulty chips and the DiagnosisCard actions slot (spec 4c)
+
+**Files:**
+- Rewrite: `src/components/practice/DifficultySelector.tsx` (today 49 lines: five 28px square `button`s carrying `text-[12.5px] font-bold`, `bg-brand text-paper-0` when active and `bg-paper-0 text-ink hover:bg-brand-tint` otherwise, a green pool dot, `disabled:opacity-50`, and a hand-written `aria-pressed`)
+- Rewrite: `src/components/practice/DiagnosisCard.tsx` (today 69 lines; after stage A its line 55 already reads `<MarkdownMath variant="ui" className="mt-2.5">`; the rest still carries the inline die-cut `div` with `h-[72px] w-[72px] bg-red`, an inline `clipPath` polygon and `boxShadow: "var(--shadow-cut)"`, plus `text-[30px]`, `text-[14px]`, `text-[12.5px]` and a `Link` hand-styled with `border-[1.5px]`). The File Structure row above calls this file "modify, small": that is true of its props (one new optional prop) but not of its body, which is a full rewrite because of the finding below.
+
+**Interfaces:**
+- Consumes:
+  - `Chip({ variant: "nav" | "meta" | "action" | "toggle", pressed?: boolean, icon?: IconName, className?, children?, ...ComponentPropsWithoutRef<"button"> })` from `src/components/ui/Chip.tsx`. Every chip is `h-6` (24px) and `min-w-8` (32px), `rounded-chip`, `px-2`, `text-ui`, `inline-flex items-center justify-center gap-1`. `variant="toggle"` emits `aria-pressed={pressed === true}` by itself and only steps aside when the consumer passes `role="radio"`, so this task passes `pressed` and never writes `aria-pressed` by hand. A pressed toggle inverts to `bg-ink text-paper-0` with a paper-0 focus ring; the rest state is `bg-paper-0 text-ink hover:bg-desk active:translate-y-px`. `disabled`, `title` and `onClick` ride through `...rest`. The base class string carries no `relative`, so the pool dot's positioning context comes from `className`.
+  - `DieCutWindow({ shape: "triangle" | "circle" | "wedge", color: string, size?: number, className?, children?: ReactNode })` from `src/components/ui/DieCutWindow.tsx`: a square `div`, `aria-hidden`, `relative shrink-0 animate-cut-reveal`, `width`/`height` set to `size` (default 72), `backgroundColor: color`, the shape's `clipPath` (triangle is `polygon(50% 0%, 100% 100%, 0% 100%)`, today's exact polygon) and `boxShadow: "var(--shadow-cut)"`. Default 72 is today's size, so this task passes no `size`.
+  - `ButtonLink({ variant?: "primary" | "secondary" | "tertiary" | "destructive", size?: "sm" | "md", tone?: "brand" | "plum", icon?: IconName, className?, children?, ...ComponentPropsWithoutRef<typeof Link> })` from `src/components/ui/Button.tsx`: `secondary` is paper-0 with the 1.5px ink border (the cut sticker), `sm` is 24px tall. Stage A's own gallery renders this exact call: `<ButtonLink href="/learn" variant="secondary" size="sm">Review Model 3</ButtonLink>`.
+  - `MarkdownMath({ children, variant?: "reading" | "ui" | "chat", className? })` from `src/components/shared/MarkdownMath.tsx` (`ui` is 14px Archivo with tight margins).
+  - Type utilities from stage A Task 1: `text-meta` (12px, weight 500), `text-ui` (14px, weight 400), `text-h1` (30px, weight 700, line-height 1.2), and the `border-hairline` color utility. `.display-cut` (font family, weight 700, letter-spacing; it sets no font-size) and `.meta-caps` (12px uppercase) already live in `src/app/globals.css` and are not touched.
+  - `CornerNumeral` is deliberately NOT used here. It is the ghosted top-right numeral at opacity 0.16; the die-cut numeral is a full-opacity paper-0 numeral printed on the revealed red stock, and it is the `children` of `DieCutWindow`.
+- Produces:
+  - `DifficultySelector({ value: number; counts: Record<number, number>; disabled: boolean; onChange: (difficulty: number) => void })`: the props, the export name and every call site are unchanged. Only the markup inside changes.
+  - `DiagnosisCard({ diagnosis: { modelNumber: number; modelTitle: string; symptom: string; explanationMd: string; learnHref: string }, actions?: ReactNode })`: one new optional prop, rendered as a single row at the bottom of the card and nothing at all when it is absent. The card contributes no button of its own to that row: Task 5's `PracticePanel` passes `<Button variant="secondary">Try again</Button>` first and `<Button>Next problem</Button>` second, so the state's one primary sits last (spec 4c).
+  - Selectors Task 6 relies on: `[role="group"][aria-label="Difficulty"] button[aria-pressed]` counts 5, each 24px tall and 32px wide, with exactly one `aria-pressed="true"`; `section[aria-label="Diagnosis"]` is the only one on the screen and holds exactly one `[aria-hidden="true"]` element (the die-cut, 72x72, red); the card's only `a` reads "Review Model N"; the actions row, when passed, is the card's second and last child.
+- FINDING (verified before this task was written, stated here because Task 4's implementer sees only Task 4): stage A does not migrate this die-cut. `grep -n "DiagnosisCard" docs/superpowers/plans/2026-08-21-ui-modernization-stage-a-system-primitives.md` returns only the `MarkdownMath` cascade rows, whose table entry changes line 55 and nothing else, and `grep -n "DieCutWindow" <that plan>` shows the primitive created in its Task 4 and consumed only by `EmptyState` and the temporary gallery. Stage B has no mention at all. Spec line 70 says `DieCutWindow` is "extracted from DiagnosisCard, reused by EmptyState", and spec 4c lists the card among the primitive's consumers, so the extraction has to land somewhere: it lands here. Two consequences. First, this task deletes the inline `clipPath`, the inline `boxShadow` and the `h-[72px] w-[72px]` box and calls the primitive instead. Second, the die-cut reveal reaches the Practice screen in this task, not in stage A; the plan header's motion line credits stage A for the animation, which is correct in the sense that stage A Task 1 defines `--animate-cut-reveal`, and this task is what puts a `DieCutWindow` on the screen that plays it.
+
+Behaviour contract (read before editing):
+- `DifficultySelector` keeps its outer shape exactly: a `flex items-center gap-1.5` row, the `meta-caps text-ink-soft` label "Difficulty", then `<div className="flex gap-1" role="group" aria-label="Difficulty">` holding five controls for levels 1 to 5. The group role, the group label and the `title` on each control are load-bearing (the `title` is the pool count's only exposure) and stay.
+- Each level becomes `<Chip variant="toggle" pressed={active} disabled={disabled} onClick={() => onChange(level)} title={...} className="relative font-semibold disabled:opacity-50">`. `relative` gives the pool dot its context, `font-semibold` keeps the numeral solid against the chip's 14px `text-ui` base (the old file used `font-bold` at 12.5px), and `disabled:opacity-50` preserves today's disabled look, which the primitive does not style. No `aria-pressed` is written here: the chip emits it. No `bg-brand`: the pressed chip inverts to ink, which is the system's one toggle-pressed look (spec 1f) and keeps brand for primary actions only.
+- The chips change size, on purpose: 28x28 becomes 32x24 (the chip's `h-6 min-w-8`, and a single digit at `px-2` never exceeds the 32px minimum, so all five stay identical). Everything on this row is now 24px tall, which is the point of the chip scale. The header row's own height and kraft are Task 5's business, not this task's.
+- The pool dot is unchanged: `<span aria-hidden className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-green" />`, rendered only when `pool > 0 && !active`, sitting after the numeral inside the chip. It is absolutely positioned, so it does not affect the chip's flex layout.
+- `DiagnosisCard` keeps its section, its label, its two-column body and every string it prints. What changes: the inline die-cut becomes `<DieCutWindow shape="triangle" color="var(--color-red)">` wrapping today's numeral span, whose `text-[30px]` becomes `text-h1 leading-none` (30px, and `leading-none` overrides the token's 1.2 line-height exactly as the old class did); the symptom's `text-[14px]` becomes `text-ui`; the model line's `text-[12.5px]` becomes `text-meta`; the hand-styled `Link` becomes `ButtonLink variant="secondary" size="sm"` with `className="mt-3"`, which drops the `border-[1.5px]`, the `rounded-input` and the `active:translate-y-px` in favour of the primitive's identical secondary look; the `MarkdownMath` line keeps stage A's `variant="ui" className="mt-2.5"`.
+- The die-cut stays `aria-hidden` (the primitive sets it), and the model number is still read out in text one line below ("Model N: title failed"), so nothing is lost to a screen reader.
+- The actions slot renders as `{actions ? <div className="flex flex-wrap gap-2 border-t border-hairline px-4 py-3">{actions}</div> : null}`, the section's last child, outside the `flex gap-4 p-4` body so the row spans the full card width under both columns. `flex-wrap` keeps two buttons from overflowing a narrow panel. When `actions` is absent the card renders exactly as before, which is what happens for the whole of this task: `PracticePanel` starts passing the row in Task 5.
+- Motion (spec 1e): the die-cut's `animate-cut-reveal` (200ms, once on mount) and chip hover and press are the only motion here. Nothing else animates, and stage A's reduced-motion guard covers both.
+- Not touched: the diagnosis API, the confidence floor that decides whether a card renders at all, `learnHref`, the four `DifficultySelector` call-site props, and `PracticePanel` (Task 5).
+
+- [ ] **Step 1: Rewrite `src/components/practice/DifficultySelector.tsx`**
+
+Replace the whole file with:
+
+```tsx
+"use client";
+
+import { Chip } from "@/components/ui/Chip";
+
+/** Difficulty 1-5 (docs/06 §3), with the verified-and-unsolved pool count. */
+export function DifficultySelector({
+  value,
+  counts,
+  disabled,
+  onChange,
+}: {
+  value: number;
+  counts: Record<number, number>;
+  disabled: boolean;
+  onChange: (difficulty: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="meta-caps text-ink-soft">Difficulty</span>
+      <div className="flex gap-1" role="group" aria-label="Difficulty">
+        {[1, 2, 3, 4, 5].map((level) => {
+          const active = level === value;
+          const pool = counts[level] ?? 0;
+          return (
+            <Chip
+              key={level}
+              variant="toggle"
+              pressed={active}
+              disabled={disabled}
+              onClick={() => onChange(level)}
+              title={`Difficulty ${level}: ${pool} ready`}
+              className="relative font-semibold disabled:opacity-50"
+            >
+              {level}
+              {pool > 0 && !active && (
+                <span
+                  aria-hidden
+                  className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-green"
+                />
+              )}
+            </Chip>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2: Rewrite `src/components/practice/DiagnosisCard.tsx`**
+
+Replace the whole file with:
+
+```tsx
+"use client";
+
+import type { ReactNode } from "react";
+
+import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { ButtonLink } from "@/components/ui/Button";
+import { DieCutWindow } from "@/components/ui/DieCutWindow";
+
+/**
+ * The system's hero moment (docs/08): a paper sheet with a triangular die-cut
+ * window revealing a red sheet beneath carrying the failed model's numeral.
+ *
+ * Only rendered when a diagnosis survived the confidence floor. A suppressed
+ * diagnosis gets the plain wrong state instead, never a guessed attribution.
+ */
+export function DiagnosisCard({
+  diagnosis,
+  actions,
+}: {
+  diagnosis: {
+    modelNumber: number;
+    modelTitle: string;
+    symptom: string;
+    explanationMd: string;
+    learnHref: string;
+  };
+  /** The state's exits, as one row at the bottom: Try again (secondary), then Next problem (primary). */
+  actions?: ReactNode;
+}) {
+  return (
+    <section
+      aria-label="Diagnosis"
+      className="relative overflow-hidden rounded-card bg-paper-1 shadow-lift"
+    >
+      <div className="flex gap-4 p-4">
+        {/* The die-cut: a triangle punched through the sheet, showing red
+            stock beneath with the failed model's numeral on it. */}
+        <DieCutWindow shape="triangle" color="var(--color-red)">
+          <span className="display-cut text-h1 absolute inset-x-0 bottom-1 text-center leading-none text-paper-0">
+            {diagnosis.modelNumber}
+          </span>
+        </DieCutWindow>
+
+        <div className="min-w-0 flex-1">
+          <p className="meta-caps mb-1 text-red">Diagnosis</p>
+          <p className="text-ui leading-snug font-semibold text-ink">
+            {diagnosis.symptom}
+          </p>
+          <p className="text-meta mt-0.5 text-ink-soft">
+            Model {diagnosis.modelNumber}: {diagnosis.modelTitle} failed
+          </p>
+
+          <MarkdownMath variant="ui" className="mt-2.5">
+            {diagnosis.explanationMd}
+          </MarkdownMath>
+
+          <ButtonLink
+            href={diagnosis.learnHref}
+            variant="secondary"
+            size="sm"
+            className="mt-3"
+          >
+            Review Model {diagnosis.modelNumber}
+          </ButtonLink>
+        </div>
+      </div>
+
+      {actions ? (
+        <div className="flex flex-wrap gap-2 border-t border-hairline px-4 py-3">
+          {actions}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+```
+
+- [ ] **Step 3: Gate**
+
+```bash
+npm run typecheck
+npm run lint
+```
+
+Both exit 0. `typecheck` is the real check on this task: it is what proves `pressed`, `title` and `disabled` are all in `Chip`'s prop type, that `DieCutWindow` accepts `children`, and that `ButtonLink` accepts `href` and `className`.
+
+- [ ] **Step 4: Visual and keyboard check**
+
+In the dev preview at 1440x900, open http://localhost:3010/practice/<drtId>.
+
+- Difficulty chips: `const chips = [...document.querySelectorAll('[role="group"][aria-label="Difficulty"] button[aria-pressed]')]`. `chips.length` is `5`; `chips.map(c => c.textContent.trim())` is `["1","2","3","4","5"]`; `chips.map(c => c.getBoundingClientRect().height)` is `[24,24,24,24,24]` and `chips.map(c => c.getBoundingClientRect().width)` is `[32,32,32,32,32]`; `chips.filter(c => c.getAttribute('aria-pressed') === 'true').length` is `1`; `chips.map(c => c.getAttribute('title'))` reads `["Difficulty 1: N ready", ...]` with the seeded counts; `chips.some(c => c.className.includes('text-['))` is `false`.
+- Pressed look: `const on = document.querySelector('[role="group"][aria-label="Difficulty"] [aria-pressed="true"]')`. `getComputedStyle(on).backgroundColor` is `rgb(50, 41, 33)` (ink) and `.color` is `rgb(249, 245, 236)` (paper-0). It is NOT brand: `getComputedStyle(on).backgroundColor === 'rgb(181, 82, 46)'` is `false`. Hover an unpressed chip with `computer` `hover`: its background steps to desk, not to brand-tint.
+- Pool dots: `document.querySelectorAll('[role="group"][aria-label="Difficulty"] button span.bg-green').length` equals the number of levels that have a non-empty pool and are not the pressed one (with the DRT seed's 12 verified problems, at least one); each dot's `getBoundingClientRect().width` is `6`, and `getComputedStyle(dot).backgroundColor` is `rgb(46, 125, 91)`.
+- Chip behaviour: click the chip for a level whose `title` says a non-zero count. Its `aria-pressed` flips to `"true"`, the previously pressed chip flips to `"false"`, the dot disappears from the newly pressed chip, and the panel loads a problem at that difficulty (today's `onChange` path, unchanged). While it loads, `chips.every(c => c.disabled)` is `true` and `getComputedStyle(chips[0]).opacity` is `"0.5"`.
+- Keyboard: `chips[0].focus()`, then Tab via `computer` key walks 1 to 5 in DOM order with a visible focus ring on every one. Press Space on a focused chip: it activates, exactly as the click did. Nothing inside the group is reachable by Tab other than the five chips (the dots are `aria-hidden` spans).
+- Diagnosis card: type a plainly wrong value into the answer input and click Submit, then wait for the diagnosis call to return. If the confidence floor suppressed the diagnosis, the plain wrong state renders instead and no card exists: submit another wrong answer on the next problem until `document.querySelector('section[aria-label="Diagnosis"]')` is non-null. Call it `card`.
+- Card and die-cut: `getComputedStyle(card).backgroundColor` is `rgb(241, 234, 220)` (paper-1) and `.boxShadow` is not `"none"`. `const cut = card.querySelector('[aria-hidden="true"]')`; `card.querySelectorAll('[aria-hidden="true"]').length` is `1`; `cut.getBoundingClientRect().width` and `.height` are both `72`; `getComputedStyle(cut).backgroundColor` is `rgb(168, 58, 50)` (red); `getComputedStyle(cut).clipPath.startsWith('polygon(')` is `true`; `getComputedStyle(cut).animationName` is `"cut-reveal"`; `cut.getAttribute('style')` no longer contains `clipPath` written by this file (the primitive writes it, so the check that matters is the grep in Step 5).
+- Numeral: `const num = cut.querySelector('span')`; `num.textContent.trim()` is the failed model's number; `getComputedStyle(num).fontSize` is `"30px"`; `getComputedStyle(num).color` is `rgb(249, 245, 236)`; `getComputedStyle(num).fontFamily` contains the display family (`.display-cut`).
+- Card type: `const ps = [...card.querySelectorAll('p')]`. `getComputedStyle(ps[0]).fontSize` is `"12px"` (the `meta-caps` "Diagnosis", and its color is `rgb(168, 58, 50)`); `getComputedStyle(ps[1]).fontSize` is `"14px"` (the symptom, weight 600); `getComputedStyle(ps[2]).fontSize` is `"12px"` (the model line); `getComputedStyle(ps[3]).fontSize` is `"14px"` (the explanation's first paragraph, the `ui` variant of `MarkdownMath`). A KaTeX fragment inside the explanation still renders: `card.querySelector('.katex')` is non-null when the explanation contains math.
+- Review link: `const link = card.querySelector('a')`; `link.textContent.trim()` is `"Review Model N"` for the same N as the numeral; `link.getBoundingClientRect().height` is `24`; `getComputedStyle(link).backgroundColor` is `rgb(249, 245, 236)` (paper-0) and `.borderTopWidth` is `"1.5px"`; `link.getAttribute('href')` is unchanged from before this task (it is `diagnosis.learnHref`, and clicking it opens that model's reader).
+- Actions slot, absent for now: `card.children.length` is `1` and `card.textContent.includes('Try again')` is `false`, because `PracticePanel` does not pass `actions` until Task 5. Task 5's check is the one that sees `card.children.length` `2`, the row's buttons reading "Try again" then "Next problem", and the primary last.
+- `read_console_messages` with `onlyErrors: true` is clean after all of the above.
+
+- [ ] **Step 5: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-\[1\.5px\]|border-ink-faint/(25|40)|/60\b|/70\b|/85\b|bg-brand\b|scale-|clipPath|polygon\(|shadow-cut" src/components/practice/DifficultySelector.tsx src/components/practice/DiagnosisCard.tsx ; grep -n $'\xe2\x80\x94' src/components/practice/DifficultySelector.tsx src/components/practice/DiagnosisCard.tsx ; grep -c "aria-pressed" src/components/practice/DifficultySelector.tsx ; grep -rn "DieCutWindow" src/components/practice
+```
+
+The first two print nothing. The third prints `0`: the chip primitive emits `aria-pressed`, and this file never writes it (the browser check in Step 4 is what proves the attribute reaches the DOM). The fourth prints exactly two lines, both in `DiagnosisCard.tsx`: the import and the element. Note that arbitrary sizes such as `h-[72px]` are allowed by the stage's constraints and are simply gone from both files now; only `text-[` was ever banned.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/components/practice/DifficultySelector.tsx src/components/practice/DiagnosisCard.tsx
+git status --short
+git commit -m "Restyle the difficulty chips and give the DiagnosisCard an actions slot (stage C, spec 4c)"
+```
+
+`git status --short` before the commit lists exactly those two files (both ` M`).
+
+---
