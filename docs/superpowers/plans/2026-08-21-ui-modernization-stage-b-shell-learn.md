@@ -521,3 +521,624 @@ git commit -m "Restyle Settings on one paper sheet with hairline rows and an emp
 ```
 
 ---
+### Task 4: Descendant counts, `TopicCoverCard`, the Learn index, and the rail moves under `[topicId]` (spec 3a, 3c data, 3b frame)
+
+**Files:**
+- Modify: `src/lib/topics.ts` (insert one import at line 3; append three exports after the last line, today 189)
+- Create: `src/components/learn/TopicCoverCard.tsx`
+- Modify: `src/components/learn/GenerateTopicInput.tsx` (full rewrite; today 227 lines, the `run` callback at lines 52 to 108 stays byte-identical)
+- DELETE: `src/app/(tabs)/learn/layout.tsx` (34 lines; the index has no rail, spec 3a)
+- Create: `src/app/(tabs)/learn/[topicId]/layout.tsx`
+- Modify: `src/app/(tabs)/learn/page.tsx` (full rewrite; today 87 lines)
+
+**Interfaces:**
+- Consumes: `getTopicTree(): Promise<TopicNode[]>` and `getRootNameByTopicId(): Promise<Map<string, string>>` from `src/lib/topics.ts`; `TopicNode = { id, name, slug, parentId, docCount, verifiedProblemCount, children }`; `accentForRoot(rootName: string): AccentName` and `ACCENT_VAR: Record<AccentName, string>` from `src/lib/topicColors.ts`; `deserializeModelIndex(json)` from `src/lib/modelIndex.ts` (only `.length` is used); `TopicTree({ topics: TopicNode[] })` (client, unchanged until Task 5); from `src/components/ui/`: `Sheet({ as?, tone?, lift?, className?, ...rest })`, `BaseBand({ color, className? })`, `CornerNumeral({ n, color, size?: 56 | 30, onStock?, className? })` (its parent must be `relative`), `Button({ variant?, size?, tone?, icon?, loading?, ...button })`, `Notice({ kind: "info" | "success" | "warning" | "error", action?, className?, children })`, `Icon({ name, size?, className?, title? })`.
+- Produces:
+  - `export type DescendantCounts = { docs: number; verifiedProblems: number }`; `export function rollUpCounts(topics: { id: string; parentId: string | null }[], own: Map<string, DescendantCounts>): Map<string, DescendantCounts>` (pure); `export const getDescendantCounts: () => Promise<Map<string, DescendantCounts>>` (memoized per request with React `cache`; Tasks 5 and 6 call it).
+  - `TopicCoverCard({ href, name, numeral, meta, accent }: TopicCoverCardProps)` with `TopicCoverCardProps = { href: string; name: string; numeral: number; meta: string; accent: AccentName }` (Task 6 reuses it for subtopics).
+  - `GenerateTopicInput({ initialValue?: string; compact?: boolean })` (Task 6's `EmptyState` action renders `<GenerateTopicInput initialValue={topic.name} compact />`).
+  - `src/app/(tabs)/learn/[topicId]/layout.tsx` frames `/learn/[topicId]`, `?doc=` and `/history` with a 320px `aside[aria-label="Topics"]`. Task 5 swaps its `TopicTree` import for `TopicRail` and changes nothing else.
+
+- [ ] **Step 1: Add the counts helper to `src/lib/topics.ts`**
+
+Insert after line 1 (`import "server-only";`) so lines 1 to 5 read:
+
+```ts
+import "server-only";
+
+import { cache } from "react";
+
+import { prisma } from "@/lib/db";
+```
+
+Append at the end of the file (after `getRootNameByTopicId`):
+
+```ts
+export type DescendantCounts = { docs: number; verifiedProblems: number };
+
+/**
+ * Pure roll-up: a topic's own counts plus every descendant's, keyed by topic
+ * id. Every topic in `topics` gets an entry, even with nothing beneath it.
+ * Kept free of the database so the arithmetic can be read on its own (D-054).
+ */
+export function rollUpCounts(
+  topics: { id: string; parentId: string | null }[],
+  own: Map<string, DescendantCounts>,
+): Map<string, DescendantCounts> {
+  const totals = new Map<string, DescendantCounts>();
+  for (const topic of topics) totals.set(topic.id, { docs: 0, verifiedProblems: 0 });
+  const parentOf = new Map(topics.map((topic) => [topic.id, topic.parentId]));
+
+  for (const topic of topics) {
+    const mine = own.get(topic.id);
+    if (!mine) continue;
+    let currentId: string | null = topic.id;
+    // Same depth guard as getTopicPath: a cyclic parent chain fails loudly.
+    for (let depth = 0; currentId && depth < 12; depth += 1) {
+      const bucket = totals.get(currentId);
+      if (!bucket) break;
+      bucket.docs += mine.docs;
+      bucket.verifiedProblems += mine.verifiedProblems;
+      currentId = parentOf.get(currentId) ?? null;
+    }
+  }
+  return totals;
+}
+
+/**
+ * topic id -> counts for the topic AND everything beneath it (spec 3a cover
+ * numerals, 3c counts line, the Practice button's enabled state). One
+ * request-scoped value: React `cache` dedupes the three queries across the
+ * layout and the page that both read it.
+ */
+export const getDescendantCounts = cache(
+  async (): Promise<Map<string, DescendantCounts>> => {
+    const [topics, docs, problems] = await Promise.all([
+      prisma.topic.findMany({ select: { id: true, parentId: true } }),
+      prisma.mentalModelDoc.groupBy({ by: ["topicId"], _count: { _all: true } }),
+      prisma.problem.groupBy({
+        by: ["topicId"],
+        where: { verified: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const own = new Map<string, DescendantCounts>();
+    for (const row of docs) {
+      own.set(row.topicId, { docs: row._count._all, verifiedProblems: 0 });
+    }
+    for (const row of problems) {
+      const bucket = own.get(row.topicId) ?? { docs: 0, verifiedProblems: 0 };
+      bucket.verifiedProblems = row._count._all;
+      own.set(row.topicId, bucket);
+    }
+    return rollUpCounts(topics, own);
+  },
+);
+```
+
+`src/lib/topics.ts` imports `server-only`, so this helper is verified only through the rendered pages in Step 7, never with a `tsx` one-liner.
+
+- [ ] **Step 2: Create `src/components/learn/TopicCoverCard.tsx`**
+
+```tsx
+import Link from "next/link";
+
+import { BaseBand } from "@/components/ui/BaseBand";
+import { CornerNumeral } from "@/components/ui/CornerNumeral";
+import { Sheet } from "@/components/ui/Sheet";
+import { ACCENT_VAR, type AccentName } from "@/lib/topicColors";
+
+export type TopicCoverCardProps = {
+  href: string;
+  name: string;
+  /** Descendant model-doc count. The numeral is hidden when it is 0 (docs/08: numerals only where they carry information). */
+  numeral: number;
+  /** One line under the name, for example "3 models · 12 problems". */
+  meta: string;
+  accent: AccentName;
+};
+
+/**
+ * A topic as a swatch-book cover (spec 3a): paper sheet, corner numeral, the
+ * root's accent band along the bottom. The whole card is the link.
+ */
+export function TopicCoverCard({ href, name, numeral, meta, accent }: TopicCoverCardProps) {
+  const color = ACCENT_VAR[accent];
+  return (
+    <Link href={href} className="block rounded-card">
+      <Sheet
+        tone="paper-1"
+        lift
+        className="relative flex min-h-[120px] flex-col justify-end overflow-hidden p-4 pb-7"
+      >
+        {numeral > 0 && <CornerNumeral n={numeral} size={56} color={color} />}
+        <h3 className="max-w-[24ch] text-ui-lg font-semibold text-ink">{name}</h3>
+        <p className="mt-0.5 text-meta text-ink-soft">{meta}</p>
+        <BaseBand color={color} />
+      </Sheet>
+    </Link>
+  );
+}
+```
+
+- [ ] **Step 3: Rewrite `src/components/learn/GenerateTopicInput.tsx`**
+
+Replace the whole file. The `run` callback is the one from today's file, unchanged; the render is on primitives, the input id comes from `useId` (two instances can never share a page today, but the topic page empty state and the index both mount one, and a fixed id would silently collide the day they do).
+
+```tsx
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/Notice";
+
+/**
+ * The generate action: on the Learn index header (spec 3a) and, prefilled
+ * and compact, as the action of an empty topic's EmptyState (spec 3c).
+ *
+ * The route is synchronous (docs/02: "build the simple synchronous version
+ * first"), so it emits no progress events. The stage row is therefore driven
+ * on the client: "Classifying" while the classifier runs, then "Writing the
+ * models" once the generator call is plausibly underway, then the real filed
+ * path from the response (DECISIONS.md D-014). The final stage is the only one
+ * carrying server truth, which is why it is the only one that names a path.
+ *
+ * Two details that are easy to get wrong and were both caught in testing:
+ * the stage timer must be cleared on EVERY exit path, or a fast failure gets
+ * overwritten by a late "writing" tick and the input stays disabled forever;
+ * and the form carries a real submit button rather than relying on implicit
+ * submission (DECISIONS.md D-015).
+ */
+
+type Stage = "idle" | "classifying" | "writing" | "filing";
+
+type Failure = {
+  code: string;
+  message: string;
+  failures?: string[];
+};
+
+/** The classifier is fast; the generator is not. */
+const CLASSIFY_MS = 4_000;
+const FILED_LINGER_MS = 1_200;
+
+export function GenerateTopicInput({
+  initialValue = "",
+  compact = false,
+}: {
+  /** Prefill, used by the topic page empty state with the topic's name. */
+  initialValue?: string;
+  /** Drops the top margin so the form sits inside another component's layout. */
+  compact?: boolean;
+}) {
+  const router = useRouter();
+  const inputId = useId();
+  const [value, setValue] = useState(initialValue);
+  const [stage, setStage] = useState<Stage>("idle");
+  const [filedPath, setFiledPath] = useState<string[] | null>(null);
+  const [failure, setFailure] = useState<Failure | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearStageTimer = useCallback(() => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  }, []);
+
+  useEffect(() => clearStageTimer, [clearStageTimer]);
+
+  const busy = stage !== "idle";
+
+  const run = useCallback(
+    async (request: string) => {
+      if (!request) return;
+
+      clearStageTimer();
+      setFailure(null);
+      setFiledPath(null);
+      setStage("classifying");
+      timer.current = setTimeout(() => setStage("writing"), CLASSIFY_MS);
+
+      const fail = (code: string, message: string, failures?: string[]) => {
+        clearStageTimer();
+        setStage("idle");
+        setFailure({ code, message, failures });
+      };
+
+      try {
+        const response = await fetch("/api/models/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ request }),
+        });
+
+        const payload: unknown = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          const body = payload as {
+            error?: { code?: string; message?: string };
+            failures?: string[];
+          };
+          fail(
+            body?.error?.code ?? "INTERNAL",
+            body?.error?.message ?? "Generation failed.",
+            body?.failures,
+          );
+          return;
+        }
+
+        const result = payload as { docId: string; topicId: string; topicPath: string[] };
+        clearStageTimer();
+        setFiledPath(result.topicPath);
+        setStage("filing");
+        setValue("");
+        router.push(`/learn/${result.topicId}?doc=${result.docId}`);
+        router.refresh();
+        // Leave the filing line up briefly so the destination registers.
+        timer.current = setTimeout(() => setStage("idle"), FILED_LINGER_MS);
+      } catch {
+        fail(
+          "AI_UNAVAILABLE",
+          "Could not reach the server. Check that the dev server is running, then try again.",
+        );
+      }
+    },
+    [clearStageTimer, router],
+  );
+
+  function onSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    void run(value.trim());
+  }
+
+  return (
+    <div className={compact ? "" : "mt-6"}>
+      <form onSubmit={onSubmit} className="flex items-center gap-1.5">
+        <label htmlFor={inputId} className="sr-only">
+          Generate mental models for a topic
+        </label>
+        <input
+          id={inputId}
+          type="text"
+          value={value}
+          disabled={busy}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="Generate mental models for any topic..."
+          className="h-8 min-w-0 flex-1 rounded-input border border-hairline bg-paper-0 px-2.5 text-ui text-ink shadow-sheet placeholder:text-ink-faint disabled:opacity-60"
+        />
+        <Button type="submit" size="md" loading={busy} disabled={value.trim().length === 0}>
+          {busy ? "Working..." : "Generate"}
+        </Button>
+      </form>
+
+      {busy && (
+        <ol aria-live="polite" className="mt-2 flex flex-col gap-1 px-0.5 text-meta text-ink-soft">
+          <StageLine done={stage !== "classifying"} active={stage === "classifying"}>
+            Classifying the topic
+          </StageLine>
+          <StageLine done={stage === "filing"} active={stage === "writing"}>
+            Writing the models
+          </StageLine>
+          <StageLine done={false} active={stage === "filing"}>
+            {filedPath ? `Filing under ${filedPath.join(" / ")}` : "Filing"}
+          </StageLine>
+        </ol>
+      )}
+
+      {failure && (
+        <FailureNotice
+          failure={failure}
+          canRetry={value.trim().length > 0}
+          onRetry={() => void run(value.trim())}
+        />
+      )}
+    </div>
+  );
+}
+
+function StageLine({
+  children,
+  active,
+  done,
+}: {
+  children: React.ReactNode;
+  active: boolean;
+  done: boolean;
+}) {
+  return (
+    <li className={active ? "text-ink" : done ? "text-ink-soft" : "text-ink-faint"}>
+      <span aria-hidden className="mr-1.5">
+        {done ? "✓" : active ? "▸" : "·"}
+      </span>
+      {children}
+    </li>
+  );
+}
+
+/**
+ * Typed failure states (docs/06 §7). A non-math request is a friendly dead end
+ * with no retry button; everything else offers a retry.
+ */
+function FailureNotice({
+  failure,
+  onRetry,
+  canRetry,
+}: {
+  failure: Failure;
+  onRetry: () => void;
+  canRetry: boolean;
+}) {
+  const notMath = failure.code === "NOT_MATH";
+
+  return (
+    <Notice
+      kind={notMath ? "warning" : "error"}
+      className="mt-2"
+      action={
+        !notMath && canRetry ? (
+          <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
+            Try again
+          </Button>
+        ) : undefined
+      }
+    >
+      <p className="text-ui leading-snug text-ink">{failure.message}</p>
+
+      {failure.failures && failure.failures.length > 0 && (
+        <ul className="mt-1.5 flex flex-col gap-0.5 text-meta leading-snug text-ink-soft">
+          {failure.failures.slice(0, 4).map((line) => (
+            <li key={line}>· {line}</li>
+          ))}
+        </ul>
+      )}
+    </Notice>
+  );
+}
+```
+
+The button is `size="md"` (32px) so it lines up with the 32px input; the spec's `sm` (24px) would sit 8px short of the field next to it. Note this in the task report.
+
+- [ ] **Step 4: Delete the Learn layout and create the `[topicId]` layout**
+
+```bash
+git rm "src/app/(tabs)/learn/layout.tsx"
+```
+
+Create `src/app/(tabs)/learn/[topicId]/layout.tsx`:
+
+```tsx
+import { TopicTree } from "@/components/learn/TopicTree";
+import { Sheet } from "@/components/ui/Sheet";
+import { getTopicTree } from "@/lib/topics";
+
+/** Reads the database on every request: the topic tree changes whenever a
+ *  document is generated, so this must not be prerendered. */
+export const dynamic = "force-dynamic";
+
+/**
+ * Frames every route under /learn/[topicId] (the topic page, the ?doc= reader
+ * and /history) with the topic rail (spec 3b, D-055). The Learn index has no
+ * rail (spec 3a), which is why this lives here and not in learn/layout.tsx.
+ *
+ * The rail is a full-height, self-scrolling column: the page frame scrolls
+ * the content column, not the window, so there is nothing for it to stick to.
+ * Task 5 swaps TopicTree for TopicRail; nothing else here changes.
+ */
+export default async function TopicLayout({ children }: { children: React.ReactNode }) {
+  const topics = await getTopicTree();
+
+  return (
+    <div className="flex h-full min-h-0 gap-2 p-2">
+      <Sheet
+        as="aside"
+        tone="paper-1"
+        aria-label="Topics"
+        className="hidden h-full min-h-0 w-[320px] shrink-0 flex-col overflow-y-auto py-2 lg:flex"
+      >
+        <TopicTree topics={topics} />
+      </Sheet>
+
+      <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
+    </div>
+  );
+}
+```
+
+Until Task 6 the topic page still carries its own `px-8 py-10` inside this column; that is expected.
+
+- [ ] **Step 5: Rewrite `src/app/(tabs)/learn/page.tsx`**
+
+Replace the whole file:
+
+```tsx
+import Link from "next/link";
+
+import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
+import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
+import { TopicTree } from "@/components/learn/TopicTree";
+import { Icon } from "@/components/ui/Icon";
+import { Sheet } from "@/components/ui/Sheet";
+import { prisma } from "@/lib/db";
+import { deserializeModelIndex } from "@/lib/modelIndex";
+import { accentForRoot } from "@/lib/topicColors";
+import { getDescendantCounts, getTopicTree, type DescendantCounts } from "@/lib/topics";
+
+/** Reads the database on every request: the topic tree and doc list change
+ *  whenever a document is generated, so this must not be prerendered. */
+export const dynamic = "force-dynamic";
+
+/** Spec 3a: the eight most recent documents, one row each. */
+const RECENT_TAKE = 8;
+/** Spec 3a fallback: past this many roots the cover grid stops reading as a shelf. */
+const COVER_GRID_MAX_ROOTS = 12;
+const ZERO: DescendantCounts = { docs: 0, verifiedProblems: 0 };
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+/**
+ * Learn index (spec 3a): a cover per root topic with its descendant doc count
+ * as the numeral, the generate action, and the recent documents so the seeded
+ * exemplar is one click from the front door.
+ */
+export default async function LearnIndexPage() {
+  const [tree, counts, rootOrder, docs] = await Promise.all([
+    getTopicTree(),
+    getDescendantCounts(),
+    // Seed order (creation order), not the tree's alphabetical order: the
+    // taxonomy reads Arithmetic before Algebra on purpose.
+    prisma.topic.findMany({
+      where: { parentId: null },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.mentalModelDoc.findMany({
+      select: {
+        id: true,
+        title: true,
+        isExemplar: true,
+        modelIndexJson: true,
+        createdAt: true,
+        topic: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: RECENT_TAKE,
+    }),
+  ]);
+
+  const rootById = new Map(tree.map((root) => [root.id, root]));
+  const roots = rootOrder.flatMap((row) => {
+    const root = rootById.get(row.id);
+    return root ? [root] : [];
+  });
+
+  return (
+    <div className="h-full overflow-y-auto p-2">
+      <div className="grid grid-cols-1 gap-6 pt-16 lg:grid-cols-[minmax(280px,1fr)_2fr]">
+        <header>
+          <h1 className="display-cut text-display text-ink">Learn</h1>
+          <p className="mt-3 max-w-[40ch] text-ui text-ink-soft">
+            Mental models for any math topic, filed into a tree you can browse. Open a cover, or
+            generate a new set.
+          </p>
+          <GenerateTopicInput />
+        </header>
+
+        <section aria-labelledby="learn-topics">
+          <h2 id="learn-topics" className="sr-only">
+            Topics
+          </h2>
+
+          {roots.length > COVER_GRID_MAX_ROOTS ? (
+            <Sheet tone="paper-1" className="animate-enter-sheet py-2">
+              <TopicTree topics={tree} />
+            </Sheet>
+          ) : (
+            <ul aria-label="Topic covers" className="animate-enter-sheet grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {roots.map((root) => {
+                const c = counts.get(root.id) ?? ZERO;
+                return (
+                  <li key={root.id}>
+                    <TopicCoverCard
+                      href={`/learn/${root.id}`}
+                      name={root.name}
+                      numeral={c.docs}
+                      meta={`${plural(c.docs, "model")} · ${plural(c.verifiedProblems, "problem")}`}
+                      accent={accentForRoot(root.name)}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <h2 className="meta-caps mt-10 text-ink-soft">Recent</h2>
+          <Sheet tone="paper-1" className="mt-2 overflow-hidden">
+            {docs.length === 0 ? (
+              <p className="px-4 py-6 text-ui text-ink-soft">
+                No documents yet. Generate one, or run <code>npx prisma db seed</code> to load the
+                exemplar.
+              </p>
+            ) : (
+              <ul className="divide-y divide-hairline">
+                {docs.map((doc) => {
+                  const modelCount = deserializeModelIndex(doc.modelIndexJson).length;
+                  return (
+                    <li key={doc.id}>
+                      <Link
+                        href={`/learn/${doc.topic.id}?doc=${doc.id}`}
+                        className="flex items-start gap-3 px-4 py-3 transition-colors duration-150 ease-paper hover:bg-paper-0"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-meta text-ink-soft">
+                            {doc.topic.name} · {plural(modelCount, "model")}
+                            {doc.isExemplar ? " · Exemplar" : ""}
+                            {" · "}
+                            {doc.createdAt.toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </p>
+                          <p className="truncate text-ui font-medium text-ink">{doc.title}</p>
+                        </div>
+                        <Icon name="plus" className="mt-0.5 shrink-0 text-ink-soft" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Sheet>
+        </section>
+      </div>
+    </div>
+  );
+}
+```
+
+`MentalModelDoc` has no description column, so the row is meta + title (the spec's "description, clamped" has no data behind it; say so in the task report). `getRootNameByTopicId` is no longer imported here: a root's accent is its own name.
+
+- [ ] **Step 6: Gate**
+
+Run: `npm run typecheck && npm run lint`
+Expected: no errors. Likely trips and their fixes: `Sheet` typed `as="aside"` must accept `aria-label` (it spreads `ComponentPropsWithoutRef<"aside">`); if `Notice`'s `action` is typed narrower than `ReactNode`, match plan A's type, do not edit the primitive; if `deserializeModelIndex` takes a different argument type than `modelIndexJson`'s column type, read `src/lib/modelIndex.ts`'s signature and pass what `getTopicDetail` passes (it calls `deserializeModelIndex(doc.modelIndexJson)`).
+
+- [ ] **Step 7: Visual and keyboard check**
+
+Open http://localhost:3010/learn at 1440x900.
+
+- Two columns: "Learn" in the display cut at left with the intro and the generate form (32px input on `paper-0`, 32px primary button); at right a 2-column grid of covers, one per root, with the accent band along each bottom and a numeral only on roots that have documents beneath them. `read_page`: the `ul[aria-label="Topic covers"]` items, each a link `/learn/<rootId>`; the Algebra cover's meta reads at least "1 model" (the seeded exemplar rolls up from Distance-Rate-Time).
+- `javascript_tool`: `document.querySelectorAll('ul[aria-label="Topic covers"] > li > a').length` equals the root count shown by `read_page`; `document.querySelector('form button[type="submit"]').disabled` is `true`, then after `computer` types "rates" into the field it is `false` (do NOT submit: the route calls the generator). Clear the field.
+- Recent: one `paper-1` sheet with hairline rows, the exemplar row first ("Distance-Rate-Time · n models · Exemplar · date", then the title), `Icon plus` at the right. `document.querySelector('a[href*="?doc="]').getAttribute('href')` gives `/learn/<drtId>?doc=<docId>`; keep both ids for Task 8.
+- Navigate to `/learn/<drtId>`: the tree is on the left inside a 320px sheet and the topic page on the right. `javascript_tool`: `document.querySelector('aside[aria-label="Topics"]').getBoundingClientRect().width` is `320`; `getComputedStyle(document.querySelector('aside[aria-label="Topics"]')).overflowY` is `"auto"`; `document.querySelector('main').getBoundingClientRect().width` is unchanged from `/learn` (the rail is inside main, not beside it). `/learn/<drtId>/history` shows the same rail. `resize_window` to 1000x900: `getComputedStyle(document.querySelector('aside[aria-label="Topics"]')).display` is `"none"`; back to 1440x900 it is `"flex"`.
+- Keyboard on `/learn`: Tab order is TopBar chips, then the generate field, then the Generate button (skipped while disabled), then the first cover, the rest of the covers, the Recent rows; each cover shows the global focus ring on the rounded sheet.
+- Reduced motion emulated: the cover grid appears without the enter animation.
+
+- [ ] **Step 8: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|stock-textured" src/lib/topics.ts src/components/learn/TopicCoverCard.tsx src/components/learn/GenerateTopicInput.tsx "src/app/(tabs)/learn/[topicId]/layout.tsx" "src/app/(tabs)/learn/page.tsx" ; grep -n $'\xe2\x80\x94' src/lib/topics.ts src/components/learn/TopicCoverCard.tsx src/components/learn/GenerateTopicInput.tsx "src/app/(tabs)/learn/[topicId]/layout.tsx" "src/app/(tabs)/learn/page.tsx"
+```
+
+Both print nothing. (`min-h-[120px]`, `w-[320px]`, `max-w-[40ch]` and `grid-cols-[...]` are arbitrary values, but only `text-[` is banned.) Also `ls "src/app/(tabs)/learn"` no longer lists `layout.tsx`.
+
+- [ ] **Step 9: Commit**
+
+`[topicId]` is a glob to git's pathspec matcher, so the literal flag is required:
+
+```bash
+GIT_LITERAL_PATHSPECS=1 git add src/lib/topics.ts src/components/learn/TopicCoverCard.tsx src/components/learn/GenerateTopicInput.tsx "src/app/(tabs)/learn/[topicId]/layout.tsx" "src/app/(tabs)/learn/page.tsx"
+git status --short
+git commit -m "Add descendant counts and topic covers to the Learn index; move the rail under [topicId] (stage B, spec 3a)"
+```
+
+`git status --short` before the commit lists exactly the five paths above plus `D  src/app/(tabs)/learn/layout.tsx` (staged by Step 4's `git rm`).
+
+---
