@@ -564,3 +564,41 @@ Fix: put the four next/font `.variable` classes on `<html>` and leave
 `stock-textured antialiased` on `<body>`. Confirmed in the browser: `:root` now
 resolves all four, body computes to Archivo, doc body to Source Serif 4, code to
 IBM Plex Mono, and doc `h1`/`h2` to Advercase.
+
+### D-044. `/practice` becomes a topic picker, not a placeholder
+
+The Practice tab in the top bar pointed at `/practice`, which was still the
+Phase 0 scaffold placeholder reading "Not built yet. The practice loop arrives
+in Phase 3." The practice loop had in fact shipped in Phase 3, at
+`/practice/[topicId]`, and works. Only the index route was never revisited:
+`git log` on that file shows two commits, the Phase 0 scaffold and an unrelated
+typography pass. docs/07's Phase 3 task list scopes "Practice tab left panel
+complete", which is the topic-scoped workspace, so nothing ever assigned the
+index. Every working route into practice (`Practice this topic` on a topic page,
+and the attempt-history page) links to `/practice/[topicId]`, so the nav tab was
+the single affordance that dead-ended.
+
+docs/06 lists `/practice` in its route table but §3 only specifies the
+topic-selected split view, so the no-topic state was undefined. Smallest
+reasonable choice, per the working agreement: make it a picker whose only job is
+to get you into a topic.
+
+It lists **two** groups, not one:
+
+- **Ready to practice**: `verifiedProblemCount > 0`, ordered by pool size.
+- **Models ready, no problems yet**: `docCount > 0` and no verified problems.
+
+The second group is load-bearing rather than decoration. A topic needs a model
+document before problems can be generated against it, and on the current
+database exactly one topic (Distance-Rate-Time, 12 verified problems) has a
+pool while six more have documents and none. A page showing only the first group
+would render a single card, or nothing at all on a fresh seed, which is the same
+"looks broken" failure the placeholder had. Opening a topic in the second group
+lands on `PoolEmptyState`, which offers "Generate 5 problems"; verified in the
+browser rather than assumed.
+
+No new query: `getTopicTree()` already returns `docCount` and
+`verifiedProblemCount` per topic, and its verified count is deliberately a
+separate grouped query so unverified problems can never be surfaced
+(non-negotiable 2). The page flattens that tree and filters it. Accents come
+from `getRootNameByTopicId()`, matching the Learn index.
