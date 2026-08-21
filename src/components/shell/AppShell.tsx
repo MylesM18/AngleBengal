@@ -26,14 +26,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen flex-col">
       <header className="stock-textured z-20 flex h-14 shrink-0 items-center gap-6 border-b border-ink-faint/40 bg-kraft px-4">
         <Link href="/learn" className="flex items-center gap-2" aria-label="AngleBengal home">
-          <Image
-            src="/anglebengal-mark.svg"
-            alt=""
-            width={28}
-            height={28}
-            priority
-            className="shrink-0"
-          />
+          {/* Not `priority`: next/image does not optimize SVG, so preloading a
+              28px mark only earns an unused-preload warning. */}
+          <Image src="/anglebengal-mark.svg" alt="" width={28} height={28} className="shrink-0" />
           <span className="font-expanded text-[16px] text-ink">AngleBengal</span>
         </Link>
 

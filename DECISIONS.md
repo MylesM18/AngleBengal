@@ -230,3 +230,43 @@ Recorded because both were silent and neither showed up in the gates:
 2. **Doc accent used the leaf topic, not the root.** Fixed in Phase 0; noted
    here because the same root-resolution helper is what the generated docs rely
    on to pick up their topic colors.
+
+### D-017. Tutor streaming uses a JSON header line, not SSE
+
+docs/04 specifies "a text stream" whose first chunk is preceded by a JSON
+header line carrying the session id. Implemented literally: the response is
+`text/plain`, the first line is `{"sessionId":"..."}\n`, and everything after
+that newline is answer text.
+
+Server-Sent Events were the obvious alternative and were not used: SSE would
+require framing every delta as `data:` lines and re-joining them on the client,
+for no gain here. There is exactly one stream, one consumer, and no need for
+event types or reconnection.
+
+Failures after the stream opens cannot use a status code, since the headers are
+already sent. They arrive as a trailing `[error] ...` line, which the client
+renders as part of the turn rather than as a blank drawer (non-negotiable 4).
+
+### D-018. History budget is a quarter of the context ceiling
+
+docs/02 sets a ~12k token ceiling on injected context but does not split it
+between documents and conversation history. Model docs are the expensive part
+and the reason the tutor is worth anything, so history gets
+`CONTEXT_TOKEN_BUDGET / 4` (3k tokens, roughly a dozen turns) and documents
+keep the rest. History is trimmed newest-first and then restored to
+chronological order.
+
+### D-019. The composer is controlled by the drawer
+
+React's `set-state-in-effect` lint rule (correctly) rejects syncing a prop into
+local state via `useEffect`. The composer therefore holds no text of its own:
+the drawer owns the draft, and clicking a starter prompt is a plain state
+update in the parent. Focus is still moved in an effect, because focusing is a
+DOM side effect rather than a state update.
+
+### D-020. Empty chat sessions are filtered out of the session list
+
+A `ChatSession` row is created before the first turn is persisted, so a request
+that fails before the model responds can leave an empty shell. The sessions
+list filters to sessions with at least one message rather than showing untitled
+empty rows the student cannot open usefully.

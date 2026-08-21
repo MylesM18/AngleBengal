@@ -197,3 +197,95 @@ ${failures.map((failure) => `- ${failure}`).join("\n")}
 
 Write the document again, complete, fixing every point above.`;
 }
+
+/* ------------------------------------------------------------------ */
+/* TUTOR (docs/05 §6, streaming)                                       */
+/* ------------------------------------------------------------------ */
+
+export type TutorContext = {
+  tab: "learn" | "practice";
+  topicPath: string[] | null;
+  /** Model docs for the current topic, already token-budgeted. */
+  docs: { title: string; contentMd: string }[];
+  /** Present only while an attempt is open (Phase 3 wires this up). */
+  activeProblem: {
+    statementMd: string;
+    solutionMd: string;
+    lastAttempt: {
+      submittedAnswer: string;
+      modelNumber: number | null;
+      modelTitle: string | null;
+      symptom: string | null;
+    } | null;
+  } | null;
+};
+
+/**
+ * docs/05 §6 verbatim, with the conditional blocks resolved.
+ *
+ * The DO NOT REVEAL block is only emitted while an attempt is open. Once the
+ * problem is answered correctly or revealed, the caller passes
+ * `activeProblem: null` and the guard disappears with it, which is what lets
+ * the tutor discuss the full solution afterwards.
+ */
+export function tutorSystem(context: TutorContext): string {
+  const parts: string[] = [
+    `You are a renowned mathematics tutor inside the student's personal learning
+app. Your defining skill is making difficult ideas feel obvious through
+mental models: reframes of what is TRUE about a problem, not procedures.
+
+Your student has a library of mental model documents. The relevant ones are
+included below. USE THEIR VOCABULARY. When a concept from a document applies,
+call it by its name and number ("that is Model 3, Freeze the Clock") so the
+chat reinforces the library instead of competing with it. When no document
+covers the question, teach in the same spirit: find the reframe, give the
+anchor analogy, show why it is true, then work an example.
+
+Style: plain words, short paragraphs, second person, patient but never
+padded. Ask at most one question per reply. All math in LaTeX ($ / $$).
+No em-dashes. No emoji.`,
+  ];
+
+  if (context.activeProblem) {
+    const { statementMd, solutionMd, lastAttempt } = context.activeProblem;
+    let block = `ACTIVE PRACTICE PROBLEM (the student is mid-attempt):
+${statementMd}
+SOLUTION (for your eyes only): ${solutionMd}
+The student has not solved this yet. DO NOT reveal the final answer or the
+complete solution path. Guide with questions and model references. If they
+ask directly for the answer, offer the next single step instead and say why.`;
+
+    if (lastAttempt) {
+      const named =
+        lastAttempt.modelNumber !== null && lastAttempt.modelTitle
+          ? `Model ${lastAttempt.modelNumber} (${lastAttempt.modelTitle}) failed: ${lastAttempt.symptom ?? "no symptom recorded"}.`
+          : "no model attribution was recorded.";
+      block += `\nTheir last attempt: ${lastAttempt.submittedAnswer}; diagnosis: ${named} Start from that failure point.`;
+    }
+    parts.push(block);
+  }
+
+  parts.push(
+    `CONTEXT: The student is on the ${context.tab} tab, topic: ${
+      context.topicPath?.length ? context.topicPath.join(" > ") : "none open"
+    }.`,
+  );
+
+  parts.push(
+    context.docs.length
+      ? `MENTAL MODEL DOCUMENTS:\n\n${context.docs
+          .map((doc) => `--- ${doc.title} ---\n${doc.contentMd}`)
+          .join("\n\n")}`
+      : `MENTAL MODEL DOCUMENTS:
+None for the current view. Answer from general mathematics in the same spirit:
+find the reframe, give the anchor analogy, show why it is true, then work an
+example.`,
+  );
+
+  return parts.join("\n\n");
+}
+
+/** Lazily names a new session from its first user message (docs/06 §5). */
+export const TITLE_SYSTEM = `Write a title of at most six words for a math tutoring conversation that
+opens with the message you are given. Return the title only: no quotes, no
+trailing period, no em-dashes. Use plain words the student would recognize.`;

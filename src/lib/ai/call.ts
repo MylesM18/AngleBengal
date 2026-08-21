@@ -187,3 +187,49 @@ function asApiError(error: unknown, promptName: PromptName): ApiError {
     "The AI service did not respond. Try again in a moment.",
   );
 }
+
+/**
+ * Streaming text call, used by the tutor (docs/05 §6).
+ *
+ * Yields text deltas as they arrive. The AiCallLog row is written when the
+ * stream finishes, so a stream that dies partway is still logged with ok=false
+ * and whatever usage the API reported.
+ */
+export type StreamOptions = CallOptions & {
+  /** Prior turns, oldest first, already token-budgeted by the caller. */
+  history?: { role: "user" | "assistant"; content: string }[];
+};
+
+export async function* streamText(
+  options: StreamOptions,
+): AsyncGenerator<string, void, unknown> {
+  const started = Date.now();
+  let usage: Usage = { inputTokens: 0, outputTokens: 0 };
+  let ok = false;
+
+  try {
+    const stream = await getOpenAI().responses.create({
+      model: options.model,
+      input: [
+        { role: "system" as const, content: options.system },
+        ...(options.history ?? []),
+        { role: "user" as const, content: options.user },
+      ],
+      stream: true,
+      ...(options.effort ? { reasoning: { effort: options.effort } } : {}),
+    });
+
+    for await (const event of stream) {
+      if (event.type === "response.output_text.delta") {
+        yield event.delta;
+      } else if (event.type === "response.completed") {
+        usage = usageOf(event.response);
+        ok = true;
+      }
+    }
+  } catch (error) {
+    throw asApiError(error, options.promptName);
+  } finally {
+    await logCall(options.promptName, options.model, usage, Date.now() - started, ok);
+  }
+}

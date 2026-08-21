@@ -291,3 +291,42 @@ body {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* Chat bubbles reuse the doc renderer at a tighter, sans-serif scale. */
+.doc-prose.chat-prose {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.doc-prose.chat-prose > :last-child {
+  margin-bottom: 0;
+}
+
+.doc-prose.chat-prose p,
+.doc-prose.chat-prose ul,
+.doc-prose.chat-prose ol {
+  margin-bottom: 0.55rem;
+}
+
+.doc-prose.chat-prose h1,
+.doc-prose.chat-prose h2,
+.doc-prose.chat-prose h3 {
+  font-size: 14px;
+  font-stretch: normal;
+  margin: 0.7rem 0 0.3rem;
+}
+
+.doc-prose.chat-prose table {
+  font-size: 12px;
+}
+
+.doc-prose.chat-prose .katex-display {
+  margin: 0.35rem 0;
+  padding: 4px 0;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
