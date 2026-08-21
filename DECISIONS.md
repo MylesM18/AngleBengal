@@ -3,11 +3,16 @@
 Small choices made where the specs were ambiguous, per the working agreement in
 CLAUDE.md. Each entry names the ambiguity, the choice, and why.
 
-## Open, blocked on owner
+## Resolved
 
 ### D-009. The exemplar contains no LaTeX, but the generator is told to emit only LaTeX
 
-**Status: OPEN. Needs a decision before Phase 1 generation is trusted.**
+**Status: RESOLVED 2026-08-21. Owner chose (a), and it worked.**
+
+The generator prompt carries an EXEMPLAR DEVIATIONS block naming both
+deviations explicitly. Measured across five generated documents: **0 code-span
+formulas and 133 to 228 LaTeX spans each**, with 254 KaTeX elements rendering
+and 0 KaTeX errors on the Related Rates page. No escalation to (b) needed.
 
 Same shape as D-001, found while verifying Phase 0. The exemplar contains
 **zero** `$` or `$$` math delimiters. All twenty of its formulas are markdown
@@ -46,10 +51,7 @@ Options:
   from docs/05 §2.1 and lean on KaTeX only where a generated doc chooses `$`.
   Contradicts the KaTeX locked decision.
 
-Recommendation: **(a)**, and inspect the first generated doc. If it comes back
-with code-span math anyway, escalate to (b).
-
-## Resolved
+Recommendation was **(a)**, and the first generated doc confirmed it.
 
 ### D-001. The exemplar contains em-dashes that the spec forbids
 
@@ -68,7 +70,7 @@ counter-instruction.
 counter-instruction, both of which live in `src/lib/ai/prompts.ts`, which does
 not exist yet.
 
-`content/exemplars/drt-mental-models.md` contains 31 em-dash characters,
+`content/exemplars/drt-mental-models.md` contains 32 em-dash characters across 31 lines,
 including in all six model headings (`## Model 1 — A rate is an exchange rate,
 not a measurement`).
 
@@ -108,8 +110,6 @@ Options, for the owner to choose:
 
 No option is implemented yet. Nothing about this is safe to guess: it changes
 the few-shot that sets the quality bar for every generated document.
-
-## Resolved
 
 ### D-002. Session scope
 
@@ -194,3 +194,39 @@ The block's actual advice is worth keeping in mind though, so it is recorded
 here instead: **Next 16 has breaking changes from earlier versions, and the
 authoritative docs ship in `node_modules/next/dist/docs/`.** Check there before
 writing Next-specific code rather than relying on recall.
+
+### D-014. Generation progress stages are client-side
+
+docs/06 §2 asks for a staged progress row ("Classifying, Writing models, Filing
+under ..."), but docs/02 says to build the synchronous version of the generate
+route first, and a synchronous route emits no progress events.
+
+The stages are therefore driven on the client: "Classifying the topic"
+immediately, "Writing the models" after 4 seconds (the classifier is fast, the
+generator is not), and "Filing under {path}" from the response. Only the last
+stage carries server truth, which is why it is the only one that names a path.
+If the route later streams real progress (docs/02 offers that path), these
+become real events with no UI change.
+
+### D-015. The generate form has an explicit submit button
+
+docs/06 §2 describes "a single input". A form with no submit control relies on
+implicit submission, which is fragile and gives no visible affordance. Added a
+"Generate" button: it is the discoverable action, it gives the disabled and
+busy states somewhere to live, and it keeps the control reachable by keyboard
+without depending on implicit submission.
+
+### D-016. Bugs found and fixed while verifying Phase 1
+
+Recorded because both were silent and neither showed up in the gates:
+
+1. **Orphaned stage timer.** The 4-second "Writing the models" timer was not
+   cleared when a request failed faster than that. A non-math request would
+   return in about 2 seconds, set the failure, and then get overwritten by the
+   late tick: the stage row stuck on "Writing the models" and the input stayed
+   **disabled permanently**, which broke the retry requirement in Phase 1
+   acceptance criterion 2. The timer is now cleared on every exit path, and the
+   stale-closure `finally` that pretended to do this was removed.
+2. **Doc accent used the leaf topic, not the root.** Fixed in Phase 0; noted
+   here because the same root-resolution helper is what the generated docs rely
+   on to pick up their topic colors.

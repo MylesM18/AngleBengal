@@ -1,0 +1,199 @@
+import "server-only";
+
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
+import type { TopicNode } from "@/lib/topics";
+
+/**
+ * Every prompt, as a template function (docs/05).
+ *
+ * Two of these templates carry deliberate corrections to the spec, both
+ * recorded in DECISIONS.md, both the same underlying problem: the exemplar is
+ * injected as the few-shot AND the instructions contradict what it does.
+ *
+ *   D-001: the exemplar uses 31 em-dashes; house style forbids them and
+ *          validation rejects them. Fix: strip them from the injected copy
+ *          (the file on disk is never touched), plus a counter-instruction.
+ *   D-009: the exemplar writes math as code spans and never uses LaTeX; the
+ *          spec requires `$`-delimited LaTeX. Fix: a counter-instruction.
+ *
+ * Without these, the model imitates the example over the instruction and the
+ * generated doc fails validation.
+ */
+
+const EXEMPLAR_PATH = "content/exemplars/drt-mental-models.md";
+
+let exemplarCache: string | null = null;
+
+/**
+ * Replaces em-dashes with hyphens for the prompt copy only. House style allows
+ * hyphens, and this keeps `## Model 1 - Title` in the canonical docs/03 form.
+ */
+export function stripEmDashes(text: string): string {
+  return text.replace(/\s*—\s*/g, " - ");
+}
+
+/** The exemplar as the model should see it: em-dash free (D-001). */
+export async function loadExemplarForPrompt(): Promise<string> {
+  if (exemplarCache) return exemplarCache;
+  const raw = await readFile(path.join(process.cwd(), EXEMPLAR_PATH), "utf8");
+  exemplarCache = stripEmDashes(raw);
+  return exemplarCache;
+}
+
+/* ------------------------------------------------------------------ */
+/* CLASSIFIER (docs/05 §3)                                             */
+/* ------------------------------------------------------------------ */
+
+export const CLASSIFIER_SYSTEM = `You are a librarian for a mathematics curriculum. Given a user's free-text
+request for a math topic and the current topic taxonomy, decide where it
+belongs.
+
+Rules:
+- Prefer filing under an EXISTING topic. Only propose new nodes when nothing
+  fits at all.
+- New paths must be at most 3 levels deep and must reuse an existing root
+  (Algebra, Geometry, Trigonometry, Precalculus, Calculus, Statistics &
+  Probability) unless the topic truly belongs to none of them (e.g., Linear
+  Algebra, Discrete Math), in which case a new root is allowed.
+- Normalize names to standard curriculum terminology in Title Case
+  ("Related Rates", not "related rates problems").
+- If the request is not a mathematics topic, set isMath to false.
+
+Return existingTopicId as the id string of the matching topic and newTopicPath
+as null, OR existingTopicId as null and newTopicPath as the full root-to-leaf
+path. Exactly one of the two is non-null when isMath is true. When isMath is
+false, set both to null and canonicalName to the empty string.`;
+
+/** The tree as an indented list, with ids so the model can return one. */
+export function renderTaxonomy(topics: TopicNode[], depth = 0): string {
+  return topics
+    .map((topic) => {
+      const line = `${"  ".repeat(depth)}- ${topic.name} [id: ${topic.id}]`;
+      const children = topic.children.length
+        ? `\n${renderTaxonomy(topic.children, depth + 1)}`
+        : "";
+      return line + children;
+    })
+    .join("\n");
+}
+
+export function classifierUser(request: string, topics: TopicNode[]): string {
+  return `Request: ${request}
+
+Current taxonomy:
+${renderTaxonomy(topics)}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* GENERATOR (docs/05 §2)                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * docs/05 §2.1 verbatim, plus the EXEMPLAR DEVIATIONS block. That block is the
+ * whole reason generation can satisfy validation: the exemplar is the
+ * strongest signal in this prompt, and on these two points it must not be
+ * copied.
+ */
+export async function generatorSystem(): Promise<string> {
+  const exemplar = await loadExemplarForPrompt();
+
+  return `You are a mathematics educator who writes mental model documents: guides that
+teach how to THINK about a class of problems, not procedures to memorize. Your
+documents close the translation gap, the moment when a student has read a
+problem, has numbers on the page, and does not know what mathematics to write.
+
+You will be given a math topic. Write a complete mental model document for it
+in markdown, following EXACTLY the structure of the exemplar document provided
+below. The exemplar is about distance-rate-time problems; your document is
+about the given topic, but its architecture, depth, and voice must match.
+
+REQUIRED STRUCTURE (validated programmatically; missing sections cause
+rejection):
+
+1. Title: "# {N} Mental Models for {Topic}" with an italic one-line subtitle
+   stating what the models let you do.
+2. "## Why models instead of steps": 2-3 paragraphs naming the specific
+   translation failure students hit in this topic, and one paragraph on how
+   the models stack.
+3. Between 3 and 7 sections titled "## Model {n} - {Short memorable name}".
+   Each model MUST contain these H3 subsections:
+   - "### The idea": the reframe itself, stated in 1-3 paragraphs with one
+     concrete anchor analogy (like "a rate is a currency conversion").
+   - "### Why this works": the mathematical or physical reason the reframe is
+     true, not an appeal to authority. Use a table or worked micro-example
+     where it sharpens the point.
+   - "### What it fixes": 2-4 bullet points naming specific student errors
+     this model prevents.
+   - "### Seeing it work" or "### Working it": at least one fully worked
+     example with real numbers, showing the model applied. Show wrong-answer
+     contrast where the topic has a classic trap.
+   - "### Habit" (optional but preferred): one sentence describing a physical,
+     repeatable behavior that installs the model.
+4. "## Putting them all on one problem": ONE integration problem worked
+   start to finish, explicitly narrating which model fires at each step,
+   by number and name.
+5. "## Diagnostic: which model is failing?": a markdown table with columns
+   Symptom | Failed model | Fix. Every model must appear at least once.
+   Symptoms are OBSERVABLE errors ("answer off by a factor of 60"), not vague
+   states ("confused about rates").
+6. "## The compressed loop": the whole method as one blockquoted sentence
+   chain, then 1-2 sentences naming the single most important failure mode
+   to self-monitor.
+
+RULES:
+- Models must be genuinely distinct lenses, not steps of one procedure
+  renamed. If two models only ever fire together, merge them.
+- Every claim of "why" must be real: unit analysis, a physical invariant,
+  a counting argument, a picture. Never "because that's the rule."
+- All math in LaTeX delimited by $ or $$. All tables in GitHub markdown.
+- Numbers in worked examples must be arithmetically correct. Recompute every
+  line before writing it.
+- Voice: direct, second person, confident, plain words. No em-dashes
+  anywhere in the document. No emoji. No exclamation-point enthusiasm.
+- Length target: comparable to the exemplar (2,500-4,500 words).
+
+EXEMPLAR DEVIATIONS (read this twice; it overrides imitation):
+
+The exemplar below is your model for STRUCTURE, DEPTH and VOICE. On exactly
+two points it does not follow the rules above, and you must follow the rules
+rather than the example:
+
+1. MATH NOTATION. The exemplar writes formulas as markdown code spans, like
+   \`d = rt\` and \`1.2(r + 35)\`. Do NOT do this. Write all mathematics as
+   LaTeX delimited by $ for inline and $$ for display: $d = rt$, and
+   $$\\frac{d}{28} + \\frac{d}{4} = 2$$. This applies inside tables too.
+2. DASHES. Do not use the em-dash character anywhere in your document. Use
+   commas, colons, parentheses, or hyphens instead. Model headings use a
+   plain hyphen: "## Model 3 - Freeze the clock".
+
+Everything else about the exemplar is the standard to hit.
+
+THE EXEMPLAR (structure and quality bar; different topic):
+
+${exemplar}`;
+}
+
+export function generatorUser(
+  topicName: string,
+  topicPath: string[],
+  emphasis?: string | null,
+): string {
+  const lines = [`Topic: ${topicName}`, `Taxonomy path: ${topicPath.join(" > ")}`];
+  if (emphasis?.trim()) lines.push(`Additional emphasis requested: ${emphasis.trim()}`);
+  return lines.join("\n");
+}
+
+/** Appended to the retry attempt so the model sees exactly what failed. */
+export function generatorRetryUser(
+  original: string,
+  failures: string[],
+): string {
+  return `${original}
+
+Your previous attempt was rejected by structural validation for these reasons:
+${failures.map((failure) => `- ${failure}`).join("\n")}
+
+Write the document again, complete, fixing every point above.`;
+}
