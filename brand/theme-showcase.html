@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AngleBengal · Swatch Book Theme</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Source+Serif+4:opsz,wght@8..60,200..900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper-0:#F9F5EC; --paper-1:#F1EADC; --desk:#E3DAC6; --kraft:#CBB281;
+  --ink:#322921; --ink-soft:#6B5F52; --ink-faint:#A69B8A;
+  --brand:#B5522E; --brand-deep:#8F3F22; --brand-tint:#EFD9CB;
+  --red:#A83A32; --red-tint:#F0D6D0; --green:#2E7D5B; --green-tint:#D8E6DA;
+  --marigold:#DFAF3F; --marigold-tint:#F4E6C4; --cobalt:#3D66A8; --cobalt-tint:#D7DFEE;
+  --plum:#4C3E57; --plum-tint:#E3DAE6; --teal:#40787A; --coral:#EC7574;
+  --chartreuse:#C9C05E; --mint:#8FBF9A; --pink:#E9A6B1;
+  --shadow-sheet:0 1px 2px rgba(50,41,33,.10),0 3px 10px rgba(50,41,33,.08);
+  --shadow-lift:0 2px 4px rgba(50,41,33,.12),0 8px 22px rgba(50,41,33,.10);
+  --shadow-cut:inset 0 2px 3px rgba(50,41,33,.18);
+  --r-card:10px; --r-input:6px; --r-chip:4px;
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.2 0 0 0 0 0.16 0 0 0 0 0.13 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Archivo',sans-serif;font-size:14px;color:var(--ink);
+  background:var(--desk);background-image:var(--grain);
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:48px 32px 96px}
+.meta{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+section{margin-top:72px}
+.sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:24px}
+.sec-head .rule{flex:1;height:1px;background:var(--ink-faint);opacity:.5}
+.serif{font-family:'Source Serif 4',serif}
+.mono{font-family:'IBM Plex Mono',monospace}
+.xp{font-stretch:125%;font-weight:700}
+
+/* entrance: paper settling */
+.in{opacity:0;transform:translateY(6px);animation:settle .5s cubic-bezier(.2,0,0,1) forwards}
+@keyframes settle{to{opacity:1;transform:none}}
+.in:nth-child(2){animation-delay:.06s}.in:nth-child(3){animation-delay:.12s}
+.in:nth-child(4){animation-delay:.18s}.in:nth-child(5){animation-delay:.24s}
+@media (prefers-reduced-motion: reduce){.in{animation:none;opacity:1;transform:none}}
+
+/* HERO */
+.hero{background:var(--paper-1);border-radius:var(--r-card);box-shadow:var(--shadow-lift);
+  padding:72px 48px 0;display:flex;flex-direction:column;align-items:center;text-align:center;overflow:hidden}
+.hero svg{width:120px;height:120px}
+.hero h1{font-size:52px;letter-spacing:-.01em;margin:20px 0 10px}
+.hero h1 .xp{font-stretch:112%}
+.hero p{font-size:16px;color:var(--ink-soft);max-width:46ch}
+.hero .band{width:100%;height:18px;background:var(--brand);margin-top:56px}
+
+/* SWATCHES */
+.swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+.swatch{border-radius:var(--r-card);box-shadow:var(--shadow-sheet);overflow:hidden;
+  aspect-ratio:3/4;position:relative;display:flex;flex-direction:column;justify-content:flex-end;
+  transition:transform .18s cubic-bezier(.2,0,0,1),box-shadow .18s}
+.swatch:hover{transform:translateY(-3px);box-shadow:var(--shadow-lift)}
+.swatch .num{position:absolute;top:10px;right:14px;font-size:44px;font-stretch:125%;font-weight:700;opacity:.9}
+.swatch .cut{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%);width:52px;height:52px;
+  background:var(--desk);background-image:var(--grain);box-shadow:var(--shadow-cut)}
+.cut.tri{clip-path:polygon(50% 8%,96% 92%,4% 92%)}
+.cut.cir{border-radius:50%}
+.cut.wedge{clip-path:polygon(8% 90%,50% 6%,92% 90%,50% 62%)}
+.swatch .label{padding:10px 12px;font-size:12px;font-weight:600;display:flex;justify-content:space-between}
+.swatch .label .hex{font-family:'IBM Plex Mono',monospace;font-weight:400;opacity:.75}
+
+/* TYPE */
+.typeboard{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+.typecard{background:var(--paper-0);border-radius:var(--r-card);box-shadow:var(--shadow-sheet);padding:36px}
+.typecard .huge{font-size:96px;font-stretch:125%;font-weight:700;line-height:1;letter-spacing:-.02em}
+.typecard .huge .deg{color:var(--brand)}
+.typecard .serif{font-size:17px;line-height:1.7;margin-top:8px}
+.typecard .serif b{font-weight:600}
+.spec-row{display:flex;justify-content:space-between;border-top:1px solid var(--ink-faint);
+  padding:14px 0;align-items:baseline;gap:16px}
+.spec-row:first-child{border-top:none;padding-top:0}
+.spec-row .sample{font-size:22px}
+
+/* UI MOMENTS */
+.moments{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.sheet{background:var(--paper-1);border-radius:var(--r-card);box-shadow:var(--shadow-sheet);
+  overflow:hidden;display:flex;flex-direction:column}
+.sheet .body{padding:24px;flex:1;position:relative}
+.baseband{height:16px}
+.chip{display:inline-block;background:var(--kraft);background-image:var(--grain);color:var(--ink);
+  border-radius:var(--r-chip);padding:3px 8px;font-size:12px;font-weight:600;margin-right:6px}
+.corner-num{position:absolute;top:12px;right:18px;font-size:56px;font-stretch:125%;font-weight:700;line-height:1}
+.problem-statement{font-size:15px;line-height:1.6;max-width:44ch;margin-top:6px}
+.answer-row{display:flex;gap:8px;margin-top:18px;align-items:center}
+.input{background:var(--paper-0);border:1.5px solid var(--ink);border-radius:var(--r-input);
+  padding:8px 12px;font:inherit;width:110px}
+.unit{color:var(--ink-soft);font-size:13px}
+
+.btn{font:inherit;font-weight:600;border:none;border-radius:var(--r-input);padding:9px 16px;
+  cursor:pointer;transition:transform .12s,box-shadow .12s;box-shadow:var(--shadow-sheet)}
+.btn:active{transform:translateY(1px);box-shadow:none}
+.btn-primary{background:var(--brand);color:#fff}
+.btn-primary:hover{background:var(--brand-deep)}
+.btn-secondary{background:var(--paper-0);color:var(--ink);border:1.5px solid var(--ink)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-link{background:none;box-shadow:none;color:var(--cobalt);padding:9px 4px}
+.btn-link:hover{text-decoration:underline}
+
+/* diagnosis */
+.diag{display:flex;gap:20px;align-items:flex-start}
+.diag-cut{flex:0 0 88px;height:100px;background:var(--red);box-shadow:var(--shadow-cut);
+  clip-path:polygon(50% 4%,100% 96%,0% 96%);display:flex;align-items:flex-end;justify-content:center;
+  color:#fff;font-size:36px;font-stretch:125%;font-weight:700;padding-bottom:8px}
+.diag h4{font-size:15px;margin-bottom:4px}
+.diag .sym{color:var(--red);font-weight:600;font-size:13px;margin-bottom:8px}
+.diag p{font-family:'Source Serif 4',serif;font-size:15px;line-height:1.6;color:var(--ink-soft)}
+
+/* chat */
+.chat-head{background:var(--plum);color:#fff;padding:12px 16px;display:flex;gap:10px;align-items:center;font-weight:600}
+.chat-head svg{width:24px;height:24px}
+.bubble{max-width:80%;padding:12px 14px;font-size:14px;line-height:1.55;margin:10px 16px;box-shadow:var(--shadow-sheet)}
+.bubble.user{background:var(--paper-0);border-radius:10px 10px 2px 10px;margin-left:auto}
+.bubble.tutor{background:var(--plum-tint);border-radius:10px 10px 10px 2px}
+
+/* sketchpad strip */
+.toolbar{background:var(--kraft);background-image:var(--grain);padding:10px 14px;display:flex;gap:14px;align-items:center;font-size:12px;font-weight:600}
+.tool{background:var(--paper-0);border-radius:var(--r-chip);padding:4px 10px;box-shadow:var(--shadow-sheet)}
+.tool.active{background:var(--ink);color:var(--paper-0)}
+.graph{height:150px;background:var(--paper-0);position:relative;
+  background-image:
+    linear-gradient(rgba(61,102,168,.22) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(61,102,168,.22) 1px,transparent 1px);
+  background-size:19px 19px}
+.graph::before,.graph::after{content:"";position:absolute;background:rgba(61,102,168,.45)}
+.graph::before{left:0;right:0;top:50%;height:1.5px}
+.graph::after{top:0;bottom:0;left:50%;width:1.5px}
+.hand{position:absolute;left:12%;top:18%;font-family:'Source Serif 4',serif;font-style:italic;
+  color:var(--ink);font-size:20px;transform:rotate(-2deg)}
+
+/* logo row */
+.logos{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.logo-tile{border-radius:var(--r-card);box-shadow:var(--shadow-sheet);aspect-ratio:4/3;
+  display:flex;align-items:center;justify-content:center}
+.logo-tile svg{width:44%;height:auto}
+.logo-tile .meta{position:absolute}
+footer{margin-top:80px;display:flex;justify-content:space-between;color:var(--ink-soft);font-size:12px}
+@media(max-width:820px){.swatches{grid-template-columns:repeat(2,1fr)}.typeboard,.moments,.logos{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HERO -->
+  <div class="hero in">
+    <svg viewBox="0 0 240 240" aria-label="AngleBengal mark">
+      <path fill-rule="evenodd" fill="#B5522E" d="M 58 88 L 74 34 L 98 74 L 120 78 L 142 74 L 166 34 L 182 88 L 186 130 C 182 168 156 198 120 204 C 84 198 58 168 54 130 Z M 170.4 73.9 L 155.2 68.6 L 164.3 53.4 Z M 69.6 73.9 L 75.7 53.4 L 84.8 68.6 Z"/>
+      <path d="M 106 86 L 103 102 M 120 84 L 120 102 M 134 86 L 137 102" stroke="#322921" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="95" cy="126" r="7.5" fill="#322921"/><circle cx="145" cy="126" r="7.5" fill="#322921"/>
+      <path d="M 120 160 L 107 145 M 120 160 L 133 145" stroke="#322921" stroke-width="5" stroke-linecap="round"/>
+      <path d="M 113.8 152.8 A 9.5 9.5 0 0 1 126.2 152.8" stroke="#322921" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path fill-rule="evenodd" fill="#322921" d="M 77 143 A 7 7 0 1 0 77 157 A 7 7 0 1 0 77 143 Z M 80 141.2 A 5.8 5.8 0 1 0 80 152.8 A 5.8 5.8 0 1 0 80 141.2 Z"/>
+      <path fill-rule="evenodd" fill="#322921" d="M 160 157 A 6 6 0 1 0 160 169 A 6 6 0 1 0 160 157 Z M 157.5 160.5 A 5 5 0 1 0 157.5 170.5 A 5 5 0 1 0 157.5 160.5 Z"/>
+      <circle cx="166" cy="138" r="3.2" fill="#322921"/><circle cx="90" cy="174" r="3" fill="#322921"/>
+    </svg>
+    <h1 class="xp">AngleBengal</h1>
+    <p class="serif">A mental model mathematics tutor, built like a swatch book: paper, pigment, die-cuts, and one angle hidden in the cat.</p>
+    <div style="margin-top:18px" class="meta">Swatch Book · Theme Reference · v1</div>
+    <div class="band"></div>
+  </div>
+
+  <!-- PALETTE -->
+  <section>
+    <div class="sec-head in"><span class="meta">01 · Pigments</span><span class="rule"></span><span class="meta">sampled from the boards</span></div>
+    <div class="swatches">
+      <div class="swatch in" style="background:var(--brand);color:#fff"><span class="num">01</span><div class="cut wedge"></div><div class="label"><span>Terracotta</span><span class="hex">B5522E</span></div></div>
+      <div class="swatch in" style="background:var(--red);color:#fff"><span class="num">02</span><div class="cut tri"></div><div class="label"><span>Guardsman</span><span class="hex">A83A32</span></div></div>
+      <div class="swatch in" style="background:var(--green);color:#fff"><span class="num">03</span><div class="cut cir"></div><div class="label"><span>Emerald</span><span class="hex">2E7D5B</span></div></div>
+      <div class="swatch in" style="background:var(--marigold);color:var(--ink)"><span class="num">04</span><div class="cut tri"></div><div class="label"><span>Marigold</span><span class="hex">DFAF3F</span></div></div>
+      <div class="swatch in" style="background:var(--cobalt);color:#fff"><span class="num">05</span><div class="cut cir"></div><div class="label"><span>Cobalt</span><span class="hex">3D66A8</span></div></div>
+      <div class="swatch in" style="background:var(--plum);color:#fff"><span class="num">06</span><div class="cut wedge"></div><div class="label"><span>Plum</span><span class="hex">4C3E57</span></div></div>
+      <div class="swatch in" style="background:var(--teal);color:#fff"><span class="num">07</span><div class="cut tri"></div><div class="label"><span>Teal</span><span class="hex">40787A</span></div></div>
+      <div class="swatch in" style="background:var(--coral);color:var(--ink)"><span class="num">08</span><div class="cut cir"></div><div class="label"><span>Coral</span><span class="hex">EC7574</span></div></div>
+      <div class="swatch in" style="background:var(--kraft);color:var(--ink)"><span class="num">09</span><div class="cut tri"></div><div class="label"><span>Kraft</span><span class="hex">CBB281</span></div></div>
+      <div class="swatch in" style="background:var(--chartreuse);color:var(--ink)"><span class="num">10</span><div class="cut wedge"></div><div class="label"><span>Chartreuse</span><span class="hex">C9C05E</span></div></div>
+    </div>
+  </section>
+
+  <!-- TYPOGRAPHY -->
+  <section>
+    <div class="sec-head in"><span class="meta">02 · Type</span><span class="rule"></span><span class="meta">Archivo · Source Serif 4 · Plex Mono</span></div>
+    <div class="typeboard">
+      <div class="typecard in">
+        <div class="huge">∠<span class="deg">45°</span></div>
+        <p class="serif" style="margin-top:24px"><b>"60 mph" is not a description of how the car feels.</b> It is a currency conversion between hours and miles: one hour buys sixty miles. Once you hold it that way, you never have to remember whether to multiply or divide, because you already know how conversions work.</p>
+      </div>
+      <div class="typecard in">
+        <div class="spec-row"><span class="sample xp">Model 3 · Freeze the Clock</span><span class="meta">Archivo Exp 700</span></div>
+        <div class="spec-row"><span class="sample" style="font-weight:600;font-size:15px">Submit answer · Practice · Learn</span><span class="meta">Archivo 600 · UI</span></div>
+        <div class="spec-row"><span class="sample serif" style="font-size:17px">The equation is a statement about the relationship between two phrases.</span><span class="meta">Serif 17/1.7</span></div>
+        <div class="spec-row"><span class="sample mono" style="font-size:14px">d/28 + d/4 = 2</span><span class="meta">Plex Mono</span></div>
+        <div class="spec-row"><span class="sample meta" style="font-size:12px">DISTANCE · RATE · TIME</span><span class="meta">Meta caps</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- UI MOMENTS -->
+  <section>
+    <div class="sec-head in"><span class="meta">03 · Paper at work</span><span class="rule"></span><span class="meta">band · numeral · die-cut · kraft</span></div>
+    <div class="moments">
+
+      <div class="sheet in">
+        <div class="body">
+          <span class="corner-num" style="color:var(--cobalt);opacity:.85">3</span>
+          <div class="meta">Algebra · Word Problems · DRT</div>
+          <p class="problem-statement serif">A cyclist leaves at 9:00 AM riding 12 mph. At 10:30 AM a friend leaves the same point driving 30 mph. How far from the start does the friend catch the cyclist?</p>
+          <div style="margin-top:14px"><span class="chip">M1 · Exchange Rate</span><span class="chip">M3 · Freeze the Clock</span><span class="chip">M5 · Shared Column</span></div>
+          <div class="answer-row"><input class="input" value="30"><span class="unit">miles</span>
+            <button class="btn btn-primary">Submit answer</button><button class="btn btn-link">Skip</button></div>
+        </div>
+        <div class="baseband" style="background:var(--cobalt)"></div>
+      </div>
+
+      <div class="sheet in">
+        <div class="body">
+          <div class="diag">
+            <div class="diag-cut">1</div>
+            <div>
+              <div class="meta" style="margin-bottom:6px">Not quite</div>
+              <h4>Model 1 failed: A Rate Is an Exchange Rate</h4>
+              <div class="sym">Answer off by a factor of 60</div>
+              <p>You fed 45 raw minutes into a miles-per-hour rate. Convert to 0.75 hours first, then the exchange works.</p>
+              <div style="margin-top:14px"><button class="btn btn-secondary">Review Model 1</button><button class="btn btn-link">Try again</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="baseband" style="background:var(--red)"></div>
+      </div>
+
+      <div class="sheet in">
+        <div class="chat-head">
+          <svg viewBox="0 0 240 240"><path fill-rule="evenodd" fill="#B5522E" d="M 58 88 L 74 34 L 98 74 L 120 78 L 142 74 L 166 34 L 182 88 L 186 130 C 182 168 156 198 120 204 C 84 198 58 168 54 130 Z M 170.4 73.9 L 155.2 68.6 L 164.3 53.4 Z M 69.6 73.9 L 75.7 53.4 L 84.8 68.6 Z"/><path d="M 106 86 L 103 102 M 120 84 L 120 102 M 134 86 L 137 102" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/><circle cx="95" cy="126" r="7.5" fill="#F9F5EC"/><circle cx="145" cy="126" r="7.5" fill="#F9F5EC"/><path d="M 120 160 L 107 145 M 120 160 L 133 145" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/><path d="M 113.8 152.8 A 9.5 9.5 0 0 1 126.2 152.8" stroke="#F9F5EC" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg>
+          Tutor <span class="meta" style="color:var(--plum-tint);margin-left:auto">Practice · DRT</span>
+        </div>
+        <div class="body" style="padding:8px 0 16px">
+          <div class="bubble user">Why can't I just average the two speeds?</div>
+          <div class="bubble tutor serif">Because rate is a ratio, not a quantity that accumulates. That is Model 6. You spent twice as long at the slower speed, so it gets more of the vote. Rebuild the two accumulators: what was the total distance?</div>
+        </div>
+        <div class="baseband" style="background:var(--plum)"></div>
+      </div>
+
+      <div class="sheet in">
+        <div class="toolbar">
+          <span class="tool active">Pen</span><span class="tool">Eraser</span>
+          <span style="opacity:.5">|</span>
+          <span class="tool">Blank</span><span class="tool">Grid</span><span class="tool active">Graph</span>
+          <span style="margin-left:auto"><button class="btn btn-primary" style="padding:5px 12px;font-size:12px">Clean up</button></span>
+        </div>
+        <div class="graph"><span class="hand">d⁄28 + d⁄4 = 2</span></div>
+        <div class="body" style="padding:14px 24px;background:var(--paper-0)">
+          <span class="meta" style="font-size:11px">Clean copy</span>
+          <div style="font-size:18px;margin-top:4px">d/28 + d/4 = 2 <button class="btn btn-link" style="font-size:12px">Insert into answer</button></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- LOGO -->
+  <section>
+    <div class="sec-head in"><span class="meta">04 · The mark</span><span class="rule"></span><span class="meta">cat first · geometry second</span></div>
+    <div class="logos">
+      <div class="logo-tile in" style="background:var(--paper-0)">
+        <svg viewBox="0 0 240 240"><use href="#mk"/><path fill-rule="evenodd" fill="#B5522E" d="M 58 88 L 74 34 L 98 74 L 120 78 L 142 74 L 166 34 L 182 88 L 186 130 C 182 168 156 198 120 204 C 84 198 58 168 54 130 Z M 170.4 73.9 L 155.2 68.6 L 164.3 53.4 Z M 69.6 73.9 L 75.7 53.4 L 84.8 68.6 Z"/><path d="M 106 86 L 103 102 M 120 84 L 120 102 M 134 86 L 137 102" stroke="#322921" stroke-width="5" stroke-linecap="round"/><circle cx="95" cy="126" r="7.5" fill="#322921"/><circle cx="145" cy="126" r="7.5" fill="#322921"/><path d="M 120 160 L 107 145 M 120 160 L 133 145" stroke="#322921" stroke-width="5" stroke-linecap="round"/><path d="M 113.8 152.8 A 9.5 9.5 0 0 1 126.2 152.8" stroke="#322921" stroke-width="3.5" fill="none" stroke-linecap="round"/><path fill-rule="evenodd" fill="#322921" d="M 77 143 A 7 7 0 1 0 77 157 A 7 7 0 1 0 77 143 Z M 80 141.2 A 5.8 5.8 0 1 0 80 152.8 A 5.8 5.8 0 1 0 80 141.2 Z"/><path fill-rule="evenodd" fill="#322921" d="M 160 157 A 6 6 0 1 0 160 169 A 6 6 0 1 0 160 157 Z M 157.5 160.5 A 5 5 0 1 0 157.5 170.5 A 5 5 0 1 0 157.5 160.5 Z"/><circle cx="166" cy="138" r="3.2" fill="#322921"/><circle cx="90" cy="174" r="3" fill="#322921"/></svg>
+      </div>
+      <div class="logo-tile in" style="background:var(--plum)">
+        <svg viewBox="0 0 240 240"><path fill-rule="evenodd" fill="#B5522E" d="M 58 88 L 74 34 L 98 74 L 120 78 L 142 74 L 166 34 L 182 88 L 186 130 C 182 168 156 198 120 204 C 84 198 58 168 54 130 Z M 170.4 73.9 L 155.2 68.6 L 164.3 53.4 Z M 69.6 73.9 L 75.7 53.4 L 84.8 68.6 Z"/><path d="M 106 86 L 103 102 M 120 84 L 120 102 M 134 86 L 137 102" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/><circle cx="95" cy="126" r="7.5" fill="#F9F5EC"/><circle cx="145" cy="126" r="7.5" fill="#F9F5EC"/><path d="M 120 160 L 107 145 M 120 160 L 133 145" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/><path d="M 113.8 152.8 A 9.5 9.5 0 0 1 126.2 152.8" stroke="#F9F5EC" stroke-width="3.5" fill="none" stroke-linecap="round"/><path fill-rule="evenodd" fill="#F9F5EC" d="M 77 143 A 7 7 0 1 0 77 157 A 7 7 0 1 0 77 143 Z M 80 141.2 A 5.8 5.8 0 1 0 80 152.8 A 5.8 5.8 0 1 0 80 141.2 Z"/><path fill-rule="evenodd" fill="#F9F5EC" d="M 160 157 A 6 6 0 1 0 160 169 A 6 6 0 1 0 160 157 Z M 157.5 160.5 A 5 5 0 1 0 157.5 170.5 A 5 5 0 1 0 157.5 160.5 Z"/><circle cx="166" cy="138" r="3.2" fill="#F9F5EC"/><circle cx="90" cy="174" r="3" fill="#F9F5EC"/></svg>
+      </div>
+      <div class="logo-tile in" style="background:var(--paper-1);flex-direction:column;gap:8px">
+        <div style="font-size:30px" class="xp">AngleBengal</div>
+        <span class="meta">Lockup · Archivo 700 / 112%</span>
+      </div>
+    </div>
+  </section>
+
+  <footer class="in">
+    <span>AngleBengal · Swatch Book theme reference</span>
+    <span>ink on paper · no light, only pigment</span>
+  </footer>
+</div>
+</body>
+</html>
