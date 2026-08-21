@@ -1550,3 +1550,476 @@ git commit -m "Rename TopicTree to TopicRail and restyle it with search, a back 
 `git status --short` before the commit lists `R  src/components/learn/TopicTree.tsx -> src/components/learn/TopicRail.tsx` (or `D` plus `A` if the rewrite fell under git's 50% similarity; either is fine, `git log --follow` still reaches the history) and ` M` for the two mount sites.
 
 ---
+
+### Task 6: Topic page, `DocCard` and subtopic covers (spec 3c)
+
+**Files:**
+- Modify: `src/lib/topics.ts` (the `TopicDetail` type at lines 89 to 105 and `getTopicDetail` at lines 127 to 172: both gain `children`; nothing else in the file changes, Task 4's `getDescendantCounts` stays as written)
+- Rewrite: `src/components/learn/DocCard.tsx` (today 58 lines; the props stay identical so the page's call site does not change shape)
+- Modify: `src/app/(tabs)/learn/[topicId]/page.tsx` (imports at lines 1 to 12, the non-doc branch at lines 89 to 128, the `Breadcrumb` helper at lines 130 to 149; lines 14 to 44 (types, params, `selectedDocId`, D-008) and the doc branch at lines 46 to 88 are UNTOUCHED, stage D owns the reader)
+
+**Interfaces:**
+- Consumes: from Task 4: `getDescendantCounts(): Promise<Map<string, DescendantCounts>>` with `DescendantCounts = { docs: number; verifiedProblems: number }` (memoized per request, so calling it again here costs nothing), `TopicCoverCard({ href, name, numeral, meta, accent }: TopicCoverCardProps)`, `GenerateTopicInput({ initialValue?: string; compact?: boolean })`; `ACCENT_VAR: Record<AccentName, string>`, `accentForRoot(rootName): AccentName`, `type AccentName` from `src/lib/topicColors.ts`; from `src/components/ui/`: `Sheet({ as?, tone?, lift?, className?, ...rest })`, `CornerNumeral({ n, color, size?: 56 | 30, onStock?, className? })` (parent must be `relative`), `BaseBand({ color, className? })` (parent must be `relative overflow-hidden` and reserve bottom padding), `ButtonLink({ href, variant?, size?, tone?, icon?, className?, children })`, `buttonClasses({ variant?, size?, tone?, className? }): string`, `EmptyState({ title, line?, action?, shape?, accent: string, className? })`.
+- Produces: `TopicDetail.children: { id: string; name: string }[]` (sorted by name; the self-review's type-consistency list names it). `DocCard({ topicId, doc: { id, title, isExemplar, modelCount, createdAt }, accent: AccentName })` keeps its props. Nothing else is consumed by a later task; Task 8 verifies this page.
+
+Behaviour contract (read before editing):
+- The header's counts are DESCENDANT totals from `getDescendantCounts()` (the same numbers the index covers show), not the topic's own `docCount`. The doc grid and the "Subtopics" grid are independent: a topic can show both, either, or (when it has neither) the `EmptyState`.
+- "Practice this topic" is a real `ButtonLink` only when verified problems exist beneath the topic; otherwise it renders as a disabled-looking `span` (no `href`, `aria-disabled`, a `title` that says why). A topic with zero verified problems must not offer a link into an empty practice session.
+- The `EmptyState` action is Task 4's `GenerateTopicInput` in compact form with the topic's name prefilled, so the first document is one click away. Nothing in this task submits a generation.
+- `plural(n, word)` is the same three-line helper Task 4 put in `learn/page.tsx`; it is defined locally again here (and again in Task 7). Promoting it into `src/lib/` is a later-stage cleanup, not part of stage B's file list.
+
+- [ ] **Step 1: `TopicDetail` and `getTopicDetail` gain `children`**
+
+In `src/lib/topics.ts`, inside the `TopicDetail` type (lines 89 to 105), add one member directly after the `modelDocs` member, so the end of the type reads:
+
+```ts
+  modelDocs: {
+    id: string;
+    title: string;
+    isExemplar: boolean;
+    modelCount: number;
+    createdAt: Date;
+  }[];
+  children: { id: string; name: string }[];
+};
+```
+
+In `getTopicDetail` (lines 127 to 172) add `children` to the Prisma `select`, directly after the `modelDocs: { ... }` select entry:
+
+```ts
+      modelDocs: {
+        select: { id: true, title: true, isExemplar: true, modelIndexJson: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+      },
+      children: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+```
+
+and add `children: topic.children,` to the returned object, directly after the mapped `modelDocs` entry:
+
+```ts
+    modelDocs: topic.modelDocs.map((doc) => ({
+      id: doc.id,
+      title: doc.title,
+      isExemplar: doc.isExemplar,
+      modelCount: deserializeModelIndex(doc.modelIndexJson).length,
+      createdAt: doc.createdAt,
+    })),
+    children: topic.children,
+```
+
+(The `modelDocs` lines above are today's code, shown so the insertion point is unambiguous; match the file's existing formatting and do not reflow it. `children` is the Prisma self-relation already used by `getTopicTree`, so no schema change.)
+
+- [ ] **Step 2: Rewrite `src/components/learn/DocCard.tsx`**
+
+Replace the whole file with:
+
+```tsx
+import Link from "next/link";
+
+import { BaseBand } from "@/components/ui/BaseBand";
+import { CornerNumeral } from "@/components/ui/CornerNumeral";
+import { Sheet } from "@/components/ui/Sheet";
+import { ACCENT_VAR, type AccentName } from "@/lib/topicColors";
+
+export type DocCardProps = {
+  topicId: string;
+  doc: {
+    id: string;
+    title: string;
+    isExemplar: boolean;
+    modelCount: number;
+    createdAt: Date;
+  };
+  accent: AccentName;
+};
+
+const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };
+
+/**
+ * One model document on the topic page (spec 3c): a lifting paper-1 sheet
+ * with the model count as a corner numeral, the title, a meta line and the
+ * accent base band. The whole card is the link into the reader.
+ */
+export function DocCard({ topicId, doc, accent }: DocCardProps) {
+  const color = ACCENT_VAR[accent];
+  const models = `${doc.modelCount} ${doc.modelCount === 1 ? "model" : "models"}`;
+  return (
+    <Link href={`/learn/${topicId}?doc=${doc.id}`} className="block rounded-card">
+      <Sheet tone="paper-1" lift className="relative flex min-h-[132px] flex-col overflow-hidden p-4 pb-7">
+        {doc.modelCount > 0 ? <CornerNumeral n={doc.modelCount} size={56} color={color} /> : null}
+        {doc.isExemplar ? (
+          <span className="meta-caps mb-1.5 self-start rounded-chip bg-brand-tint px-1.5 py-0.5 text-brand-deep">
+            Exemplar
+          </span>
+        ) : null}
+        <h3 className="max-w-[26ch] text-ui-lg font-semibold leading-tight text-ink">{doc.title}</h3>
+        <p className="mt-auto pt-3 text-meta text-ink-soft">
+          {models} · {doc.createdAt.toLocaleDateString("en-US", DATE_FORMAT)}
+        </p>
+        <BaseBand color={color} />
+      </Sheet>
+    </Link>
+  );
+}
+
+export default DocCard;
+```
+
+Notes for the implementer: the file exports both the named and the default form; keep whichever the page imports today (the page's import line is not edited). The inline numeral span, its `text-[56px]` and the hand-rolled band are gone; `CornerNumeral` sits in the sheet's top-right by itself (the sheet is `relative`), and `BaseBand` is 16px tall, so `pb-7` leaves 12px of clear paper above it. `min-h-[132px]` and `max-w-[26ch]` are arbitrary values and allowed; the banned pattern is `text-[`. The `Exemplar` tag loses its `text-[10px]` (meta-caps sets the size).
+
+- [ ] **Step 3: Imports in `src/app/(tabs)/learn/[topicId]/page.tsx`**
+
+Keep every existing import line (lines 1 to 12) and make exactly these changes: add `getDescendantCounts` to the existing `@/lib/topics` import, add `ACCENT_VAR` to the existing `@/lib/topicColors` import, and add these five imports in their alphabetical places among the existing ones:
+
+```tsx
+import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
+import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
+import { ButtonLink, buttonClasses } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+```
+
+(That is four lines; the fifth change is the two additions to existing imports.) `Link` stays imported: the doc branch and `Breadcrumb` still use it. Then add two module-level helpers at the very bottom of the file, after `Breadcrumb`:
+
+```tsx
+const ZERO = { docs: 0, verifiedProblems: 0 };
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+```
+
+- [ ] **Step 4: Replace the non-doc branch (lines 89 to 128)**
+
+Replace everything from the `return (` that opens the non-doc branch (line 89, right after the doc branch's closing) through its closing `);` (line 128) with:
+
+```tsx
+  const counts = await getDescendantCounts();
+  const totals = counts.get(topic.id) ?? ZERO;
+  const canPractice = totals.verifiedProblems > 0;
+  const empty = topic.modelDocs.length === 0 && topic.children.length === 0;
+  const countLine = [
+    plural(totals.docs, "model document"),
+    plural(totals.verifiedProblems, "verified problem"),
+    ...(topic.children.length > 0 ? [plural(topic.children.length, "subtopic")] : []),
+  ].join(" · ");
+
+  return (
+    <div className="mx-auto max-w-[860px] px-8 pt-16 pb-10">
+      <Breadcrumb path={topic.path} topicId={topic.id} hasSiblings={false} />
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <h1 className="display-cut text-h1 text-ink">{topic.name}</h1>
+        {canPractice ? (
+          <ButtonLink href={`/practice/${topic.id}`} size="md">
+            Practice this topic
+          </ButtonLink>
+        ) : (
+          <span
+            aria-disabled="true"
+            title="No verified problems beneath this topic yet"
+            className={buttonClasses({
+              variant: "primary",
+              size: "md",
+              tone: "brand",
+              className: "pointer-events-none opacity-50",
+            })}
+          >
+            Practice this topic
+          </span>
+        )}
+      </div>
+      <p className="mt-2 text-meta text-ink-soft">{countLine}</p>
+
+      {topic.modelDocs.length > 0 ? (
+        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+          {topic.modelDocs.map((doc) => (
+            <DocCard key={doc.id} topicId={topic.id} doc={doc} accent={accent} />
+          ))}
+        </div>
+      ) : null}
+
+      {topic.children.length > 0 ? (
+        <>
+          <h2 className="meta-caps mt-10">Subtopics</h2>
+          <ul aria-label="Subtopics" className="mt-3 grid grid-cols-1 gap-6 sm:grid-cols-2">
+            {topic.children.map((child) => {
+              const c = counts.get(child.id) ?? ZERO;
+              return (
+                <li key={child.id}>
+                  <TopicCoverCard
+                    href={`/learn/${child.id}`}
+                    name={child.name}
+                    numeral={c.docs}
+                    meta={`${plural(c.docs, "model")} · ${plural(c.verifiedProblems, "problem")}`}
+                    accent={accent}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : null}
+
+      {empty ? (
+        <EmptyState
+          shape="wedge"
+          accent={ACCENT_VAR[accent]}
+          title="No models here yet"
+          line="Generate the first mental model document for this topic."
+          action={<GenerateTopicInput initialValue={topic.name} compact />}
+          className="mt-8"
+        />
+      ) : null}
+    </div>
+  );
+}
+```
+
+This deletes the kraft "No models here yet / arrives in Phase 1" box, the brand `Link` "Practice this topic", the `text-[30px]` h1, the `text-[13px]` count line and the `py-10` frame. The root keeps `mx-auto max-w-[860px]` and no `h-full`/`overflow` of its own: Task 4's `[topicId]/layout.tsx` owns the scrolling column, this div just sits in it with the shell's `pt-16` top offset. `accent` is the existing `accentForRoot(...)` constant from line 30; subtopic covers share the root's accent deliberately (one accent per root, spec 1a).
+
+- [ ] **Step 5: `Breadcrumb` type size**
+
+In the `Breadcrumb` helper (lines 130 to 149) change one class on the `nav`:
+
+```tsx
+// before
+    <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1.5 text-[12px]">
+// after
+    <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1.5 text-meta">
+```
+
+Nothing else in `Breadcrumb` changes (the `path.join("  ›  ")` span and the optional "All documents" `Link` stay; the doc branch still calls it with `hasSiblings`).
+
+- [ ] **Step 6: Gate**
+
+Run: `npm run typecheck && npm run lint`
+Expected: no errors. Likely trips and their fixes: `topic.children` missing on the type means Step 1's type member was not added; a Prisma type error on `children` in the select means the relation field on `Topic` has another name in `prisma/schema.prisma` (`grep -n "children\|parent" prisma/schema.prisma`), use that name in the select and map it to `children` in the return; an unused `Link` warning means the doc branch was touched, restore it; if `ButtonLink` does not accept `size="md"` because md is the default, the prop is harmless, keep it.
+
+- [ ] **Step 7: Visual and keyboard check**
+
+In the dev preview (launch config `anglebengal-dev`, http://localhost:3010) at 1440x900:
+
+- A container root: on `/learn`, `javascript_tool` `document.querySelector('a[href^="/learn/"]').getAttribute('href')` gives `/learn/<rootId>`; navigate there. `read_page` shows the breadcrumb in meta type, the h1 in display-cut, the count line ("n model documents · n verified problems · n subtopics"), the "Subtopics" meta-caps heading and a two-column grid of cover cards with corner numerals. `document.querySelectorAll('ul[aria-label="Subtopics"] > li').length` equals the root's child count in the rail; `document.querySelector('ul[aria-label="Subtopics"] a').getAttribute('href')` starts with `/learn/`.
+- Practice affordance: on the same page `document.querySelector('a[href^="/practice/"]')` exists when verified problems exist beneath the root, otherwise `document.querySelector('span[aria-disabled="true"]').title` is "No verified problems beneath this topic yet". Exactly one of the two exists.
+- The doc grid: `/learn/<drtId>` with a single document redirects into the doc branch by D-008 (that branch is unchanged and must still render), so the `DocCard` grid is visible only on a topic with 2 or more documents. If the seed has such a topic, open it and check `document.querySelectorAll('a[href*="?doc="]').length` equals its document count and each card shows the corner numeral, the title in ui-lg and the base band (`getComputedStyle(document.querySelector('a[href*="?doc="] span[aria-hidden]')).height` is `"16px"`). If no topic has 2 or more documents, record that in the task log: the grid branch is covered by the typecheck and Task 8 re-checks it if a second document exists by then. Do not generate documents to manufacture the case.
+- An empty leaf: in the rail, expand a root and open a child whose own count reads 0 and that has no chevron. `read_page` shows the wedge `EmptyState` "No models here yet" with the compact generate field; `javascript_tool` `document.querySelector('form input').value` equals the page's h1 text. Do NOT submit the form.
+- Keyboard: Tab from the rail's last visible link lands on the "Practice this topic" button link (or skips the disabled span, which has no tabIndex); further Tabs walk the doc cards or subtopic covers in DOM order; Enter on a cover navigates.
+- `read_console_messages` with `onlyErrors: true` is clean on all three pages.
+
+- [ ] **Step 8: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|stock-textured" src/lib/topics.ts src/components/learn/DocCard.tsx "src/app/(tabs)/learn/[topicId]/page.tsx" ; grep -n $'\xe2\x80\x94' src/lib/topics.ts src/components/learn/DocCard.tsx "src/app/(tabs)/learn/[topicId]/page.tsx"
+```
+
+Both print nothing. Also `grep -n "arrives in Phase 1" "src/app/(tabs)/learn/[topicId]/page.tsx"` prints nothing.
+
+- [ ] **Step 9: Commit**
+
+```bash
+GIT_LITERAL_PATHSPECS=1 git add src/lib/topics.ts src/components/learn/DocCard.tsx "src/app/(tabs)/learn/[topicId]/page.tsx"
+git status --short
+git commit -m "Restyle the topic page and DocCard on primitives; add subtopic covers and the prefilled empty state (stage B, spec 3c)"
+```
+
+`git status --short` before the commit lists exactly the three files as ` M`.
+
+---
+
+### Task 7: Attempt history on a hairline sheet (spec 3e)
+
+**Files:**
+- Rewrite: `src/app/(tabs)/learn/[topicId]/history/page.tsx` (today 144 lines; the data flow is kept, the markup is replaced)
+
+**Interfaces:**
+- Consumes: `attemptHistory(topicId, { modelNumber? }): Promise<AttemptRow[]>` and `attemptSummary(topicId): Promise<TopicAttemptSummary>` from `src/lib/attempts.ts`, with `AttemptRow = { id; problemId; statementMd; difficulty: number; submittedAnswer: string; correct: boolean; createdAt: Date; diagnosedModelNum: number | null; diagnosedModelTitle: string | null; diagnosisSymptom: string | null; learnHref: string | null; hasSketch: boolean }` and `TopicAttemptSummary = { total; correct; diagnosed }`; `getTopicDetail(topicId)` (its `path`); `MarkdownMath({ children, variant?: "reading" | "ui" | "chat", className? })` from plan A Task 2 (the `variant="ui"` call-site swap on this file's line 112 was already made there; this rewrite keeps it); `cx` from `src/lib/cx.ts`; from `src/components/ui/`: `Sheet`, `ButtonLink`, `ChipLink({ href, variant: "nav" | "action", current?, icon?, className?, children })`, `chipClasses({ variant, active?, className? }): string`, `Icon({ name, size?, className?, title? })`, `EmptyState`.
+- Produces: nothing consumed later. Task 8 verifies this page; the self-review lists no new types from it.
+
+Behaviour contract (read before editing):
+- The list is one `paper-1` sheet of hairline-divided rows; the 4px coloured left borders are gone. Correct or wrong is carried by the `check`/`cross` icon plus the word, in green or red.
+- The blamed model becomes a chip. `Chip` in plan A renders a `button`, and a row here is not interactive, so a model without a reader link renders as a `span` styled with `chipClasses({ variant: "meta" })` (kraft meta chip); a model WITH `learnHref` renders as `ChipLink variant="action"` to that href. The model's title is kept as the chip's `title` attribute (hover tooltip), not as visible text.
+- The summary uses `plural` for "attempt"; the other two counts read as today.
+- The empty state is the wedge `EmptyState` in the brand colour with a "Practise this topic" primary button link (today's spelling, kept).
+
+- [ ] **Step 1: Rewrite `src/app/(tabs)/learn/[topicId]/history/page.tsx`**
+
+Replace the whole file with:
+
+```tsx
+import { notFound } from "next/navigation";
+
+import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { ButtonLink } from "@/components/ui/Button";
+import { ChipLink, chipClasses } from "@/components/ui/Chip";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Icon } from "@/components/ui/Icon";
+import { Sheet } from "@/components/ui/Sheet";
+import { attemptHistory, attemptSummary } from "@/lib/attempts";
+import { cx } from "@/lib/cx";
+import { getTopicDetail } from "@/lib/topics";
+
+export const dynamic = "force-dynamic";
+
+type Params = { topicId: string };
+type Search = { model?: string; doc?: string };
+
+const TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+};
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+/**
+ * Attempt history for one topic (spec 3e): one paper-1 sheet of hairline
+ * rows, a check or cross per attempt, the blamed model as a chip, and the
+ * wedge EmptyState when nothing has been practised yet. `?model=N` filters
+ * to the attempts blamed on that model.
+ */
+export default async function HistoryPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>;
+  searchParams: Promise<Search>;
+}) {
+  const { topicId } = await params;
+  const { model } = await searchParams;
+  const topic = await getTopicDetail(topicId);
+  if (!topic) notFound();
+
+  const modelNumber = model ? Number.parseInt(model, 10) : undefined;
+  const filtered = Number.isInteger(modelNumber) ? modelNumber : undefined;
+  const [attempts, summary] = await Promise.all([
+    attemptHistory(topicId, filtered !== undefined ? { modelNumber: filtered } : {}),
+    attemptSummary(topicId),
+  ]);
+
+  const title = filtered !== undefined ? `Attempts blamed on Model ${filtered}` : "Attempt history";
+  const emptyLine =
+    filtered !== undefined
+      ? "No attempt has been attributed to this model."
+      : "Attempts show up here once you have practised this topic.";
+
+  return (
+    <div className="mx-auto max-w-[860px] px-8 pt-16 pb-10">
+      <nav aria-label="Breadcrumb" className="mb-3 text-meta text-ink-soft">
+        {topic.path.join("  ›  ")}
+      </nav>
+      <h1 className="display-cut text-h1 text-ink">{title}</h1>
+      <p className="mt-2 text-meta text-ink-soft">
+        {plural(summary.total, "attempt")} on this topic · {summary.correct} correct · {summary.diagnosed}{" "}
+        diagnosed to a model
+      </p>
+      {filtered !== undefined ? (
+        <ButtonLink href={`/learn/${topicId}/history`} variant="tertiary" size="sm" className="mt-3">
+          Show all attempts
+        </ButtonLink>
+      ) : null}
+
+      {attempts.length === 0 ? (
+        <EmptyState
+          shape="wedge"
+          accent="var(--color-brand)"
+          title="Nothing here yet"
+          line={emptyLine}
+          action={
+            <ButtonLink href={`/practice/${topicId}`} size="md">
+              Practise this topic
+            </ButtonLink>
+          }
+          className="mt-6"
+        />
+      ) : (
+        <Sheet tone="paper-1" className="mt-6 overflow-hidden">
+          <ul className="divide-y divide-hairline">
+            {attempts.map((a) => (
+              <li key={a.id} className="px-4 py-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span
+                    className={cx(
+                      "inline-flex items-center gap-1 text-ui font-semibold",
+                      a.correct ? "text-green" : "text-red",
+                    )}
+                  >
+                    <Icon name={a.correct ? "check" : "cross"} size={14} />
+                    {a.correct ? "Correct" : "Wrong"}
+                  </span>
+                  <span className="text-ui text-ink">
+                    You answered <strong>{a.submittedAnswer}</strong>
+                  </span>
+                  {a.diagnosedModelNum !== null ? (
+                    a.learnHref ? (
+                      <ChipLink href={a.learnHref} variant="action" title={a.diagnosedModelTitle ?? undefined}>
+                        Model {a.diagnosedModelNum}
+                      </ChipLink>
+                    ) : (
+                      <span className={chipClasses({ variant: "meta" })} title={a.diagnosedModelTitle ?? undefined}>
+                        Model {a.diagnosedModelNum}
+                      </span>
+                    )
+                  ) : null}
+                  <span className="ml-auto text-meta text-ink-soft">
+                    Difficulty {a.difficulty}
+                    {a.hasSketch ? " · sketch attached" : ""} · {a.createdAt.toLocaleString("en-US", TIME_FORMAT)}
+                  </span>
+                </div>
+                <div className="mt-1.5 max-w-[70ch] text-ink-soft">
+                  <MarkdownMath variant="ui">{a.statementMd}</MarkdownMath>
+                </div>
+                {!a.correct && a.diagnosedModelNum !== null && a.diagnosisSymptom ? (
+                  <p className="mt-1.5 text-ui text-ink-soft">{a.diagnosisSymptom}</p>
+                ) : null}
+                {!a.correct && a.diagnosedModelNum === null ? (
+                  <p className="mt-1.5 text-ui text-ink-soft">Not attributed to a model.</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </Sheet>
+      )}
+    </div>
+  );
+}
+```
+
+Notes for the implementer: `Link` is no longer imported (every link is a `ButtonLink` or `ChipLink`); the `text-[12px]`, `text-[12.5px]`, `text-[11.5px]`, `text-[13px]`, `text-[30px]` sizes, the `border-l-[4px]` rows, the kraft empty box and the `✓`/`✗` glyphs are gone. `max-w-[70ch]` is an arbitrary value and allowed. The brand colour for the `EmptyState` is `var(--color-brand)`; if stage A's `@theme` names the brand token differently (`grep -n "color-brand" src/app/globals.css`), use the expression plan A's `EmptyState` task uses and note it in the commit body. If `ChipLink` in plan A's final signature does not spread `...rest` onto `Link`, drop the `title` prop from the `ChipLink` branch only; the `span` branch keeps it.
+
+- [ ] **Step 2: Gate**
+
+Run: `npm run typecheck && npm run lint`
+Expected: no errors. Likely trips and their fixes: `chipClasses` not exported from `@/components/ui/Chip` means plan A's Task named it differently, use that name; a type error on `title` for `ChipLink` means its props omit `title`, apply the note above; `divide-hairline` unknown means the hairline colour token has another name in `@theme` (`grep -n "hairline" src/app/globals.css`), use that one.
+
+- [ ] **Step 3: Visual and keyboard check**
+
+In the dev preview at 1440x900, open http://localhost:3010/learn/<drtId>/history (the id from Task 4 Step 7).
+
+- The rail from Task 4/5 is on the left; the page column shows the meta breadcrumb, "Attempt history" in display-cut, and the summary line. `javascript_tool`: `document.querySelector('h1').textContent` is "Attempt history"; `document.querySelectorAll('[class*="border-l-"]').length` is `0`.
+- If the seed has no attempts (the owner has not practised), the wedge `EmptyState` "Nothing here yet" renders with "Attempts show up here once you have practised this topic." and the primary "Practise this topic" button: `document.querySelector('a[href^="/practice/"]').getAttribute('href')` equals `/practice/<drtId>`; `document.querySelector('section[aria-label="Nothing here yet"]')` exists.
+- If attempts exist: `document.querySelectorAll('ul.divide-y > li').length` equals the number in the summary line; every row starts with an svg (`document.querySelectorAll('ul.divide-y > li svg').length` is at least the row count); a wrong row with a blamed model shows a chip whose text starts with "Model " (`document.querySelector('ul.divide-y a[href*="?doc="], ul.divide-y span[title]')` exists); no row is taller than its content (no empty `p` for correct rows: `document.querySelectorAll('ul.divide-y > li p:empty').length` is `0`).
+- Navigate to `/learn/<drtId>/history?model=1`: `document.querySelector('h1').textContent` is "Attempts blamed on Model 1"; `document.querySelector('a[href$="/history"]').textContent.trim()` is "Show all attempts" and that link is a tertiary button (no filled background: `getComputedStyle(document.querySelector('a[href$="/history"]')).backgroundColor` is `"rgba(0, 0, 0, 0)"`); when the filter matches nothing the `EmptyState` line reads "No attempt has been attributed to this model.".
+- Keyboard: Tab from the rail reaches "Show all attempts" (when present), then the first model chip link (when present), then the "Practise this topic" button (when present); each shows the focus ring.
+- `read_console_messages` with `onlyErrors: true` is clean on both URLs.
+
+- [ ] **Step 4: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|stock-textured|border-l-" "src/app/(tabs)/learn/[topicId]/history/page.tsx" ; grep -n $'\xe2\x80\x94' "src/app/(tabs)/learn/[topicId]/history/page.tsx"
+```
+
+Both print nothing.
+
+- [ ] **Step 5: Commit**
+
+```bash
+GIT_LITERAL_PATHSPECS=1 git add "src/app/(tabs)/learn/[topicId]/history/page.tsx"
+git status --short
+git commit -m "Restyle the attempt history on a hairline sheet with icons and chips (stage B, spec 3e)"
+```
+
+`git status --short` before the commit lists exactly that file as ` M`.
+
+---
