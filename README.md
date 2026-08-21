@@ -87,4 +87,4 @@ Deliberately not built: spaced repetition, mobile layouts, real-time handwriting
 
 ## License
 
-No license has been chosen yet, so default copyright applies: all rights reserved. Add a `LICENSE` file if you want to change that.
+[MIT](LICENSE). Copyright (c) 2026 Myles Magee.
