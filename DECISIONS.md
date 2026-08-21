@@ -445,3 +445,33 @@ logs every non-2xx fetch, and `GET /api/problems/next` answers an empty pool
 with `404 POOL_EMPTY` exactly as docs/04 specifies. Returning 200 with a null
 body would silence it and deviate from the contract. The status is semantically
 right, so the spec wins and Best Practices sits at 96 rather than 100.
+
+### D-039. Multi-line display math needs its delimiters on their own lines
+
+Found in a full-app smoke test, in a real tutor reply. remark-math fails to
+parse a `$$` block that spans several lines when a delimiter shares a line with
+content. Reproduced in isolation:
+
+| Form | Result |
+|---|---|
+| `$$\text{avg}=\frac{a}{b}` then `=41.4.$$` | KaTeX ParseError, raw LaTeX and the closing `$$` visible on screen |
+| `$$` / content / `$$` on separate lines | renders correctly |
+
+Two things made this worse than a cosmetic glitch. The visible raw LaTeX is
+exactly what non-negotiable 5 forbids, and the unclosed block swallows the text
+after it, so one badly delimited equation corrupts the rest of the message.
+
+`normalizeMathDelimiters` now puts the delimiters of any multi-line `$$` block
+on their own lines, leaving single-line `$$x$$` untouched. It runs after the
+`\[ ... \]` conversion, because that conversion can produce the broken form
+itself when its body spans lines. Eleven cases cover it, including that code
+spans and fenced blocks stay untouched.
+
+### D-040. The header mark keeps `priority`
+
+Reversed from an earlier change. `priority` was removed to silence an
+"unused preload" warning, which turned out to be an artifact of the browser
+pane being backgrounded during that check. With it removed, Next warns the
+other way: the mark is measured as the Largest Contentful Paint and should load
+eagerly. It genuinely is above the fold, so `priority` is the correct answer and
+the console is clean with it restored.
