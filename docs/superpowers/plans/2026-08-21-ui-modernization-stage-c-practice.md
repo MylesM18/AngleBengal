@@ -445,3 +445,390 @@ git commit -m "Add the resizable practice split with a keyboard separator (stage
 `git status --short` before the commit lists exactly those four files (three `A`, one ` M`).
 
 ---
+
+### Task 2: Rebuild the sketch toolbar on primitives with a Clear popover (spec 4b)
+
+**Files:**
+- Rewrite: `src/components/sketchpad/SketchToolbar.tsx` (today 139 lines: the `window.confirm` at line 42, `text-[11.5px]` / `text-[11px]` / `text-[12px]` chips, `border-b border-ink-faint/40` on the strip at line 46, the cycling background button at lines 112 to 124)
+- Modify: `src/components/sketchpad/Sketchpad.tsx:75` (one line: the sketchpad root gains `data-sketchpad` and `tabIndex={-1}` so the Undo shortcut has a focus scope; the toast and the rest of the file wait for Task 3)
+
+**Interfaces:**
+- Consumes: `Chip({ variant: "nav" | "meta" | "action" | "toggle", pressed?: boolean, icon?: IconName, className?, children?, ...ButtonHTMLAttributes })` and `chipClasses({ variant, active, className? }): string` (the full chip class string, including its `inline-flex items-center justify-center gap-1` layout, 24px height, `min-w-8`, `rounded-chip`, hover to `desk`, pressed/active inverted to `bg-ink text-paper-0`) from `src/components/ui/Chip.tsx`; `Button({ variant?: "primary" | "secondary" | "tertiary" | "destructive", size?: "sm" | "md", tone?, icon?, loading?, className?, ...ButtonHTMLAttributes })` from `src/components/ui/Button.tsx`; `Icon({ name: IconName, size?, className?, title? })` and `type IconName` (includes `pen`, `eraser`, `undo`, `clear`, `grid`, `graph`) from `src/components/ui/Icon.tsx`; `Sheet({ tone?, lift?, as?, className?, ...rest })` from `src/components/ui/Sheet.tsx`; `cx(...parts)` from `src/lib/cx.ts`; from `src/lib/sketch/store.ts` (not edited): `useSketchStore` with the fields `tool`, `width`, `color`, `background`, `strokes` and the actions `setTool`, `setWidth`, `setColor`, `setBackground`, `undo`, `clear`, plus `INK_COLORS: Record<InkColor, string>`, `STROKE_SIZES = { S: 3, M: 5, L: 8 }`, `type Tool = "pen" | "eraser"`, `type Background = "blank" | "grid" | "graph"` (the spec's "Plain" chip is `"blank"`), `type InkColor`, `type StrokeWidth = "S" | "M" | "L"`.
+- Produces: `SketchToolbar({ cleaning: boolean; onCleanUp: () => void })`, the same props as today, so `Sketchpad.tsx:76` keeps calling it unchanged. The sketchpad root `div` in `Sketchpad.tsx` now carries `data-sketchpad` and `tabIndex={-1}`: Task 3 rewrites that element and MUST keep both attributes (and `outline-none`). The Clear chip is the only `button[aria-haspopup="dialog"]` on the screen, the popover is the only `[role="dialog"]`, and the background group is the only `[role="radiogroup"]`; Task 6 (acceptance) queries them by those selectors. The Undo shortcut lives entirely in this task; Task 3 adds nothing for it.
+
+Behaviour contract (read before editing):
+- The strip is the screen's single kraft surface: `stock-textured bg-kraft` with a `border-hairline` bottom edge, no `border-ink-faint/40`. Groups sit 8px apart (`gap-2`) with 4px inside a group (`gap-1`), no group borders, nothing wraps unless the sheet is narrower than the strip (`flex-wrap` stays).
+- Tool chips are icon-only toggles with `aria-pressed` and an `aria-label` ("Pen", "Eraser"). Width chips keep `aria-label="Stroke width S|M|L"` and `aria-pressed`, and show a `bg-current` dot of 3, 5 or 8px. Ink dots stay 24px `aria-pressed` buttons; the selected one gets an ink border and a paper-0 inner ring (`inset-ring-2 inset-ring-paper-0`), no scale transform.
+- Background is a `role="radiogroup"` of three `role="radio"` chips (Plain / Grid / Graph) with `aria-checked`, roving `tabIndex` (the checked one is `0`), ArrowLeft/ArrowUp and ArrowRight/ArrowDown moving the selection and focus with wrap-around; a click selects. The cycling button is gone.
+- Undo is a `Chip action` with the `undo` icon, disabled on an empty canvas. Cmd/Ctrl+Z (no Shift, no Alt) calls `undo()` only while `document.activeElement` is inside the element marked `data-sketchpad`, and never when the active element is an `input`, `textarea` or contenteditable. A `pointerdown` anywhere inside the sketchpad root focuses the root (`tabIndex={-1}`, `outline-none`) when focus is not already inside it, so drawing with the pointer is enough to arm the shortcut; the answer input outside keeps its native undo.
+- Clear is a `Chip action` with the `clear` icon, disabled on an empty canvas, `aria-haspopup="dialog"`, `aria-expanded`. It toggles a popover under the chip: a `Sheet tone="paper-0" lift` holding the sentence "Clear the whole canvas? This cannot be undone." and two `Button size="sm"`: `destructive` Clear, then `tertiary` Keep. On open, focus goes to Keep (the safe default). Escape or Keep closes and returns focus to the Clear chip. Clear empties the canvas, closes, and (the chip is now disabled) moves focus to the sketchpad root. A pointerdown outside the chip and popover closes without moving focus. No transition on open or close (spec 1e).
+- The right side is one `Button size="sm"` (primary by default): "Clean up", "Reading..." while `cleaning`, disabled while `cleaning`. Its `onClick` is the `onCleanUp` prop.
+- No `window.confirm` remains anywhere under `src/` after this task.
+
+- [ ] **Step 1: Rewrite `src/components/sketchpad/SketchToolbar.tsx`**
+
+Replace the whole file with:
+
+```tsx
+"use client";
+
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
+import { Button } from "@/components/ui/Button";
+import { Chip, chipClasses } from "@/components/ui/Chip";
+import { Icon, type IconName } from "@/components/ui/Icon";
+import { Sheet } from "@/components/ui/Sheet";
+import { cx } from "@/lib/cx";
+import {
+  INK_COLORS,
+  STROKE_SIZES,
+  useSketchStore,
+  type Background,
+  type InkColor,
+  type StrokeWidth,
+  type Tool,
+} from "@/lib/sketch/store";
+
+/**
+ * The kraft utility strip at the top of the sketchpad: the screen's single
+ * kraft surface (spec 4b). Tool, width, ink and background controls on the
+ * left, Undo and Clear (with its confirm popover) in the middle, the one
+ * "Clean up" button on the right. Cmd/Ctrl+Z undoes while focus is inside
+ * the element marked `data-sketchpad` (the Sketchpad root).
+ */
+
+const TOOLS: { value: Tool; label: string; icon: IconName }[] = [
+  { value: "pen", label: "Pen", icon: "pen" },
+  { value: "eraser", label: "Eraser", icon: "eraser" },
+];
+
+const WIDTHS: StrokeWidth[] = ["S", "M", "L"];
+
+const BACKGROUNDS: { value: Background; label: string; icon: IconName | null }[] = [
+  { value: "blank", label: "Plain", icon: null },
+  { value: "grid", label: "Grid", icon: "grid" },
+  { value: "graph", label: "Graph", icon: "graph" },
+];
+
+const CLEAR_QUESTION = "Clear the whole canvas? This cannot be undone.";
+
+function isTextEntry(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.isContentEditable
+  );
+}
+
+export function SketchToolbar({
+  cleaning,
+  onCleanUp,
+}: {
+  cleaning: boolean;
+  onCleanUp: () => void;
+}) {
+  const tool = useSketchStore((state) => state.tool);
+  const width = useSketchStore((state) => state.width);
+  const color = useSketchStore((state) => state.color);
+  const background = useSketchStore((state) => state.background);
+  const strokeCount = useSketchStore((state) => state.strokes.length);
+
+  const setTool = useSketchStore((state) => state.setTool);
+  const setWidth = useSketchStore((state) => state.setWidth);
+  const setColor = useSketchStore((state) => state.setColor);
+  const setBackground = useSketchStore((state) => state.setBackground);
+  const undo = useSketchStore((state) => state.undo);
+  const clear = useSketchStore((state) => state.clear);
+
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const clearWrapRef = useRef<HTMLDivElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const [clearOpen, setClearOpen] = useState(false);
+  const clearTitleId = useId();
+
+  const empty = strokeCount === 0;
+
+  const focusClearChip = useCallback(() => {
+    clearWrapRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+  }, []);
+
+  function keepCanvas() {
+    setClearOpen(false);
+    focusClearChip();
+  }
+
+  function clearCanvas() {
+    clear();
+    setClearOpen(false);
+    // The Clear chip is disabled once the canvas is empty, so focus goes to
+    // the sketchpad root instead of a control that can no longer take it.
+    stripRef.current
+      ?.closest<HTMLElement>("[data-sketchpad]")
+      ?.focus({ preventScroll: true });
+  }
+
+  function onPopoverKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Escape") return;
+    event.stopPropagation();
+    keepCanvas();
+  }
+
+  function onBackgroundKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const delta =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? -1
+          : 0;
+    if (delta === 0) return;
+    event.preventDefault();
+    const index = BACKGROUNDS.findIndex((item) => item.value === background);
+    const nextIndex = (index + delta + BACKGROUNDS.length) % BACKGROUNDS.length;
+    setBackground(BACKGROUNDS[nextIndex].value);
+    event.currentTarget
+      .querySelectorAll<HTMLButtonElement>('[role="radio"]')
+      [nextIndex]?.focus();
+  }
+
+  // While the popover is open: focus Keep (the safe default) and close on any
+  // pointerdown outside the chip and popover, without moving focus.
+  useEffect(() => {
+    if (!clearOpen) return;
+    const buttons = popoverRef.current?.querySelectorAll<HTMLButtonElement>("button");
+    buttons?.[buttons.length - 1]?.focus();
+    function onPointerDown(event: PointerEvent) {
+      if (!clearWrapRef.current?.contains(event.target as Node)) setClearOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [clearOpen]);
+
+  // Cmd/Ctrl+Z undoes the last stroke while focus is inside the sketchpad.
+  // A pointerdown inside the sketchpad focuses its root so drawing arms it.
+  useEffect(() => {
+    const root = stripRef.current?.closest<HTMLElement>("[data-sketchpad]");
+    if (!root) return;
+    function onPointerDown() {
+      if (!root.contains(document.activeElement)) root.focus({ preventScroll: true });
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey) return;
+      if (event.key !== "z" && event.key !== "Z") return;
+      if (!root.contains(document.activeElement)) return;
+      if (isTextEntry(event.target)) return;
+      event.preventDefault();
+      useSketchStore.getState().undo();
+    }
+    root.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      root.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={stripRef}
+      className="stock-textured flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft px-3 py-2"
+    >
+      <div className="flex gap-1" role="group" aria-label="Tool">
+        {TOOLS.map(({ value, label, icon }) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setTool(value)}
+            aria-pressed={tool === value}
+            aria-label={label}
+            title={label}
+            className={chipClasses({ variant: "toggle", active: tool === value })}
+          >
+            <Icon name={icon} />
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-1" role="group" aria-label="Stroke width">
+        {WIDTHS.map((option) => (
+          <Chip
+            key={option}
+            variant="toggle"
+            pressed={width === option}
+            aria-label={`Stroke width ${option}`}
+            onClick={() => setWidth(option)}
+          >
+            <span
+              aria-hidden="true"
+              className="block rounded-full bg-current"
+              style={{ width: STROKE_SIZES[option], height: STROKE_SIZES[option] }}
+            />
+          </Chip>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-1" role="group" aria-label="Ink color">
+        {(Object.keys(INK_COLORS) as InkColor[]).map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setColor(option)}
+            aria-pressed={color === option}
+            aria-label={`${option} ink`}
+            className={cx(
+              "h-6 w-6 rounded-full border-2",
+              color === option ? "border-ink inset-ring-2 inset-ring-paper-0" : "border-paper-0",
+            )}
+            style={{ backgroundColor: INK_COLORS[option] }}
+          />
+        ))}
+      </div>
+
+      <div
+        className="flex gap-1"
+        role="radiogroup"
+        aria-label="Background"
+        onKeyDown={onBackgroundKeyDown}
+      >
+        {BACKGROUNDS.map(({ value, label, icon }) => {
+          const checked = background === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={checked}
+              tabIndex={checked ? 0 : -1}
+              onClick={() => setBackground(value)}
+              className={chipClasses({ variant: "toggle", active: checked })}
+            >
+              {icon ? (
+                <Icon name={icon} />
+              ) : (
+                <span aria-hidden="true" className="block h-3 w-3 rounded-chip border border-current" />
+              )}
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex gap-1">
+        <Chip variant="action" icon="undo" onClick={undo} disabled={empty}>
+          Undo
+        </Chip>
+
+        <div ref={clearWrapRef} className="relative">
+          <Chip
+            variant="action"
+            icon="clear"
+            disabled={empty}
+            aria-haspopup="dialog"
+            aria-expanded={clearOpen}
+            onClick={() => setClearOpen((open) => !open)}
+          >
+            Clear
+          </Chip>
+
+          {clearOpen && (
+            <div
+              ref={popoverRef}
+              role="dialog"
+              aria-labelledby={clearTitleId}
+              onKeyDown={onPopoverKeyDown}
+              className="absolute left-0 top-full z-20 mt-2 w-64"
+            >
+              <Sheet tone="paper-0" lift className="flex flex-col gap-3 p-3">
+                <p id={clearTitleId} className="text-ui text-ink">
+                  {CLEAR_QUESTION}
+                </p>
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="destructive" onClick={clearCanvas}>
+                    Clear
+                  </Button>
+                  <Button size="sm" variant="tertiary" onClick={keepCanvas}>
+                    Keep
+                  </Button>
+                </div>
+              </Sheet>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Button size="sm" onClick={onCleanUp} disabled={cleaning} className="ml-auto">
+        {cleaning ? "Reading..." : "Clean up"}
+      </Button>
+    </div>
+  );
+}
+```
+
+Notes for the implementer: `chipClasses` is used where the markup needs ARIA that `Chip` does not own (`role="radio"` with `aria-checked`, and icon-only `aria-label` chips); if plan A's final `chipClasses` does not include the `inline-flex items-center justify-center gap-1` layout, add it through `cx(chipClasses(...), "inline-flex items-center justify-center gap-1")` on those four buttons and note it in the commit body. `Chip`, `Button` and `Sheet` are expected to spread `...rest` onto their element (so `disabled`, `aria-haspopup`, `aria-expanded`, `aria-label`, `onClick` and `className` pass through); if one of them rejects a prop, wrap that element in a plain `div`/`span` carrying it, exactly as Task 1's note does for `Sheet`. The "Plain" chip has no icon in plan A's `IconName` set, so it draws a 12px outlined square with `border-current`; if the final `IconName` union has a `blank` or `square` entry, use `<Icon name=... />` instead. `inset-ring-2` / `inset-ring-paper-0` are Tailwind 4 utilities; if the build does not know them, use `ring-2 ring-inset ring-paper-0`. `Button`'s `loading` prop is deliberately not used: the text swap to "Reading..." is the spec's indicator.
+
+- [ ] **Step 2: Mark the sketchpad root in `src/components/sketchpad/Sketchpad.tsx`**
+
+Line 75 today is:
+
+```tsx
+    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0">
+```
+
+Replace that one line with:
+
+```tsx
+    <div
+      data-sketchpad
+      tabIndex={-1}
+      className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0 outline-none"
+    >
+```
+
+Nothing else in `Sketchpad.tsx` changes in this task (`git diff --stat -- src/components/sketchpad/Sketchpad.tsx` shows a handful of lines in one hunk). The inline toast, its `text-[12.5px]` and `border-l-[4px]`, move to the `Toast` primitive in Task 3.
+
+- [ ] **Step 3: Gate**
+
+Run: `npm run typecheck && npm run lint`
+Expected: no errors. Likely trips and their fixes: `chipClasses` not exported from `Chip.tsx` means plan A's Chip task was not applied as written (check that plan's Chip Interfaces block; the export is part of it); `Chip` rejecting `aria-haspopup` or `disabled` means its props type omits `ButtonHTMLAttributes<HTMLButtonElement>` (apply the wrapping note above); a lint complaint that `undo` is missing from the shortcut effect's dependency list is not expected because the effect reads `useSketchStore.getState().undo()` rather than the selector value; `root` is a `const` narrowed by the early `return`, so TypeScript keeps it non-null inside the two nested handlers without `!`.
+
+- [ ] **Step 4: Visual and keyboard check**
+
+In the dev preview at 1440x900, open http://localhost:3010/practice/<drtId>. Draw first where a step needs strokes: `computer` `left_click_drag` across the canvas inside `[aria-label="Sketchpad"]` makes one stroke.
+
+- One kraft strip: `document.querySelector('[data-sketchpad] > div').className.includes('bg-kraft')` is `true` and `document.querySelectorAll('[data-sketchpad] .bg-kraft').length` is `1` (the `PracticePanel` header outside the sketchpad keeps its kraft until Task 5; `document.querySelectorAll('[data-practice-workspace] .bg-kraft').length` is `1` only after that task). `document.querySelector('[data-sketchpad] > div').className.includes('border-ink-faint/40')` is `false`.
+- Tool chips: `[...document.querySelectorAll('[aria-label="Tool"] button')].map(b => [b.getAttribute('aria-label'), b.getAttribute('aria-pressed'), b.textContent.trim()])` is `[["Pen","true",""],["Eraser","false",""]]`; each contains an `svg`; `document.querySelector('[aria-label="Tool"] button').getBoundingClientRect().height` is `24`.
+- Width chips: `[...document.querySelectorAll('[aria-label="Stroke width"] button span')].map(s => s.getBoundingClientRect().width)` is `[3, 5, 8]`; the `aria-label`s are `Stroke width S`, `Stroke width M`, `Stroke width L`; clicking L flips its `aria-pressed` to `"true"` and the dot colour to paper-0 (`getComputedStyle(s).backgroundColor` equals the chip's `color`).
+- Ink dots: `document.querySelectorAll('[aria-label="Ink color"] button').length` is `4`; the pressed one has no `transform` (`getComputedStyle(document.querySelector('[aria-label="Ink color"] [aria-pressed="true"]')).transform` is `"none"`) and its `boxShadow` is not `"none"` (the inset ring); the others have `boxShadow` `"none"`.
+- Background radiogroup: `document.querySelectorAll('[role="radiogroup"] [role="radio"]').length` is `3`; `[...document.querySelectorAll('[role="radio"]')].map(b => b.textContent.trim())` is `["Plain","Grid","Graph"]`; the checked one (`[role="radio"][aria-checked="true"]`) is the store's initial background (`grep -n "background:" src/lib/sketch/store.ts` names it; `blank` reads "Plain") and is the only radio with `tabIndex` `0`. Focus it with `document.querySelector('[role="radio"][aria-checked="true"]').focus()` and press ArrowRight via `computer` key: the next radio is checked, focused, the canvas background changes (`computer` screenshot shows grid or graph lines), and `localStorage` is untouched (the store is in memory, as today). ArrowLeft twice wraps to the last one. No button with an `aria-label` starting `Background:` exists (`document.querySelector('[aria-label^="Background:"]')` is `null`).
+- Undo chip: with an empty canvas `document.querySelector('[data-sketchpad] button[aria-haspopup="dialog"]').previousElementSibling.disabled` is `true`; after one stroke it is `false`; clicking it empties the canvas and disables it again.
+- Clear popover: draw a stroke, click the Clear chip (`computer` `left_click` on `[aria-haspopup="dialog"]`): `document.querySelector('[role="dialog"] p').textContent` is `"Clear the whole canvas? This cannot be undone."`, `document.activeElement.textContent.trim()` is `"Keep"`, the chip's `aria-expanded` is `"true"`, the popover's `getBoundingClientRect().top` is below the chip's `bottom`, and `getComputedStyle(document.querySelector('[role="dialog"] > *')).boxShadow` is not `"none"` (lift). Press Escape via `computer` key: `document.querySelector('[role="dialog"]')` is `null`, `document.activeElement === document.querySelector('[aria-haspopup="dialog"]')` is `true`, `aria-expanded` is `"false"`. Reopen and click Keep: same result. Reopen and click Clear (the destructive button): the dialog is gone, the canvas is blank, the Clear and Undo chips are disabled, and `document.activeElement === document.querySelector('[data-sketchpad]')` is `true`. Reopen after a new stroke and click on the problem sheet: the dialog closes and focus stays where the click landed.
+- Shortcut: draw two strokes (two `left_click_drag`s), then `document.querySelector('[data-sketchpad]').contains(document.activeElement)` is `true` (the pointerdown focused the root). Press Cmd+Z via `computer` key `cmd+z` (Ctrl+Z on a non-Mac): the Undo chip stays enabled (one stroke left); press again: the Undo chip is disabled (no strokes). Then draw one stroke, click into the answer input on the left, press Cmd+Z: the Undo chip is still enabled (the sketchpad did not intercept; the input's native undo ran). Cmd+Shift+Z does nothing to the canvas.
+- Clean up: `document.querySelector('[data-sketchpad] > div > button:last-child').textContent.trim()` is `"Clean up"` and `getBoundingClientRect().height` is `24`; with an empty canvas a click shows today's nudge toast (unchanged until Task 3); with a stroke it reads "Reading..." and is disabled while the OCR call runs, then returns to "Clean up".
+- `grep -rn "window.confirm" src` prints nothing.
+- `read_console_messages` with `onlyErrors: true` is clean after all of the above.
+
+- [ ] **Step 5: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|scale-110" src/components/sketchpad/SketchToolbar.tsx ; grep -n $'\xe2\x80\x94' src/components/sketchpad/SketchToolbar.tsx src/components/sketchpad/Sketchpad.tsx ; grep -rn "window\.confirm" src ; grep -c "text-\[" src/components/sketchpad/Sketchpad.tsx
+```
+
+The first three print nothing; the last prints `1` (the inline toast's `text-[12.5px]`, which Task 3 removes; it must not have grown).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/components/sketchpad/SketchToolbar.tsx src/components/sketchpad/Sketchpad.tsx
+git status --short
+git commit -m "Rebuild the sketch toolbar on primitives with a Clear popover (stage C, spec 4b)"
+```
+
+`git status --short` before the commit lists exactly those two files (both ` M`).
+
+---
