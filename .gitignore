@@ -17,7 +17,9 @@ next-env.d.ts
 /prisma/dev.db*
 
 # env
-.env
+# .env is committed on purpose: it holds only the local SQLite path, no secret,
+# so a fresh clone runs with just OPENAI_API_KEY set (build plan Phase 0, AC1).
+# The key itself lives in .env.local, which is never committed.
 .env.local
 .env*.local
 

@@ -1,0 +1,126 @@
+// AngleBengal data model. Mirrors docs/03-data-model.md.
+// SQLite in dev, Postgres-compatible later: no native arrays (join tables and
+// JSON strings instead), no Postgres-only column types.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // switch to "postgresql" at deploy time
+  url      = env("DATABASE_URL")
+}
+
+model Topic {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  parentId    String?
+  parent      Topic?   @relation("TopicTree", fields: [parentId], references: [id])
+  children    Topic[]  @relation("TopicTree")
+  description String?
+  createdAt   DateTime @default(now())
+
+  modelDocs MentalModelDoc[]
+  problems  Problem[]
+
+  @@unique([parentId, name])
+}
+
+model MentalModelDoc {
+  id             String   @id @default(cuid())
+  topicId        String
+  topic          Topic    @relation(fields: [topicId], references: [id])
+  title          String
+  contentMd      String
+  // JSON: [{number, title, anchor}] parsed at save time from the doc's
+  // "## Model N" headings; used for diagnosis linking and tag display.
+  modelIndexJson String
+  isExemplar     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  problemTags       ProblemModelTag[]
+  diagnosedAttempts Attempt[]
+}
+
+model Problem {
+  id          String   @id @default(cuid())
+  topicId     String
+  topic       Topic    @relation(fields: [topicId], references: [id])
+  statementMd String
+  // {"type":"numeric","value":6,"unit":"miles","tolerance":0.01}
+  // or {"type":"expression","value":"30t = 12(t+1.5)"}
+  // or {"type":"multi","parts":[...]}
+  answerJson  String
+  solutionMd  String
+  difficulty  Int
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  modelTags ProblemModelTag[]
+  attempts  Attempt[]
+
+  @@index([topicId, verified, difficulty])
+}
+
+model ProblemModelTag {
+  problemId   String
+  problem     Problem        @relation(fields: [problemId], references: [id])
+  docId       String
+  doc         MentalModelDoc @relation(fields: [docId], references: [id])
+  modelNumber Int
+
+  @@id([problemId, docId, modelNumber])
+}
+
+model Attempt {
+  id              String  @id @default(cuid())
+  problemId       String
+  problem         Problem @relation(fields: [problemId], references: [id])
+  submittedAnswer String
+  correct         Boolean
+  sketchPng       Bytes?
+  ocrTextJson     String?
+
+  // diagnosis (wrong answers only)
+  diagnosedDocId      String?
+  diagnosedDoc        MentalModelDoc? @relation(fields: [diagnosedDocId], references: [id])
+  diagnosedModelNum   Int?
+  diagnosisSymptom    String?
+  diagnosisMd         String?
+  diagnosisConfidence Float?
+
+  createdAt DateTime @default(now())
+
+  @@index([problemId, createdAt])
+}
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  title     String?
+  createdAt DateTime      @default(now())
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id          String      @id @default(cuid())
+  sessionId   String
+  session     ChatSession @relation(fields: [sessionId], references: [id])
+  role        String
+  content     String
+  contextJson String?
+  createdAt   DateTime    @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+model AiCallLog {
+  id           String   @id @default(cuid())
+  promptName   String
+  modelId      String
+  inputTokens  Int
+  outputTokens Int
+  durationMs   Int
+  ok           Boolean
+  createdAt    DateTime @default(now())
+}
