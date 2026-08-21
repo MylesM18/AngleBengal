@@ -181,3 +181,16 @@ the database at build. That would freeze the topic tree and document list at
 build time, so Phase 1's generated documents would never appear. Both carry
 `export const dynamic = "force-dynamic"`, matching docs/04 ("all these routes
 are dynamic").
+
+### D-013. Next 16's CLAUDE.md auto-append is disabled
+
+`next dev` writes a `nextjs-agent-rules` block into CLAUDE.md on every run and
+re-adds it if deleted. CLAUDE.md is this project's source of truth, handed over
+with the spec bundle, so a build tool editing it is not acceptable: it would
+either churn the working tree every session or quietly grow the spec file.
+`agentRules: false` in `next.config.ts` turns it off.
+
+The block's actual advice is worth keeping in mind though, so it is recorded
+here instead: **Next 16 has breaking changes from earlier versions, and the
+authoritative docs ship in `node_modules/next/dist/docs/`.** Check there before
+writing Next-specific code rather than relying on recall.
