@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { ProblemSkeleton } from "@/components/ui/Skeleton";
 import { snapshotSketch } from "@/components/sketchpad/Sketchpad";
+import { SketchpadUnavailableNote } from "@/components/sketchpad/SketchpadUnavailableNote";
 import {
   clearActiveProblem,
   markRevealed,
@@ -435,6 +436,11 @@ export function PracticePanel({
             )}
           </div>
         )}
+
+        {/* Below `lg` the sketchpad pane is display:none, so this explains the
+            absence. Inside the scroll flow rather than pinned to the viewport
+            bottom, so it follows the content it refers to. */}
+        <SketchpadUnavailableNote />
       </div>
     </div>
   );

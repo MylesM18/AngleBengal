@@ -475,3 +475,25 @@ pane being backgrounded during that check. With it removed, Next warns the
 other way: the mark is measured as the Largest Contentful Paint and should load
 eagerly. It genuinely is above the fold, so `priority` is the correct answer and
 the console is clean with it restored.
+
+### D-041. The hidden sketchpad explains itself
+
+Below Tailwind's `lg` (1024px) the sketchpad pane is `display: none`, because
+mobile layouts are out of scope for v1 (docs/01). It was disappearing silently,
+which leaves no way to tell a deliberately unavailable feature from a broken
+one.
+
+A note now takes its place, in the practice panel's scroll flow directly under
+the answer actions rather than pinned to the viewport bottom, so it reads as
+part of the page instead of a stray footer. It says what is unavailable, why,
+and the two things the student can do: widen the window, or work on paper and
+type the answer.
+
+While verifying it, the canvas appeared not to re-measure when the viewport
+crossed the breakpoint. That turned out to be environmental, not a defect:
+neither ResizeObserver nor IntersectionObserver fires at all inside the
+embedded browser pane, while in real Chrome both fire and the canvas recovers
+on its own. An IntersectionObserver was added anyway as redundancy, and its
+comment says plainly that the ResizeObserver alone is sufficient in a real
+browser. A canvas that never gets measured is not a degraded sketchpad, it is
+no sketchpad at all.
