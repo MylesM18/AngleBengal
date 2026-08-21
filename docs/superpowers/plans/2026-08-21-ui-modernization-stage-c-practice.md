@@ -832,3 +832,273 @@ git commit -m "Rebuild the sketch toolbar on primitives with a Clear popover (st
 `git status --short` before the commit lists exactly those two files (both ` M`).
 
 ---
+
+### Task 3: Clean copy slip and the Toast primitive in the sketchpad (spec 4d)
+
+**Files:**
+- Rewrite: `src/components/sketchpad/CleanCopyPanel.tsx` (today 104 lines; after stage A its line 73 already reads `<MarkdownMath variant="ui">`; the rest still carries `text-[11px]`, `text-[12.5px]`, `text-[13px]`, `border-ink-faint/40`, `border-ink-faint/25`, an Expand/Collapse toggle, a brand-filled "Insert into answer" button and a "LaTeX"/"Copied" button with local `copied` state)
+- Rewrite: `src/components/sketchpad/Sketchpad.tsx` (109 lines after Task 2: the `toast` string state at line 21, `flash` at 27 to 30 with its own `setTimeout`, the inline toast `div` at 88 to 95 carrying `text-[12.5px]` and `border-l-[4px]`; `cleanUp` and `snapshotSketch` are kept verbatim, only the message kinds change)
+
+**Interfaces:**
+- Consumes: `Toast({ kind: NoticeKind, message: string, action?: ReactNode, onDismiss: () => void, duration?: number, className? })` from `src/components/ui/Toast.tsx` (a kraft `stock-textured` slip with `shadow-lift`, a 4px accent tab coloured by `kind`, `role="status"`; it owns the timer and calls `onDismiss` after `duration` ms, default 3200, re-arming when `message` changes; positioning is the consumer's job via `className`); `type NoticeKind = "info" | "success" | "warning" | "error"` from `src/components/ui/Notice.tsx`; `Chip({ variant: "action", icon?: IconName, className?, children?, ...ButtonHTMLAttributes<HTMLButtonElement> })` from `src/components/ui/Chip.tsx` (24px tall, `rounded-chip`, hover to `desk`); `IconName` includes `check`, `copy`, `close`; `MarkdownMath({ children, variant?: "reading" | "ui" | "chat", className? })` from `src/components/shared/MarkdownMath.tsx` (`ui` = 14px Archivo, tight margins); from `src/lib/sketch/store.ts` (not edited): `useSketchStore` with `ocrBlocks: OcrBlock[] | null`, `setOcrBlocks`, `setCanvasSize`, `strokes`, `background`, `canvasSize`, and `type OcrBlock = { kind: "math"; latex: string } | { kind: "text"; text: string }`; `compositeToPng(strokes, background, width, height): string | null` from `src/lib/sketch/render.ts` (not edited); `SketchCanvas({ onSizeChange })` (not edited) and `SketchToolbar({ cleaning, onCleanUp })` (Task 2). The slip is NOT a `Sheet`: plan A's `Sheet` bakes `shadow-sheet` into its class string and its `lift` prop is a hover lift (`hover:shadow-lift`), so a resting `shadow-lift` slip on `Sheet` would stack two shadow utilities and depend on CSS order. The slip is a plain `section` with `rounded-card bg-paper-1 shadow-lift`, which is the spec's exact description.
+- Produces: `CleanCopyPanel({ blocks: OcrBlock[]; onInsert: (latex: string) => void; onClose: () => void; onCopied?: () => void })`: today's three props plus one optional `onCopied`, called once after a successful `navigator.clipboard.writeText`, so the parent can flash "Copied" (the slip keeps no `copied` state and no collapse state). `Sketchpad({ onInsertAnswer: (latex: string) => void })` and `snapshotSketch(): string | null` keep their signatures and their callers. The sketchpad root keeps `data-sketchpad`, `tabIndex={-1}`, `outline-none` and `bg-paper-0` (Task 2's Undo scope; do not drop any of the four). Inside `Sketchpad`, `flash(message: string, kind?: NoticeKind)` is the single entry point for every sketchpad message (default kind `"warning"`). Selectors Task 6 relies on: the slip is the only `section[aria-label="Clean copy"]`, the toast is the only `[data-sketchpad] [role="status"]`, the slip's buttons read exactly "Dismiss", then "Use as answer" and "Copy" per math block, and `[data-sketchpad] .bg-kraft` counts `1` (the strip) plus `1` while a toast is visible.
+
+Behaviour contract (read before editing):
+- The canvas area stays `paper-0` (the root's `bg-paper-0`). The slip lies OVER the bottom of the canvas: `absolute inset-x-3 bottom-3 z-10`, `max-h-[40%]` of the sketchpad, `rounded-card bg-paper-1 shadow-lift`, a `flex-col` whose list scrolls inside (`min-h-0 overflow-y-auto`). It no longer sits in the column flow, so opening it does not shrink `SketchCanvas` (whose wrapper and ResizeObserver are not touched, spec 4e) and the strokes under it stay where they were.
+- Header row (`flex items-center gap-2 border-b border-hairline px-3 py-1.5`): `.meta-caps text-ink-soft` "Clean copy" at the left, and at the right one `Chip variant="action" icon="close"` "Dismiss" (`ml-auto`, `onClick={onClose}`). The Expand/Collapse toggle is dropped: spec 4d lists three actions, the slip is short, scrolls, and is one click from gone (Task 7 records this in D-052).
+- Body: a `ul` (`min-h-0 divide-y divide-hairline overflow-y-auto px-3`), one `li` per block (`flex items-start gap-2 py-1.5`). A math block renders `MarkdownMath variant="ui"` of `$$latex$$`; a text block renders `<p className="text-ui leading-snug text-ink-soft">`. Math rows carry two chips at the right (`flex shrink-0 gap-1`): `Chip variant="action" icon="check"` "Use as answer" (`onInsert(block.latex)`, the point of the feature, so it comes first) and `Chip variant="action" icon="copy"` "Copy" (`aria-label="Copy LaTeX"`, writes the LaTeX, calls `onCopied?.()` on success; a blocked clipboard stays silent, as today). No `text-[`, no `bg-brand` button, no `hover:text-ink` links.
+- The toast: `Sketchpad` keeps a `toast` state, now `{ kind: NoticeKind; message: string } | null`, and `flash(message, kind = "warning")` only sets it; the `Toast` primitive owns the 3200ms timer and calls a stable `dismissToast` (`useCallback(() => setToast(null), [])`) so its effect does not re-arm on every render. `cleanUp` keeps its four messages: the two nudges ("Nothing to read yet. Write something first.", "Could not capture the canvas.") stay `"warning"` (the default, the same marigold tab the old toast drew by hand), the OCR error message and "Could not reach the reader. Try again in a moment." pass `"error"`. The slip's `onCopied` flashes `"Copied"` with `"success"`. The toast renders after the slip with `className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2"`, so it stacks above the slip for its 3.2 seconds and keeps today's position. Nothing else in the file moves, and no `setTimeout` remains in `Sketchpad.tsx`.
+- Motion (spec 1e): the slip and the toast appear without transition; chip hovers are the only motion this task adds.
+
+- [ ] **Step 1: Rewrite `src/components/sketchpad/CleanCopyPanel.tsx`**
+
+Replace the whole file with:
+
+```tsx
+"use client";
+
+import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { Chip } from "@/components/ui/Chip";
+import type { OcrBlock } from "@/lib/sketch/store";
+
+/**
+ * The clean copy of the student's handwriting (docs/06 §4, spec 4d): a paper-1
+ * slip lying over the bottom of the canvas, each block rendered with KaTeX or
+ * as plain text, in order.
+ *
+ * "Use as answer" is the point of the whole feature, so it is the first action
+ * on every math block. Copy writes the LaTeX and tells the parent, which owns
+ * the toast; the slip keeps no state of its own.
+ */
+export function CleanCopyPanel({
+  blocks,
+  onInsert,
+  onClose,
+  onCopied,
+}: {
+  blocks: OcrBlock[];
+  /** Given the block's LaTeX, for the answer input to consume. */
+  onInsert: (latex: string) => void;
+  onClose: () => void;
+  /** Called once after a successful clipboard write, so the parent can flash "Copied". */
+  onCopied?: () => void;
+}) {
+  async function copyLatex(latex: string) {
+    try {
+      await navigator.clipboard.writeText(latex);
+      onCopied?.();
+    } catch {
+      // Clipboard can be blocked by permissions; "Use as answer" still works.
+    }
+  }
+
+  return (
+    <section
+      aria-label="Clean copy"
+      className="absolute inset-x-3 bottom-3 z-10 flex max-h-[40%] flex-col rounded-card bg-paper-1 shadow-lift"
+    >
+      <div className="flex shrink-0 items-center gap-2 border-b border-hairline px-3 py-1.5">
+        <p className="meta-caps text-ink-soft">Clean copy</p>
+        <Chip variant="action" icon="close" className="ml-auto" onClick={onClose}>
+          Dismiss
+        </Chip>
+      </div>
+
+      <ul className="min-h-0 divide-y divide-hairline overflow-y-auto px-3">
+        {blocks.map((block, index) => (
+          <li key={index} className="flex items-start gap-2 py-1.5">
+            <div className="min-w-0 flex-1">
+              {block.kind === "math" ? (
+                <MarkdownMath variant="ui">{`$$${block.latex}$$`}</MarkdownMath>
+              ) : (
+                <p className="text-ui leading-snug text-ink-soft">{block.text}</p>
+              )}
+            </div>
+
+            {block.kind === "math" && (
+              <div className="flex shrink-0 gap-1">
+                <Chip variant="action" icon="check" onClick={() => onInsert(block.latex)}>
+                  Use as answer
+                </Chip>
+                <Chip
+                  variant="action"
+                  icon="copy"
+                  aria-label="Copy LaTeX"
+                  onClick={() => void copyLatex(block.latex)}
+                >
+                  Copy
+                </Chip>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+```
+
+- [ ] **Step 2: Rewrite `src/components/sketchpad/Sketchpad.tsx`**
+
+Replace the whole file with (the `cleanUp` body and `snapshotSketch` are today's lines, unchanged except for the two `"error"` kinds):
+
+```tsx
+"use client";
+
+import { useCallback, useState } from "react";
+
+import type { NoticeKind } from "@/components/ui/Notice";
+import { Toast } from "@/components/ui/Toast";
+import { compositeToPng } from "@/lib/sketch/render";
+import { useSketchStore, type OcrBlock } from "@/lib/sketch/store";
+
+import { CleanCopyPanel } from "./CleanCopyPanel";
+import { SketchCanvas } from "./SketchCanvas";
+import { SketchToolbar } from "./SketchToolbar";
+
+/**
+ * The sketchpad panel: toolbar, canvas stack, and the clean-copy slip
+ * (docs/06 §4).
+ *
+ * The canvas size is tracked here because compositing for OCR and for the
+ * attempt snapshot both need it, and only the canvas knows it.
+ */
+export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) => void }) {
+  const [cleaning, setCleaning] = useState(false);
+  const [toast, setToast] = useState<{ kind: NoticeKind; message: string } | null>(null);
+
+  const blocks = useSketchStore((state) => state.ocrBlocks);
+  const setOcrBlocks = useSketchStore((state) => state.setOcrBlocks);
+  const setCanvasSize = useSketchStore((state) => state.setCanvasSize);
+
+  // One entry point for every sketchpad message. The Toast primitive owns the
+  // timer: it calls `dismissToast` after its default 3200ms.
+  const flash = useCallback((message: string, kind: NoticeKind = "warning") => {
+    setToast({ kind, message });
+  }, []);
+  const dismissToast = useCallback(() => setToast(null), []);
+
+  const cleanUp = useCallback(async () => {
+    const { strokes, background } = useSketchStore.getState();
+
+    // An empty canvas is a no-op with a gentle nudge, not an error and not a
+    // wasted vision call (docs/06 §4).
+    if (strokes.length === 0) {
+      flash("Nothing to read yet. Write something first.");
+      return;
+    }
+
+    const { canvasSize } = useSketchStore.getState();
+    const png = compositeToPng(strokes, background, canvasSize.width, canvasSize.height);
+    if (!png) {
+      flash("Could not capture the canvas.");
+      return;
+    }
+
+    setCleaning(true);
+    try {
+      const response = await fetch("/api/ocr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: png }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        const message =
+          (payload as { error?: { message?: string } }).error?.message ??
+          "Could not read that.";
+        flash(message, "error");
+        return;
+      }
+
+      setOcrBlocks((payload as { blocks: OcrBlock[] }).blocks);
+    } catch {
+      flash("Could not reach the reader. Try again in a moment.", "error");
+    } finally {
+      setCleaning(false);
+    }
+  }, [flash, setOcrBlocks]);
+
+  return (
+    <div
+      data-sketchpad
+      tabIndex={-1}
+      className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0 outline-none"
+    >
+      <SketchToolbar cleaning={cleaning} onCleanUp={() => void cleanUp()} />
+
+      <SketchCanvas onSizeChange={setCanvasSize} />
+
+      {blocks && blocks.length > 0 && (
+        <CleanCopyPanel
+          blocks={blocks}
+          onInsert={onInsertAnswer}
+          onClose={() => setOcrBlocks(null)}
+          onCopied={() => flash("Copied", "success")}
+        />
+      )}
+
+      {toast && (
+        <Toast
+          kind={toast.kind}
+          message={toast.message}
+          onDismiss={dismissToast}
+          className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2"
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Snapshot helper for the attempt submitter (docs/06 §4: "On submit: silently
+ * composite and attach"). Returns null for an empty canvas so an untouched
+ * sketchpad does not attach a blank image to every attempt.
+ */
+export function snapshotSketch(): string | null {
+  const { strokes, background, canvasSize } = useSketchStore.getState();
+  if (strokes.length === 0) return null;
+  return compositeToPng(strokes, background, canvasSize.width, canvasSize.height);
+}
+```
+
+- [ ] **Step 3: Gate**
+
+Run: `npm run typecheck && npm run lint`
+Expected: no errors. Likely trips and their fixes: `NoticeKind` not found at `@/components/ui/Notice` means plan A's Notice/Toast task exported it elsewhere (its Interfaces block names the file; import from there, never redeclare the union); `Toast` complaining that `kind` is missing means a call site passes `message` alone (every call here passes `toast.kind`); `Chip` rejecting `aria-label` or `onClick` means its props omit `ButtonHTMLAttributes<HTMLButtonElement>` (Task 2 already depends on that wrapping); an exhaustive-deps warning on `flash` or `dismissToast` is not expected because both close over `setToast` only.
+
+- [ ] **Step 4: Visual and keyboard check**
+
+In the dev preview at 1440x900, open http://localhost:3010/practice/<drtId>. Draw with `computer` `left_click_drag` across the canvas inside `[aria-label="Sketchpad"]` where a step needs strokes.
+
+- Toast, empty canvas: click "Clean up" (`[data-sketchpad] > div > button:last-child`) with no strokes. `document.querySelector('[data-sketchpad] [role="status"]').textContent.trim()` is `"Nothing to read yet. Write something first."`; `getComputedStyle(document.querySelector('[data-sketchpad] [role="status"]')).backgroundColor` is `rgb(203, 178, 129)` (kraft) and `.position` is `"absolute"`; `document.querySelectorAll('[data-sketchpad] .bg-kraft').length` is `2` while it shows; `document.querySelector('[data-sketchpad] [role="status"]').className.includes('text-[')` is `false`. After 3.5 seconds (`computer` `wait` 4) `document.querySelector('[data-sketchpad] [role="status"]')` is `null` and the `.bg-kraft` count is back to `1`.
+- Slip: draw a short expression (for example a fraction or `2x+3=7`), click "Clean up", wait for "Reading..." to return to "Clean up". `const slip = document.querySelector('section[aria-label="Clean copy"]')` is non-null; `getComputedStyle(slip).backgroundColor` is `rgb(241, 234, 220)` (paper-1), `.position` is `"absolute"`, `.boxShadow` is not `"none"`; `slip.getBoundingClientRect().bottom <= document.querySelector('[data-sketchpad]').getBoundingClientRect().bottom` is `true`; `slip.querySelector('.meta-caps').textContent` is `"Clean copy"`; the canvas did not shrink: `document.querySelector('[aria-label="Sketchpad"]').getBoundingClientRect().height` equals the value read before clicking "Clean up" (read it first, then compare).
+- Slip buttons: `[...slip.querySelectorAll('button')].map(b => b.textContent.trim())` is `["Dismiss", "Use as answer", "Copy", ...]` repeating the last two once per math block; every one has `getBoundingClientRect().height` `24` and contains an `svg`; `slip.textContent.includes('Collapse') || slip.textContent.includes('Insert into answer') || slip.textContent.includes('LaTeX')` is `false` (the `aria-label` "Copy LaTeX" is an attribute, not text).
+- Slip body: `slip.querySelector('li .katex')` is non-null for a math block; `getComputedStyle(slip.querySelector('li > div > *')).fontSize` is `"14px"` (the `ui` variant); `[...slip.querySelectorAll('li')].some(li => getComputedStyle(li).borderTopWidth !== '0px')` is `true` when there are two or more blocks (`divide-hairline`).
+- Use as answer: click the first "Use as answer": the answer input on the left receives that block's LaTeX (today's `onInsertAnswer` path, unchanged) and the slip stays open.
+- Copy: click "Copy" (`computer` `left_click`, a real gesture, so the clipboard write is allowed): `document.querySelector('[data-sketchpad] [role="status"]').textContent.trim()` is `"Copied"` and the slip stays open. If the preview blocks the clipboard, no toast appears and nothing else changes (the silent branch).
+- Dismiss: click "Dismiss": `document.querySelector('section[aria-label="Clean copy"]')` is `null`; the canvas still shows the strokes.
+- Keyboard: with the slip open, click the strip's empty kraft area, then Tab from "Clean up": focus lands on "Dismiss", then "Use as answer", then "Copy", in DOM order; Enter on "Use as answer" inserts; Enter on "Dismiss" closes the slip. The slip handles no Escape (it is not a dialog).
+- Task 2's checks still hold: `document.querySelectorAll('[data-sketchpad] .bg-kraft').length` is `1` with no toast showing, Cmd/Ctrl+Z after a pointerdown on the canvas still undoes (the root kept `data-sketchpad`, `tabIndex={-1}`, `outline-none`).
+- `read_console_messages` with `onlyErrors: true` is clean after all of the above.
+
+- [ ] **Step 5: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-ink-faint/(25|40)|/60\b|/70\b|/85\b|window\.confirm|border-l-\[|setTimeout" src/components/sketchpad/Sketchpad.tsx src/components/sketchpad/CleanCopyPanel.tsx ; grep -n $'\xe2\x80\x94' src/components/sketchpad/Sketchpad.tsx src/components/sketchpad/CleanCopyPanel.tsx ; grep -c "text-\[" src/components/sketchpad/Sketchpad.tsx ; grep -rn "stock-textured" src/components/sketchpad
+```
+
+The first two print nothing; the third prints `0` (Task 2's expected `1` was the old toast, now gone); the last prints only the strip line in `SketchToolbar.tsx` (the toast's `stock-textured` lives in `src/components/ui/Toast.tsx`).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/components/sketchpad/Sketchpad.tsx src/components/sketchpad/CleanCopyPanel.tsx
+git status --short
+git commit -m "Restyle the clean copy slip and move the sketchpad toast to the Toast primitive (stage C, spec 4d)"
+```
+
+`git status --short` before the commit lists exactly those two files (both ` M`).
+
+---
