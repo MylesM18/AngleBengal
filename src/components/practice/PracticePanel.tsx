@@ -281,7 +281,7 @@ export function PracticePanel({
             <section className="relative overflow-hidden rounded-card bg-paper-1 pb-[16px] shadow-sheet">
               <span
                 aria-hidden
-                className="font-expanded absolute top-1 right-3 text-[56px] leading-none text-brand opacity-[0.16]"
+                className="display-cut absolute top-1 right-3 text-[56px] leading-none text-brand opacity-[0.16]"
               >
                 {problem.difficulty}
               </span>

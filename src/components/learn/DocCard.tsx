@@ -22,7 +22,7 @@ export function DocCard({
     >
       <span
         aria-hidden
-        className="font-expanded pointer-events-none absolute top-1 right-3 text-[56px] leading-none tabular-nums"
+        className="display-cut pointer-events-none absolute top-1 right-3 text-[56px] leading-none tabular-nums"
         style={{ color: ACCENT_VAR[accent], opacity: 0.16 }}
       >
         {doc.modelCount}

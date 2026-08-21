@@ -86,15 +86,20 @@ Each root topic owns an accent, applied to its swatch-book index tab in the Lear
 
 ## Typography
 
-Three faces, loaded from Google Fonts.
+Four faces: three from Google Fonts, plus a licensed display cut self-hosted as woff2.
 
 | Role | Face | Notes |
 |---|---|---|
-| UI + display | **Archivo** (variable: wght 100-900, wdth 62-125) | The grotesque of the swatch cards. UI at normal width; display headers and corner numerals at `font-stretch: 125%` (Archivo Expanded), 700 weight |
+| Display, 22px and up | **Advercase** (Indieground, static cuts; only Bold 700 is loaded) | High-contrast condensed serif. Page titles, doc h1/h2, corner numerals. 700 weight, tracking 0, no `font-stretch` (it has no width axis). Applied via the `.display-cut` class |
+| UI + display under 22px | **Archivo** (variable: wght 100-900, wdth 62-125) | The grotesque of the swatch cards. UI at normal width; wordmark, chat header, card titles and empty states at `font-stretch: 125%` (Archivo Expanded), 700 weight, via `.font-expanded` |
 | Long-form reading | **Source Serif 4** | Model docs' body text only. 17px/1.7 |
 | Code / raw LaTeX | **IBM Plex Mono** | LaTeX source views, kbd, technical meta |
 
-Scale (px): 12 meta-caps (Archivo 600, letter-spacing .08em, uppercase), 14 UI body, 16 UI large, 17 serif reading, 22 model heading (Archivo Expanded 700), 30 doc title (Archivo Expanded 700), corner numerals 56-88 (Archivo Expanded 700, `--ink` at 12% opacity on colored stock, or accent color on paper).
+Scale (px): 12 meta-caps (Archivo 600, letter-spacing .08em, uppercase), 14 UI body, 16 UI large, 17 serif reading, 22 model heading (Advercase 700), 30 doc title and page title (Advercase 700), corner numerals 56-88 (Advercase 700, `--ink` at 12% opacity on colored stock, or accent color on paper).
+
+**The 22px line is the rule.** Advercase is condensed with very thin hairlines: it reads as deliberate at title sizes and as cramped below them. Nothing under 22px gets it, which is why doc `h3` (16px), chat headings (14px) and every `.font-expanded` site stay on Archivo.
+
+**Missing glyphs.** Advercase is a 218-glyph face, identical in both weights: Latin, digits, and the common typographic set (`–`, `—`, curly quotes, `…`, `×`, true minus `−`, `°`, `²`, `³`, `•`). It has no `<`, `>`, `^`, `~`, `` ` ``, and none of `÷ ± → ≠ ≤ ≥ √ ∑ ∫ Δ π θ ½ ′`. They do not render as tofu: `--font-display` lists Archivo after Advercase, so the browser substitutes per glyph and the character still reads, just lighter and wider than the serif around it. KaTeX is unaffected, since it ships its own fonts. The cost is cosmetic, not a failure, so no guard is needed: a generated title containing `π` or `≤` is acceptable.
 
 KaTeX renders in its own faces; set its text color to `--ink` and display-math blocks on `--paper-0` with 8px vertical breathing room. Never restyle KaTeX glyphs.
 
@@ -159,6 +164,7 @@ Paper physics only: slide, settle, lift, press. Durations 150-220ms, `cubic-bezi
 
 1. Define the tokens once in `globals.css` and mirror them in `tailwind.config` (`colors.paper.0`, `colors.brand.DEFAULT`, etc.). Components consume Tailwind classes; raw `var()` only inside the shared primitives (sheet, band, die-cut, tab).
 2. Build four primitives first and reuse them everywhere: `<Sheet>`, `<BaseBand color>`, `<DieCutWindow shape color>`, `<CornerNumeral n color>`. If a screen needs a fifth paper trick, it's probably off-theme.
-3. Fonts via `next/font/google`: Archivo (variable, both axes), Source Serif 4, IBM Plex Mono. Set `font-stretch` utilities for the expanded display cuts.
+3. Fonts via `next/font/google` (Archivo variable both axes, Source Serif 4, IBM Plex Mono) plus `next/font/local` for Advercase (woff2 in `src/fonts/`). Set `font-stretch` utilities for the expanded Archivo cuts.
+   **The font variables must go on `<html>`, not `<body>`.** Tailwind's `@theme` emits `--font-sans/-serif/-mono/-display` onto `:root`, and a custom property is substituted at the element that declares it. If the next/font variables they reference sit one level down on `<body>`, all four resolve to invalid at `:root` and inherit down invalid, and the whole app silently falls back to system fonts.
 4. The grain data-URI lives in one CSS class (`.stock-textured`), applied to desk and kraft only.
 5. `brand/theme-showcase.html` in this bundle is the visual reference implementation of everything above; when a treatment is ambiguous in words, match the showcase.

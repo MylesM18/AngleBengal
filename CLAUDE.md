@@ -35,7 +35,7 @@ These are decided. Do not relitigate them mid-build; surface concerns instead.
 | State | React server components + local component state; Zustand only for the practice-session sketchpad | Avoid a global store until it earns its place |
 | Auth | None in Phase 1 | Single user, local-first |
 | Visual theme | "Swatch Book" per docs/08 | Paper system with sampled pigment tokens; all colors/type/shadows from tokens, no ad-hoc values |
-| Typography | Archivo (UI/display, variable wdth+wght), Source Serif 4 (doc reading), IBM Plex Mono (code/LaTeX source) | Loaded via next/font/google |
+| Typography | Advercase (display 22px+, licensed, self-hosted woff2), Archivo (UI and display under 22px, variable wdth+wght), Source Serif 4 (doc reading), IBM Plex Mono (code/LaTeX source) | Google faces via next/font/google, Advercase via next/font/local. All four font variables go on `<html>`, not `<body>`: see docs/08 |
 
 ## AI model configuration
 

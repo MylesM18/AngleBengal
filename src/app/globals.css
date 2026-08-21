@@ -52,7 +52,7 @@
   --radius-input: 6px;
   --radius-chip: 4px;
 
-  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-advercase), var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-source-serif), Georgia, "Times New Roman", serif;
   --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
@@ -84,11 +84,27 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.2 0 0 0 0 0.16 0 0 0 0 0.13 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
 }
 
-/* Archivo Expanded, the display cut used for headings and corner numerals. */
+/*
+ * Archivo Expanded. Still the cut for display type below 22px: wordmark, chat
+ * header, card titles, empty states. Advercase gets too tight at those sizes.
+ */
 .font-expanded {
   font-stretch: 125%;
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+
+/*
+ * Advercase, the display cut for page titles, doc headings and corner numerals
+ * (22px and up only). It is a high-contrast condensed serif, so it carries its
+ * own tracking: no negative letter-spacing, and no font-stretch, since it ships
+ * as two static weights rather than a variable width axis.
+ */
+.display-cut {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-stretch: normal;
+  letter-spacing: 0;
 }
 
 .meta-caps {
@@ -116,18 +132,19 @@ body {
 
 .doc-prose h1 {
   font-family: var(--font-display);
-  font-stretch: 125%;
+  font-stretch: normal;
   font-weight: 700;
   font-size: 30px;
   line-height: 1.2;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   margin: 0 0 0.5rem;
 }
 
 .doc-prose h2 {
   font-family: var(--font-display);
-  font-stretch: 125%;
+  font-stretch: normal;
   font-weight: 700;
+  letter-spacing: 0;
   font-size: 22px;
   line-height: 1.25;
   margin: 2.25rem 0 0.75rem;
@@ -135,7 +152,7 @@ body {
 }
 
 .doc-prose h3 {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-weight: 700;
   font-size: 16px;
   letter-spacing: 0.01em;
@@ -312,6 +329,7 @@ body {
 .doc-prose.chat-prose h1,
 .doc-prose.chat-prose h2,
 .doc-prose.chat-prose h3 {
+  font-family: var(--font-sans);
   font-size: 14px;
   font-stretch: normal;
   margin: 0.7rem 0 0.3rem;

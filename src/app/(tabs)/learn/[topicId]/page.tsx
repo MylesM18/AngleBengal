@@ -91,7 +91,7 @@ export default async function TopicPage({
       <Breadcrumb path={topic.path} topicId={topic.id} hasSiblings={false} />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="font-expanded text-[30px] leading-tight text-ink">{topic.name}</h1>
+        <h1 className="display-cut text-[30px] leading-tight text-ink">{topic.name}</h1>
         <Link
           href={`/practice/${topic.id}`}
           className="rounded-input bg-brand px-3.5 py-2 text-[13.5px] font-semibold text-paper-0 transition-transform hover:bg-brand-deep active:translate-y-px"

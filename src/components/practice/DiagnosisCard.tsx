@@ -38,7 +38,7 @@ export function DiagnosisCard({
             boxShadow: "var(--shadow-cut)",
           }}
         >
-          <span className="font-expanded absolute inset-x-0 bottom-1 text-center text-[30px] leading-none text-paper-0">
+          <span className="display-cut absolute inset-x-0 bottom-1 text-center text-[30px] leading-none text-paper-0">
             {diagnosis.modelNumber}
           </span>
         </div>

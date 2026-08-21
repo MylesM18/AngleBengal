@@ -28,7 +28,7 @@ export default async function LearnIndexPage() {
 
   return (
     <div className="mx-auto max-w-[760px] px-8 py-10">
-      <h1 className="font-expanded text-[30px] leading-tight text-ink">Learn</h1>
+      <h1 className="display-cut text-[30px] leading-tight text-ink">Learn</h1>
       <p className="mt-2 max-w-[54ch] text-[15px] leading-relaxed text-ink-soft">
         Mental models for a topic: what is true about a class of problems, not the steps to
         grind through one. Pick a topic on the left to read its models.

@@ -39,7 +39,7 @@ export default async function HistoryPage({
         {topic.path.join("  ›  ")}
       </nav>
 
-      <h1 className="font-expanded text-[30px] leading-tight text-ink">
+      <h1 className="display-cut text-[30px] leading-tight text-ink">
         {filtered !== undefined ? `Attempts blamed on Model ${filtered}` : "Attempt history"}
       </h1>
 

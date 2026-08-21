@@ -500,3 +500,67 @@ Chrome was measured re-measuring correctly through the ResizeObserver alone.
 Carrying a second observer to guard a case that does not occur is cost without
 benefit, and the honest record of the episode is this entry rather than a spare
 observer nobody can explain later.
+
+### D-042. Advercase replaces Archivo as the display cut, above 22px only
+
+Owner-directed: set the app in the licensed Advercase face (Indieground). This
+changes a locked decision in CLAUDE.md, so both that row and docs/08 were
+updated rather than left to drift.
+
+Advercase is a high-contrast condensed serif. It reads as deliberate at title
+sizes and as cramped below them, so the scope is display type at 22px and up:
+page titles, doc `h1`/`h2`, and corner numerals. Everything smaller stays on
+Archivo Expanded. That split is why `.font-expanded` was kept rather than
+retired: it still owns the wordmark (16px), the chat header (15px), card titles
+(17px) and empty states, while a new `.display-cut` class owns Advercase.
+
+Three details the face forced:
+
+- No `font-stretch`. Advercase ships as two static weights, not a variable
+  width axis, so the inherited `font-stretch: 125%` was dead weight and was
+  removed from the sites that moved.
+- Tracking goes to 0. The old `-0.01em` was tuned for Archivo Expanded and
+  closes up an already-condensed serif.
+- Its coverage is 218 glyphs, identical in both weights: Latin, digits and the
+  common typographic set (`–` `—` curly quotes `…` `×` `−` `°` `²` `³` `•`), but no
+  `<`, `>`, `^`, `~`, `` ` ``, and none of `÷ ± → ≠ ≤ ≥ √ ∑ ∫ Δ π θ ½ ′`.
+  Checked in the browser rather than assumed: these do **not** tofu.
+  `--font-display` lists Archivo after Advercase, so the browser substitutes per
+  glyph and the character reads normally, just lighter and wider than its
+  neighbours. KaTeX is unaffected. The cost is cosmetic, so nothing guards it.
+  Noted in docs/08.
+
+Loaded via `next/font/local` from woff2 in `src/fonts/` (30KB + 32KB, converted
+from the supplied OTFs) rather than raw `@font-face` over `public/`, which
+matches how the other three faces already load and gets preloading and hashed
+URLs for free.
+
+Only the 700 cut is declared. The 400 face was listed alongside it on the
+assumption that an unused `src` entry costs nothing; it does not. next/font
+emits a `<link rel="preload" as="font">` for every entry it is given, so the
+Regular woff2 was being fetched at high priority on every page load, never
+rendering, and competing for bandwidth with the three faces that do. Its woff2
+stays in `src/fonts/`, so a future lighter display setting is a one-line change.
+
+### D-043. The font variables move from `<body>` to `<html>`
+
+Found while verifying D-042: **no custom font had ever actually rendered.** The
+app had been running on system fonts since the theme landed.
+
+Tailwind's `@theme` emits `--font-sans`, `--font-serif`, `--font-mono` and
+`--font-display` onto `:root`. Their values reference the next/font variables
+(`var(--font-archivo)` and friends), which `layout.tsx` applied to `<body>`, one
+level down. A custom property is substituted at the element that *declares* it,
+so all four resolved to invalid at `:root` and inherited down still invalid.
+Body never re-evaluated them against its own variables, and every
+`font-family: var(--font-sans)` in `globals.css` silently fell through to the
+Tailwind default system stack.
+
+It hid well because `--color-*` and `--radius-*` tokens are self-contained and
+worked fine, so the theme looked correct; only the typeface was wrong, and
+Archivo against a system grotesque is not an obvious diff.
+
+Fix: put the four next/font `.variable` classes on `<html>` and leave
+`stock-textured antialiased` on `<body>`. Confirmed in the browser: `:root` now
+resolves all four, body computes to Archivo, doc body to Source Serif 4, code to
+IBM Plex Mono, and doc `h1`/`h2` to Advercase.

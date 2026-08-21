@@ -26,7 +26,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-[760px] px-8 py-10">
-      <h1 className="font-expanded text-[30px] leading-tight text-ink">Settings</h1>
+      <h1 className="display-cut text-[30px] leading-tight text-ink">Settings</h1>
 
       <section className="mt-8">
         <h2 className="meta-caps mb-3 text-ink-soft">AI usage</h2>
