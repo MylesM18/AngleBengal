@@ -853,3 +853,247 @@ git commit -m "Restyle the tutor session menu panel onto a sheet (stage D, spec 
 `git status --short` before the commit lists exactly that one file, as ` M`.
 
 ---
+### Task 5: The reader page shell (spec 3d, first half)
+
+**Files:**
+- Modify: `src/app/(tabs)/learn/[topicId]/page.tsx` (the import block at lines 1 to 12; the doc branch's data reads at lines 53 to 54, where step 2 adds one query; the pre-header at lines 59 to 73, which is today the `Breadcrumb` call plus a second row holding the "Exemplar" span and the "Attempt history" link; the miss-list call site at line 75; and the reading sheet at lines 77 to 79). Lines 57 to 58 (the `article` and the left column) and lines 80 to 87 (the closes) are read but not rewritten, and their classes stay exactly as they are.
+- Modify: `src/components/learn/ModelMissList.tsx` (the whole 47-line file, including its two imports and its docblock at lines 5 to 12, which is kept and extended by one sentence).
+- **Lines 82 to 84 belong to Task 7 and are not touched here.** That is the `<div className="hidden xl:block">` wrapper around `DocMiniTOC`. Spec 3d moves the TOC from `xl` to `lg`, and Task 7 owns that move together with the observer. Read the wrapper, change nothing in it.
+- **Line 78 belongs to Task 6 and is not touched here.** That is `<MarkdownMath>{doc.contentMd}</MarkdownMath>`. This task moves it inside the new sheet's body container and leaves it working exactly as it is; Task 6 replaces it with `DocReader`. The page renders the whole document at every point during this task.
+- The non-doc half of this file is stage B's, as the Global Constraints say: lines 14 to 44, the subtopic branch at lines 89 to 128 and the `Breadcrumb` helper at lines 130 to 149 are read but never edited here.
+- Line numbers above describe the file as it stands in the repo. No earlier task in this plan edits either file (Tasks 1 to 4 all live under `src/components/chat/`), so nothing has drifted yet. Tasks 6 and 7 edit `page.tsx` after this task, so they anchor by content rather than by these numbers.
+- No Test line: this project has no test runner (D-054). Verification is the gate, the browser pass and the grep in steps 7 to 9.
+- Anything touching this path needs `GIT_LITERAL_PATHSPECS=1` and a quoted path, because `[topicId]` is a glob to git.
+
+**Interfaces:**
+- Consumes: `Sheet` from `src/components/ui/Sheet.tsx` (plan A Task 4), props `{ as?: SheetTag; tone?: SheetTone; lift?: boolean; className?: string } & Omit<ComponentPropsWithoutRef<T>, "as">`, where `SheetTone` is `"paper-0" | "paper-1" | "kraft"` (default `paper-1`) and `SheetTag` defaults to `"div"`; its base classes are `rounded-card shadow-sheet` plus the tone class and `className` merges through `cx`. `ButtonLink` from `src/components/ui/Button.tsx` (plan A Task 3), a Next `Link` carrying `buttonClasses({ variant, size, tone, className })`, with `variant?: "primary" | "secondary" | "tertiary" | "destructive"` (default primary) and `size?: "sm" | "md"` (default md, sm is 24px). `Notice` from `src/components/ui/Notice.tsx` (plan A Task 7): `Notice({ kind: "info" | "success" | "warning" | "error", action?: ReactNode, className?, children })`, a tint sheet with a 4px accent tab on the left, and `kind="error"` renders `role="alert"`. Type utilities from plan A Task 1: `text-h1` (30/700), `text-meta` (12/500), `text-ui` (14/400). Hairline utility from plan A Task 1: `border-hairline`, token `--color-hairline: rgba(50, 41, 33, 0.1)`. Radius roles from plan A: `rounded-card` 10 (arrives with `Sheet`), `rounded-chip` 4. Motion utility from plan A: `animate-enter-sheet`, the 6px rise and fade the Global Constraints reserve for this one sheet. From the repo, unchanged: `prisma` and the `Attempt` model's `problem` relation (an attempt reaches a topic through `problem.topicId`, the filter `attemptSummary` already uses at `src/lib/attempts.ts:155`); `modelMissCounts(docId)` and its `ModelMiss` row `{ modelNumber: number; title: string; anchor: string; misses: number }`, where `anchor` is `model-n` with no leading hash (`anchorForModel`, `src/lib/modelIndex.ts:27`); `deserializeModelIndex`; `MarkdownMath`; `DocMiniTOC`; and the file-local `Breadcrumb` helper.
+- Produces: `ModelMissList({ misses: ModelMiss[] })`. **The `topicId` and `docId` props are removed**, because the links stop pointing at the filtered history route and become in-page anchors, which is what spec 3d asks for. `src/app/(tabs)/learn/[topicId]/page.tsx:75` is the only call site in the repo, and step 5 updates it in the same task, so nothing else can break. For Tasks 6 and 7: the reading sheet is a `Sheet` whose last child is `<div className="px-8 py-8">`, holding `ModelMissList` and then the body element Task 6 replaces; the TOC column is still `<div className="hidden xl:block">` at the end of the `article`.
+
+**No primitive edit is needed in this task.** `Sheet`, `ButtonLink` and `Notice` all arrive from plan A with everything spec 3d asks of them. Do not add a task, or a step, that edits anything under `src/components/ui/`.
+
+Behaviour contract (read before editing):
+- **The pre-header collapses from two rows to one.** Today the breadcrumb is one row and the "Exemplar" span plus the "Attempt history" link are a second row below it. Spec 3d wants a single line: breadcrumb on the left in meta, a tertiary "History" link on the right. The "Exemplar" mark does not disappear, it moves down into the kraft strip where spec 3d puts it, so the second row goes away entirely.
+- **`Breadcrumb` is stage B's helper and this task does not edit it.** It carries its own `mb-3`, which is right when it is the only thing in the row and wrong inside a flex row, where the extra bottom margin pushes it off centre against the link. The wrapper zeroes it with the arbitrary variant `[&>nav]:mb-0` and owns the spacing itself with `mb-4`. That keeps the helper identical for the subtopic branch, which still renders it on its own.
+- **The reading sheet becomes the `Sheet` primitive.** Line 77 hand-rolls `rounded-card bg-paper-0 shadow-sheet`, which is three of `Sheet`'s own jobs. After this task the radius, the stock and the shadow all come from the primitive and `className` keeps only what is local: `animate-enter-sheet` and `overflow-hidden`.
+- **`overflow-hidden` is load-bearing, not decoration.** The kraft strip runs edge to edge inside the sheet, so without it the strip's square corners would poke out past the sheet's 10px radius. `lift` is not passed: plan A's `lift` is a hover treatment (`hover:-translate-y-px hover:shadow-lift`) and a document that rises under the pointer is wrong, exactly as Task 4 reasoned about the menu panel.
+- **The padding moves from the sheet to its three children.** The title block, the strip and the body each carry `px-8`, so the strip can be full width while the text stays on the same 32px margin it has today. The body keeps `py-8`; the title takes `pt-8 pb-5` and the strip `py-2.5`.
+- **The title is new to this screen.** The doc branch renders no `h1` today, so the reader's largest type is whatever `MarkdownMath` emits. Spec 3d opens the sheet with the document title at 30: `text-h1` plus `display-cut`, the same treatment the topic name gets at line 94. `leading-tight` is not written, because `text-h1` carries its own 36px line height. Written fallback: if the computed line height comes back `normal`, `text-h1` is size only in plan A and `leading-tight` goes back on the heading.
+- **The strip is this screen's single kraft surface** and holds three things and nothing else: the "Exemplar" chip when the document is the exemplar, the model count, and when the document was last practiced. It is `stock-textured bg-kraft` with `border-y border-hairline`, matching plan C's toolbar rule that a kraft strip separates with a hairline and never with `border-ink-faint/40`. The subtopic branch's kraft block is a different screen and is left alone.
+- **The "Exemplar" chip is written directly, not through the `Chip` primitive.** `Chip` renders a `<button>`, and this mark is static text: putting it in the tab order would promise an action that does not exist. Its only non-interactive variant, `meta`, is `stock-textured bg-kraft`, which is both invisible on a kraft strip and banned on this screen by the stage's own kraft-chip rule. So the strip writes the chip look on a `<span>`: `inline-flex h-6 items-center rounded-chip bg-paper-0 px-2 font-medium text-ink`, which is the same 24px height and 4px radius every chip has. `meta-caps` comes off with the old span, because the strip already sets `text-meta`.
+- **"Last practiced" has no exact source, so the task picks the honest one.** Attempts hang off problems, and problems hang off topics: an attempt is never tied to a document. The strip therefore shows the most recent attempt on this document's topic, which is what "practiced" means to the person reading (Practice runs per topic). The query is written inline with `prisma`, next to the `findUnique` this branch already runs, rather than added to `src/lib/attempts.ts`, so this stage still touches only the files its File Structure table lists. Task 9 records the reading in D-053.
+- **The date format is copied from `DocCard.tsx:43`**, `{ year: "numeric", month: "short", day: "numeric" }`, so the library has one date format rather than two. With no attempts at all the item reads "Not practiced yet", which keeps the strip's shape steady instead of leaving a gap.
+- **The miss list becomes a `Notice kind="error"` and moves inside the sheet**, above the body, where spec 3d puts it. It stops being a hand-rolled `bg-red-tint` section: the tint, the 4px accent tab and the semantics all come from the primitive.
+- **Its links become in-page anchors and lose the model title.** Spec 3d gives the copy exactly: "Model 3 has failed you 2 times", linking to `#model-3`. The title drops out because the anchor now lands on the heading that carries it, which the old `history?doc=&model=` deep link could never do, and the pre-header's "History" link still reaches the full history. `miss.anchor` is already `model-n`, so the href is `#${miss.anchor}` and a plain `<a>` is enough: a hash on the current route needs no router, and native scrolling is what respects the `scroll-margin-top` Task 6 keeps on the anchors.
+- **`role="alert"` on a block that is present at first paint will be announced once on load.** That is accepted here rather than overridden: it is the page's one warning, and spec 3d names `kind=error` explicitly. Do not pass a `role` of your own to `Notice`. Note it for Task 8's a11y pass.
+- **Nothing about the page's data flow changes.** `selectedDocId`, the `findUnique`, `notFound()`, `deserializeModelIndex`, `modelMissCounts` and the `accent` passed to `DocMiniTOC` are all untouched. This task is layout, stock and type, plus one added read.
+
+- [ ] **Step 1: Add the imports**
+
+The import block is lines 1 to 12: two Next imports, then the local group. Leave every existing line in place, `Link` included (the subtopic branch and `Breadcrumb` still use it), and add the two primitives to the local group so it reads:
+
+```tsx
+import { DocCard } from "@/components/learn/DocCard";
+import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
+import { ModelMissList } from "@/components/learn/ModelMissList";
+import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { ButtonLink } from "@/components/ui/Button";
+import { Sheet } from "@/components/ui/Sheet";
+import { modelMissCounts } from "@/lib/attempts";
+import { prisma } from "@/lib/db";
+import { deserializeModelIndex } from "@/lib/modelIndex";
+import { getTopicDetail } from "@/lib/topics";
+import { accentForRoot } from "@/lib/topicColors";
+```
+
+If typecheck later reports `Cannot find module '@/components/ui/Sheet'` or `'@/components/ui/Button'`, plan A has not been executed yet or named a file differently: take the real paths from `ls src/components/ui/`.
+
+- [ ] **Step 2: Read the last attempt on this topic**
+
+Line 54 is `const misses = await modelMissCounts(doc.id);`. Add the query and the label directly below it, so the block reads:
+
+```tsx
+    const index = deserializeModelIndex(doc.modelIndexJson);
+    const misses = await modelMissCounts(doc.id);
+    const lastAttempt = await prisma.attempt.findFirst({
+      where: { problem: { topicId: topic.id } },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
+    const lastPracticed = lastAttempt
+      ? `Last practiced ${lastAttempt.createdAt.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })}`
+      : "Not practiced yet";
+```
+
+`where: { problem: { topicId } }` is the filter `src/lib/attempts.ts:155` already uses, so the relation is known to work. `select` keeps the row to one column: the `Attempt` model holds `sketchPng Bytes?` and there is no reason to pull an image off disk to print a date.
+
+- [ ] **Step 3: Collapse the pre-header to one line**
+
+Replace lines 59 to 73, that is the `Breadcrumb` call and the whole `<div className="mb-3 flex items-center gap-2">` row under it, with:
+
+```tsx
+          <div className="mb-4 flex items-center justify-between gap-4 [&>nav]:mb-0">
+            <Breadcrumb path={topic.path} topicId={topic.id} hasSiblings={topic.docCount > 1} />
+            <ButtonLink href={`/learn/${topic.id}/history`} variant="tertiary" size="sm">
+              History
+            </ButtonLink>
+          </div>
+```
+
+The `Breadcrumb` call keeps its three props exactly. The `Link` that read "Attempt history" is gone, replaced by the `ButtonLink`; the "Exemplar" span is gone from here and reappears in step 4.
+
+- [ ] **Step 4: Rebuild the reading sheet with its title and strip**
+
+Replace lines 77 to 79, the hand-rolled sheet and its single child, with the `Sheet` below. It also swallows the miss-list call from line 75, so delete line 75 and the blank line under it as part of this edit: after this step the miss list lives inside the body container.
+
+```tsx
+          <Sheet tone="paper-0" className="animate-enter-sheet overflow-hidden">
+            <h1 className="display-cut px-8 pb-5 pt-8 text-h1 text-ink">{doc.title}</h1>
+
+            <div className="stock-textured flex flex-wrap items-center gap-3 border-y border-hairline bg-kraft px-8 py-2.5 text-meta text-ink-soft">
+              {doc.isExemplar && (
+                <span className="inline-flex h-6 items-center rounded-chip bg-paper-0 px-2 font-medium text-ink">
+                  Exemplar
+                </span>
+              )}
+              <span>
+                {index.length} {index.length === 1 ? "model" : "models"}
+              </span>
+              <span>{lastPracticed}</span>
+            </div>
+
+            <div className="px-8 py-8">
+              <ModelMissList misses={misses} />
+              <MarkdownMath>{doc.contentMd}</MarkdownMath>
+            </div>
+          </Sheet>
+```
+
+`<MarkdownMath>{doc.contentMd}</MarkdownMath>` is carried over unchanged from line 78: the whole document still renders, and Task 6 is the task that swaps it for `DocReader`. The `<div className="min-w-0 max-w-[68ch] flex-1">` that wraps all of this, and the `</div>` that closes it, stay as they are.
+
+- [ ] **Step 5: Rewrite `ModelMissList` as a `Notice`**
+
+Replace the whole of `src/components/learn/ModelMissList.tsx` with:
+
+```tsx
+import type { ModelMiss } from "@/lib/attempts";
+import { Notice } from "@/components/ui/Notice";
+
+/**
+ * "Model 3 has failed you 4 times" on the document that teaches it
+ * (docs/07 Phase 5).
+ *
+ * The point is not a score. It is that the library reflects where this
+ * particular student keeps slipping, so the document reads as a diagnosis of
+ * their own weak points rather than as a flat reference.
+ *
+ * Each line jumps to the model it names, so the fix is one click away inside
+ * the document the reader already has open (spec 3d).
+ */
+export function ModelMissList({ misses }: { misses: ModelMiss[] }) {
+  if (misses.length === 0) return null;
+
+  return (
+    <Notice kind="error" className="mb-6">
+      <p className="font-medium">Where this has tripped you up</p>
+      <ul className="mt-1.5 flex flex-col gap-1 text-ui">
+        {misses.map((miss) => (
+          <li key={miss.modelNumber}>
+            <a href={`#${miss.anchor}`} className="underline-offset-2 hover:underline">
+              Model {miss.modelNumber} has failed you {miss.misses} time
+              {miss.misses === 1 ? "" : "s"}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </Notice>
+  );
+}
+```
+
+The `next/link` import goes, because a hash on the current route needs no router. The colour of the text is `Notice`'s job now, so no `text-red`, no `text-ink` and no `bg-red-tint` are written here.
+
+- [ ] **Step 6: Confirm there is no second call site**
+
+```bash
+grep -rn "ModelMissList" src --include='*.tsx'
+```
+
+Expected: exactly two lines, the import and the call in `src/app/(tabs)/learn/[topicId]/page.tsx`, and the call now reads `<ModelMissList misses={misses} />`. If a third line appears, some other surface renders the list and needs the same prop change in this task, since the old props no longer exist.
+
+- [ ] **Step 7: Gate**
+
+Run: `npm run typecheck && npm run lint`
+Expected: no errors.
+
+Likely trips and their fixes:
+- `Property 'topicId' does not exist on type '{ misses: ModelMiss[] }'` means step 4's call site kept the old props. Remove them.
+- `'Link' is defined but never used` in `ModelMissList.tsx` means step 5's replacement was pasted under the old imports rather than over the whole file.
+- `Property 'attempt' does not exist on type 'PrismaClient'` means the client has not been generated in this checkout: run `npx prisma generate` and re-run the gate.
+- A JSX tag mismatch in `page.tsx` means step 4 left the old `</div>` that closed the hand-rolled sheet. The sheet's closing tag must read `</Sheet>`.
+
+- [ ] **Step 8: Reader shell check**
+
+In the dev preview at 1440x900, open http://localhost:3010/learn, open the Algebra topic and open the Distance-Rate-Time document, so the URL carries `?doc=`. Resolve tokens with `getComputedStyle(document.documentElement).getPropertyValue('--color-paper-0')` and friends when a bullet says "the token".
+
+Set the handles first, in `javascript_tool`:
+
+```js
+const article = document.querySelector('article');
+const nav = article.querySelector('nav[aria-label="Breadcrumb"]');
+const history = [...article.querySelectorAll('a')].find((a) => a.textContent.trim() === 'History');
+const sheet = nav.parentElement.nextElementSibling;
+const title = sheet.querySelector('h1');
+const strip = title.nextElementSibling;
+```
+
+The pre-header:
+
+- `nav.parentElement === history.parentElement`, proving breadcrumb and link share one row, and that row has exactly two element children.
+- `getComputedStyle(nav).marginBottom === '0px'`, proving the `[&>nav]:mb-0` variant reached the helper. If it is `12px`, the arbitrary variant is not compiling: keep the row and move the spacing by wrapping the breadcrumb in a `<span className="contents">` instead, then re-run this bullet.
+- `Math.abs((nav.getBoundingClientRect().top + nav.getBoundingClientRect().bottom) / 2 - (history.getBoundingClientRect().top + history.getBoundingClientRect().bottom) / 2) <= 1`, proving the two are on one centred line.
+- `Math.round(history.getBoundingClientRect().height) === 24`, the `size="sm"` height, and `history.getAttribute('href')` ends with `/history`.
+- No element in the article has the text "Attempt history".
+
+The sheet, the title and the strip:
+
+- `getComputedStyle(sheet).backgroundColor` is the `paper-0` token, `getComputedStyle(sheet).borderRadius` is `"10px"`, and `getComputedStyle(sheet).overflow` is `"hidden"`.
+- `getComputedStyle(sheet).animationName !== 'none'` right after a reload, proving `animate-enter-sheet` is on the one element the Global Constraints allow it on.
+- `getComputedStyle(title).fontSize` is `"30px"` and `getComputedStyle(title).fontWeight` is `"700"`. If `getComputedStyle(title).lineHeight` comes back `"normal"`, apply the written fallback from the contract and put `leading-tight` back on the heading.
+- `article.querySelectorAll('.stock-textured').length === 1` and that one element is `strip`, which is the screen's single kraft strip. Count inside the article, not the document: the desk itself is allowed to carry the texture.
+- `getComputedStyle(strip).borderTopColor` and `getComputedStyle(strip).borderBottomColor` are both `"rgba(50, 41, 33, 0.1)"`, the hairline token, and both widths are `"1px"`.
+- `Math.round(strip.getBoundingClientRect().width) === Math.round(sheet.getBoundingClientRect().width)`, proving the strip is full bleed, and its corners are clipped by the sheet rather than square against its radius.
+- `strip.children.length` is `3` on the exemplar document and `2` on any document that is not the exemplar. `strip.textContent` matches `/\d+ models?/` and matches `/Last practiced |Not practiced yet/`, and it contains no other label.
+- `getComputedStyle(strip).fontSize` is `"12px"`. On the "Exemplar" span, `getComputedStyle(strip.firstElementChild).height` is `"24px"` and its `borderRadius` is `"4px"`.
+
+The miss list:
+
+- If the document has diagnosed misses, `const alert = sheet.querySelector('[role="alert"]')` is not null, it sits above the prose (`alert.compareDocumentPosition(sheet.querySelector('.doc-prose, article p')) & Node.DOCUMENT_POSITION_FOLLOWING` is truthy), every `alert.querySelectorAll('a')` href matches `/^#model-\d+$/`, and for each one `document.getElementById(href.slice(1)) !== null`, so no link is dead.
+- Click the first of those links: `location.hash` becomes `#model-n` and the matching heading is inside the viewport.
+- If this environment has no diagnosed attempts, the list is legitimately absent: assert `sheet.querySelector('[role="alert"]') === null` instead, and defer the two bullets above to Task 8, which runs after a practice session has produced a diagnosis.
+- `read_console_messages` with `onlyErrors: true` is clean after all of the above.
+
+- [ ] **Step 9: Banned-pattern grep**
+
+```bash
+GIT_LITERAL_PATHSPECS=1 grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|chat-prose|doc-prose" "src/app/(tabs)/learn/[topicId]/page.tsx" src/components/learn/ModelMissList.tsx ; grep -n $'\xe2\x80\x94' "src/app/(tabs)/learn/[topicId]/page.tsx" src/components/learn/ModelMissList.tsx
+```
+
+Both print nothing. `ModelMissList.tsx` is entirely this task's, so a hit there is this task's bug. The page grep covers the whole file, so a hit inside the subtopic branch or the `Breadcrumb` helper means stage B's pass over this file is missing or incomplete: check it against plan B before touching anything here. `max-w-[68ch]` and `w-[210px]` are arbitrary layout sizes with no `text-` prefix and no slash, so they do not match and they stay.
+
+`stock-textured` and `bg-kraft` are deliberately absent from that pattern, unlike Task 4's, because this screen is allowed exactly one kraft strip and step 4 wrote it. The one-strip-per-screen rule is proved in the browser by step 8's `.stock-textured` count, not by a file grep: the subtopic branch may keep its own kraft block, and the two branches never render together.
+
+- [ ] **Step 10: Commit**
+
+```bash
+GIT_LITERAL_PATHSPECS=1 git add "src/app/(tabs)/learn/[topicId]/page.tsx" src/components/learn/ModelMissList.tsx
+git status --short
+git commit -m "Rebuild the doc reader shell on the reading sheet (stage D, spec 3d)"
+```
+
+`git status --short` before the commit lists exactly those two files, as ` M`.
+
+---
