@@ -627,3 +627,229 @@ git commit -m "Restyle the tutor composer onto paper (stage D, spec 5d)"
 `git status --short` before the commit lists exactly that one file, as ` M`.
 
 ---
+
+### Task 4: The session menu panel (spec 5e)
+
+**Files:**
+- Modify: `src/components/chat/SessionMenu.tsx` (the import block at lines 1 to 3, the panel element at lines 76 to 79 with its closing tag at line 123, the "New chat" item at lines 80 to 90, the separator at line 92, the empty line at line 95, and the session row at lines 100 to 118). Lines 5 to 28 (the file comment, `SessionSummary` and the `SessionMenu` props), lines 30 to 61 (the sessions fetch effect and the click-away plus Escape effect) and lines 94 to 99 plus 119 to 127 (the list scaffolding and the closes) are read but not rewritten.
+- **Lines 63 to 73 belong to Task 1 and are not touched here.** Line 63 is `<div ref={wrapper} className="relative">` and lines 64 to 73 are the "Chats" trigger button, which Task 1 already rewrote as part of the plum band (spec 5a) to clear its `text-[12px]` and `text-paper-0/85`. Task 4 owns the file only from `{open && (` at line 75 down. Read the trigger, change nothing in it, and let step 9's grep over the whole file prove Task 1's rewrite is still in place.
+- Line numbers above describe the file as it stands before Task 1 runs. Task 1 rewrites the trigger, so if its replacement is not the same height as the original, every number from 75 down shifts by that difference. Anchor each region by its content instead: `{open && (`, `role="menu"`, `New chat`, `my-1 border-t`, `No earlier chats.`, `sessions.map`.
+
+**Interfaces:**
+- Consumes: `Sheet` from `src/components/ui/Sheet.tsx` (plan A Task 4), whose props are `{ as?: SheetTag; tone?: SheetTone; lift?: boolean; className?: string } & Omit<ComponentPropsWithoutRef<T>, "as">`, where `SheetTone` is `"paper-0" | "paper-1" | "kraft"` (default `paper-1`) and `SheetTag` is `"div" | "section" | "article" | "aside" | "nav" | "li" | "header" | "footer"` (default `div`). Its base classes are `rounded-card shadow-sheet` plus the tone class, `className` merges through `cx` rather than replacing them, and every other prop reaches the rendered tag through `...rest`. Type utilities from plan A Task 1: `text-ui` (14/400) for the items and `text-meta` (12/500) for the secondary lines. Hairline utility from plan A Task 1: `border-hairline`, whose token is `--color-hairline: rgba(50, 41, 33, 0.1)`. Radius role from plan A: `rounded-card` is 10px and arrives with `Sheet`. From this file, unchanged: `SessionSummary`, the `open` and `sessions` state, the `wrapper` ref, both effects, and the "Chats" trigger Task 1 owns.
+- Produces: nothing importable. `SessionMenu({ currentSessionId: string | null; onSelect: (sessionId: string) => void; onNew: () => void; refreshKey: number })` keeps its exact signature, so `ChatDrawer` keeps rendering it unchanged, and no later task in this plan touches this file: Tasks 5 to 7 own the reader, and Task 8 only reads it during the stage grep.
+
+**No primitive edit is needed in this task.** `Sheet` already carries every capability spec 5e asks of it, including passing `role` straight through to the rendered element. Do not add a task, or a step, that edits `Sheet.tsx`.
+
+Behaviour contract (read before editing):
+- **The panel becomes a sheet instead of a hand-built card.** Line 78 today hand-rolls `rounded-card bg-paper-0 ... shadow-lift`, which is three of `Sheet`'s own jobs. After this task the radius and the stock come from the primitive, and the class list keeps only what is genuinely local to a popover: absolute placement, width, z-index, `overflow-hidden` and the 4px vertical padding.
+- **`lift` is deliberately not passed.** Plan A's `lift` prop is a hover treatment, not a resting shadow: its class string is `transition-[box-shadow,transform] duration-150 ease-paper hover:-translate-y-px hover:shadow-lift`, and its doc comment reads "Hover lifts the sheet". A menu that rises under the pointer is wrong, and the panel needs its raised shadow at rest, the moment it opens. So `shadow-lift` is written in `className` and `lift` stays off.
+- **That puts two shadow utilities on one element**, `shadow-sheet` from `Sheet`'s base and `shadow-lift` from `className`. `cx` only joins strings, so the winner is decided by the order the two utilities appear in the compiled stylesheet, not by their order in the attribute. Step 8 measures the computed shadow against both tokens. If `shadow-sheet` wins, the deterministic fix is the Tailwind v4 important suffix, `shadow-lift!`, and taking that fallback is one of the conditional entries Task 9 records in D-053.
+- **`role="menu"` and `role="menuitem"` survive the swap.** `SheetProps` intersects `Omit<ComponentPropsWithoutRef<T>, "as">`, so `role` type-checks as a native div prop and rides through `...rest` onto the rendered tag. The items are already plain `<button>` elements and keep their roles untouched. Step 8 asserts both, because a silently dropped `role` is exactly the kind of regression a visual pass hides.
+- The separator changes colour only. `border-ink-faint/40` is a banned alpha border and `border-hairline` is the token that means the same thing at full opacity, which is what spec 1a calls the only separator allowed between rows inside a sheet. The element stays a plain decorative `div` with the same `my-1` rhythm.
+- **Every item is `text-ui` at 500.** "New chat" steps down from `font-semibold` (600) and the session rows step up from `text-[12.5px]` to 14, both landing on `text-ui font-medium`. `font-medium` is written explicitly rather than trusting the type token's own weight, because plan A's Task 1 gate notes that an installed Tailwind that ignores `--text-*--font-weight` needs the companion weight class anyway.
+- **The current session stops being bold.** Its distinction is now stock plus a tab: `bg-paper-1` on the row and 4px of plum at its left edge. Because the weight is the same in every state, this task has no reflow hazard at all, unlike Task 2's starter rows where hover stepped the weight.
+- **The tab is stock, not a border.** It is a 4px `<span>` of `bg-plum` positioned inside a `relative` row, marked `aria-hidden`, so the row's own border widths stay `0px` and `aria-current` keeps carrying the meaning for assistive technology. A `border-l-4` would read as an outline on a row, which spec 1a bans, and would also shift the text by 4px against its neighbours.
+- `leading-snug` comes off the session row, exactly as it came off the starter rows in Task 2 and the textarea in Task 3, because plan A's `text-ui` carries its own line height. Written fallback: if the computed line height is `normal`, `text-ui` is size only in plan A, and `leading-snug` goes back on the row.
+- The message count and the empty line both go to `text-meta text-ink-soft`, the same move Task 3 made on the composer hint: `text-[10.5px]` and `text-[12px]` are hard-coded sizes the scale replaces, and `ink-soft` is the token for quiet text at full opacity.
+- **Nothing about the menu's behaviour changes.** The fetch on open, the `refreshKey` refetch, the click-away close, the Escape close, `onNew`, `onSelect` and `setOpen(false)` on both items are all untouched. This task is stock, type and one marker.
+
+- [ ] **Step 1: Add the `Sheet` import**
+
+The file's import block is lines 1 to 3. Leave `"use client"` and the React import as they are, and add the `Sheet` import as its own group below them, so the block reads:
+
+```tsx
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+import { Sheet } from "@/components/ui/Sheet";
+```
+
+The file comment at line 5 follows unchanged. If typecheck later reports `Cannot find module '@/components/ui/Sheet'`, plan A has not been executed yet or named the file differently: take the real path from `ls src/components/ui/`.
+
+- [ ] **Step 2: Restock the panel**
+
+Replace lines 76 to 79, the panel's opening tag, with:
+
+```tsx
+        <Sheet
+          tone="paper-0"
+          role="menu"
+          className="absolute right-0 z-30 mt-1 w-[260px] overflow-hidden py-1 shadow-lift"
+        >
+```
+
+Then change the matching closing tag at line 123 from `</div>` to `</Sheet>`. It is the last line before `)}` on line 124, at eight spaces of indent. Miss it and typecheck reports a JSX tag mismatch, which is the intended safety net.
+
+`rounded-card` and `bg-paper-0` are gone from the class list because `Sheet` supplies both, the radius from its base and the stock from `tone="paper-0"`. `overflow-hidden` stays: it clips the scrolling list, and it is what keeps the plum tab inside the panel's rounded corners. `w-[260px]` stays: it is a layout width, not a type size, so it is not what step 9 hunts.
+
+- [ ] **Step 3: Retype the "New chat" item**
+
+Replace lines 80 to 90, the whole first `<button>` element from `<button` through `</button>`, with:
+
+```tsx
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onNew();
+              setOpen(false);
+            }}
+            className="w-full px-3 py-2 text-left text-ui font-medium text-ink hover:bg-paper-1"
+          >
+            New chat
+          </button>
+```
+
+Everything above the `className` is retyped unchanged so the element stays contiguous: `type`, `role` and the entire `onClick` body must be byte-identical to the original. The only edited line is the class list, where `text-[12.5px] font-semibold` became `text-ui font-medium`.
+
+- [ ] **Step 4: Swap the separator to a hairline**
+
+Replace line 92 with:
+
+```tsx
+          <div className="my-1 border-t border-hairline" />
+```
+
+`border-t` still supplies the 1px width; only the colour token changed. Spec 5e asks for a hairline between "New chat" and the session list, and this element already sits exactly there, between the button above it and the list below.
+
+- [ ] **Step 5: Retype the empty line**
+
+Replace line 95 with:
+
+```tsx
+            <p className="px-3 py-2 text-meta text-ink-soft">No earlier chats.</p>
+```
+
+The copy is unchanged. This line is not a menu item, so it takes `text-meta` rather than the `text-ui` 500 the items take.
+
+- [ ] **Step 6: Rebuild the session row**
+
+Replace lines 100 to 118, the whole row `<button>` element from `<button` through `</button>`, with:
+
+```tsx
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      onSelect(session.id);
+                      setOpen(false);
+                    }}
+                    aria-current={session.id === currentSessionId ? "true" : undefined}
+                    className={`relative w-full px-3 py-2 text-left text-ui font-medium hover:bg-paper-1 ${
+                      session.id === currentSessionId ? "bg-paper-1" : ""
+                    }`}
+                  >
+                    {session.id === currentSessionId && (
+                      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-plum" />
+                    )}
+                    <span className="block truncate text-ink">
+                      {session.title ?? "Untitled chat"}
+                    </span>
+                    <span className="block text-meta text-ink-soft">
+                      {session.messageCount} message{session.messageCount === 1 ? "" : "s"}
+                    </span>
+                  </button>
+```
+
+Four things changed and nothing else. `relative` joined the class list so the tab has something to anchor to. `text-[12.5px] leading-snug` became `text-ui font-medium`. `font-semibold` came out of the current-session branch, which now sets stock only. The tab span is new, and `w-1` is Tailwind's 4px, which is the width spec 5e asks for. `type`, `role`, the `onClick` body, `aria-current`, the title span and the count expression are retyped unchanged, so diff them against the original: only the count span's class list moved, from `text-[10.5px]` to `text-meta`.
+
+- [ ] **Step 7: Gate**
+
+Run: `npm run typecheck && npm run lint`
+Expected: no errors.
+
+Likely trips and their fixes:
+- `Property 'role' does not exist on type 'SheetProps<"div">'` means plan A shipped `Sheet` without intersecting `Omit<ComponentPropsWithoutRef<T>, "as">`. That is a plan A defect: fix it in `Sheet.tsx` so native props reach the tag through `...rest`, because `aria-label` on the `Sheet` in plan A's own Task 8 demo needs the same thing. Do not fall back to a bare `<div>` here.
+- A JSX tag mismatch on `SessionMenu` means step 2's closing tag was missed: line 123 must read `</Sheet>`.
+- An unused-import error on `Sheet` means step 1 was applied but step 2 was not.
+
+- [ ] **Step 8: Panel, semantics and keyboard check**
+
+In the dev preview at 1440x900, open http://localhost:3010/learn, click the Tutor chip in the top bar, then click the "Chats" chip in the drawer band. Resolve tokens with `getComputedStyle(document.documentElement).getPropertyValue('--color-paper-0')` and friends when a bullet says "the token".
+
+Set the handles first, in `javascript_tool`:
+
+```js
+const trigger = [...document.querySelectorAll('#tutor-drawer button')].find((b) => b.textContent.trim() === 'Chats');
+const panel = document.querySelector('[role="menu"]');
+const items = [...panel.querySelectorAll('button')];
+const rule = panel.querySelector(':scope > div');
+```
+
+Semantics, which is what the swap to a primitive can silently break:
+
+- `panel !== null`, proving `role="menu"` reached the rendered element, and `panel.tagName === 'DIV'`, proving `Sheet`'s default tag is still a div.
+- `items.every((b) => b.getAttribute('role') === 'menuitem')` is `true`, and `items.length` is `1 + document.querySelectorAll('[role="menu"] li').length`, so the "New chat" item plus one item per session and nothing unroled in between.
+- `trigger.getAttribute('aria-expanded') === 'true'` while the panel is open.
+
+Panel stock:
+
+- `getComputedStyle(panel).backgroundColor` is the `paper-0` token.
+- `getComputedStyle(panel).borderRadius` is `"10px"`, arriving from `Sheet`'s `rounded-card`.
+- `getComputedStyle(panel).borderTopWidth` is `"0px"`, because sheets never carry a border.
+- The resting shadow is the lift token, not the sheet token:
+
+```js
+const root = getComputedStyle(document.documentElement);
+const probe = document.createElement('div');
+document.body.appendChild(probe);
+probe.style.boxShadow = root.getPropertyValue('--shadow-lift').trim();
+const liftComputed = getComputedStyle(probe).boxShadow;
+probe.style.boxShadow = root.getPropertyValue('--shadow-sheet').trim();
+const sheetComputed = getComputedStyle(probe).boxShadow;
+probe.remove();
+[getComputedStyle(panel).boxShadow === liftComputed, getComputedStyle(panel).boxShadow === sheetComputed];
+```
+
+Expected `[true, false]`. If it comes back `[false, true]`, `shadow-sheet` won the cascade: change the class in step 2 from `shadow-lift` to `shadow-lift!`, re-run this bullet, and note the fallback for Task 9 to record in D-053.
+
+- The panel does not move under the pointer: `getComputedStyle(panel).transform` is `"none"`, and after a `computer` `hover` over the panel it is still `"none"` and its `boxShadow` is unchanged. That is the proof that `lift` was not passed.
+
+Separator and type:
+
+- `getComputedStyle(rule).borderTopWidth` is `"1px"` and `getComputedStyle(rule).borderTopColor` is `"rgba(50, 41, 33, 0.1)"`, the hairline token.
+- For `const first = items[0]`, `getComputedStyle(first).fontSize` is `"14px"` and `fontWeight` is `"500"`, and its text is `New chat`.
+- `getComputedStyle(first).lineHeight` is not `"normal"`. If it is, plan A's `text-ui` sets size only: put `leading-snug` back on the row class in step 6 and re-run this bullet.
+
+Current-session row. These four bullets need at least one saved chat. If the panel shows "No earlier chats.", close it, send one message in the composer (type into the box and press Enter), then reopen the menu: the panel refetches on open and the session appears. If the list is still empty because the chat route did not persist a session in this environment, record these four bullets for Task 8's stage-wide browser pass rather than blocking this task, and run the rest of step 8 now.
+
+```js
+const current = panel.querySelector('[aria-current="true"]');
+const tab = current.querySelector('span[aria-hidden="true"]');
+```
+
+- `getComputedStyle(current).backgroundColor` is the `paper-1` token.
+- All four of `getComputedStyle(current).borderTopWidth`, `borderRightWidth`, `borderBottomWidth` and `borderLeftWidth` are `"0px"`, proving the marker is not a border on the row.
+- `getComputedStyle(tab).width` is `"4px"`, `getComputedStyle(tab).backgroundColor` is the `plum` token at alpha `1`, and `Math.abs(tab.getBoundingClientRect().height - current.getBoundingClientRect().height)` is at most `1`, proving `inset-y-0` runs the tab the full height of the row.
+- `getComputedStyle(current).fontWeight` is `"500"`, the same as every other row, proving weight no longer marks the current session. If a second session exists, its row has no `span[aria-hidden="true"]` child and its `backgroundColor` is `"rgba(0, 0, 0, 0)"` until hovered.
+
+Keyboard and dismissal, which the panel's two effects own and this task must leave working:
+
+- **Escape closes and focus stays on the trigger.** With the panel open after a click on "Chats", press `computer` `key` `Escape`. Then `document.querySelector('[role="menu"]') === null`, `trigger.getAttribute('aria-expanded') === 'false'`, and `document.activeElement === trigger`.
+- Note the one path that is not fixed here: if focus has been moved onto a menu item with `Tab` and Escape is pressed there, the focused button unmounts and focus falls to `<body>`. That is today's behaviour, it predates this task, and spec 5e does not ask for a focus trap, so record it for Task 8 rather than adding focus management to this file.
+- **Click-away still closes.** Reopen the menu, click on the thread area above the composer, and the panel is gone with `aria-expanded` back to `"false"`.
+- **Both items still act.** Reopen, click a session row: the panel closes and the thread swaps to that session. Reopen, click "New chat": the panel closes and the thread empties to the starters Task 2 built.
+- `read_console_messages` with `onlyErrors: true` is clean after all of the above.
+- Task 1's work is unchanged by this task: the band is still 48px of plum, and the "Chats" chip is still the chip Task 1 wrote, at `text-meta` with no alpha in its colour.
+
+- [ ] **Step 9: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-ink-faint/40|bg-kraft|stock-textured|/60\b|/70\b|/85\b|chat-prose|doc-prose" src/components/chat/SessionMenu.tsx ; grep -n $'\xe2\x80\x94' src/components/chat/SessionMenu.tsx
+```
+
+Both print nothing. The grep covers the whole file, so a hit on `text-[12px]` or `text-paper-0/85` means Task 1's trigger rewrite is missing, not that this task is wrong: check the trigger against Task 1 before touching anything. `w-[260px]` and `max-h-[280px]` are arbitrary layout sizes with no `text-` prefix and no slash, so they do not match and they stay.
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add src/components/chat/SessionMenu.tsx
+git status --short
+git commit -m "Restyle the tutor session menu panel onto a sheet (stage D, spec 5e)"
+```
+
+`git status --short` before the commit lists exactly that one file, as ` M`.
+
+---
