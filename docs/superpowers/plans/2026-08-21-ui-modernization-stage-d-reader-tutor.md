@@ -445,3 +445,185 @@ git commit -m "Restyle the empty tutor thread and the chat bubbles (stage D, spe
 `git status --short` before the commit lists exactly that one file, as ` M`.
 
 ---
+
+### Task 3: The composer (spec 5d)
+
+**Files:**
+- Modify: `src/components/chat/ChatComposer.tsx` (the import block at lines 1 to 3, the composer ground at line 48, the textarea at lines 53 to 68, the Send button at lines 69 to 76, and the hint line at line 78). Lines 5 to 15 (the docblock), lines 16 to 30 (the props and the `box` ref), lines 32 to 45 (the focus effect, the auto-grow effect and `canSend`), and lines 49 to 52 (the row wrapper and the `sr-only` label) are read but not rewritten. Lines 60 to 65, the Enter and Shift+Enter handler, sit inside step 3's replacement range and are retyped character for character there: they must come out identical.
+
+**Interfaces:**
+- Consumes: `Button` from `src/components/ui/Button.tsx` (plan A Task 4), whose props are `SharedProps & { loading?: boolean } & ComponentPropsWithoutRef<"button">`, that is `variant?: "primary" | "secondary" | "tertiary" | "destructive"` (default primary), `size?: "sm" | "md"` (default md; sm is 24px tall, md is 32px), `tone?: "brand" | "plum"` (primary only, default brand), `icon?: IconName`, `loading?: boolean`, plus every native button prop. `type` defaults to `"button"`, `className` is merged through `cx` rather than replacing the base classes, and `onClick` and `disabled` reach the real `<button>` through `...rest`. Type utilities from plan A Task 1: `text-ui` for the textarea and `text-meta` for the hint. Radius roles from plan A: `rounded-input` is the 6px role radius. From this file, unchanged: the `ChatComposer({ value, onChange, onSend, busy, focusKey })` props, the `box` ref, both effects and `const canSend = !busy && value.trim().length > 0;`.
+- Produces: nothing importable. `ChatComposer({ value: string; onChange: (value: string) => void; onSend: () => void; busy: boolean; focusKey: number })` keeps its exact signature, so `ChatDrawer` keeps calling it unchanged, and no later task in this plan touches this file: Task 4 owns `SessionMenu.tsx`, Tasks 5 to 7 own the reader.
+
+**No primitive edit is needed in this task.** Spec 5d makes exactly one amendment to spec 1f, the `tone` prop on `Button`, and plan A already declares it: `tone?: "brand" | "plum"`, primary only, default brand, with plum rendered as a plum fill whose hover lifts rather than darkening, because no `plum-deep` token exists and alpha hovers are banned. Plan A's own source comment on that prop reads "Primary only (spec 5d): plum is used by the tutor Send and nowhere else." Do not add a task, or a step, that edits `Button.tsx`.
+
+Behaviour contract (read before editing):
+- **The composer stops being a slab.** Today it is a `stock-textured` kraft strip with a `border-t border-ink-faint/40` fencing it off from the thread. Spec 5d removes all three: the ground becomes `paper-1`, there is no kraft anywhere in the tutor, and there is no top border.
+- **Losing the border is not an oversight, and no hairline replaces it.** The drawer panel is itself `paper-1` (`ChatDrawer.tsx:235`), so a `paper-1` composer is flush with the column it sits in, and the only thing that reads as an input is the `paper-0` textarea floating on that ground. That is the intended figure and ground: the sheet is the control, the paper is the room. Do not add `border-t`, `divide-y`, or a shadow to the ground to compensate.
+- The textarea loses its `border border-ink-faint` and keeps `bg-paper-0` at `rounded-input`, 6px. Type steps from the hard-coded `text-[13px]` to `text-ui`, 14/400.
+- `leading-snug` comes off with it. Plan A's `text-ui` carries its own line height, exactly as in Task 2 where the starter rows dropped `leading-snug` for the same reason. Step 7 checks that the computed line height is not `normal`, and if it is, `text-ui` is size only in plan A and `leading-snug` goes back on the textarea.
+- The auto-grow effect at lines 37 to 43 is untouched, so the box still grows with the content to the 140px ceiling. A taller line height simply means fewer visible rows before the ceiling, which is why step 7 also confirms the box still grows on Shift plus Enter.
+- **Send becomes the primitive**, `Button` at `size="sm"` with `variant="primary"` and `tone="plum"`. The hand-rolled `bg-plum px-3 py-2 text-[12.5px] font-semibold text-paper-0 transition-transform active:translate-y-px disabled:opacity-40` all goes: every one of those decisions now lives in `buttonClasses`, including the press that steps 1px down and drops the shadow, and the focus ring that turns `paper-0` on plum stock per spec 6c.
+- **`loading` is deliberately not used.** `disabled={!canSend}` already covers the busy case, because `canSend` is `!busy && value.trim().length > 0`, and setting `aria-busy` on the Send control would announce a wait that is actually happening in the thread, where Task 2's three-dot indicator already carries it.
+- **The keyboard contract is the thing that can break silently here.** Enter sends and Shift plus Enter inserts a newline, and both live in the textarea's `onKeyDown`, not in a form: line 47 returns a `div`, there is no `<form>` in this file, and the docblock at lines 5 to 15 says so, because a textarea never submits a form on Enter. Swapping the Send element must not move that handler, and `Button` defaulting to `type="button"` keeps it inert either way. Step 7 proves Enter, Shift plus Enter, Tab reachability and the empty-state disable, all four.
+- The hint line goes from `text-[10.5px] text-ink/60` to `text-meta text-ink-soft`. The copy is unchanged: alpha-on-ink is banned as a colour, and `ink-soft` is the token that means the same thing at full opacity.
+
+- [ ] **Step 1: Add the `Button` import**
+
+The file's import block is lines 1 to 3. Leave `"use client"` and the React import as they are, and add the `Button` import as its own group below them, so the block reads:
+
+```tsx
+"use client";
+
+import { useEffect, useRef } from "react";
+
+import { Button } from "@/components/ui/Button";
+```
+
+The docblock at lines 5 to 15 follows unchanged. If typecheck later reports `Cannot find module '@/components/ui/Button'`, plan A has not been executed yet or named the file differently: take the real path from `ls src/components/ui/`.
+
+- [ ] **Step 2: Restock the composer ground**
+
+Replace line 48 with:
+
+```tsx
+    <div className="shrink-0 bg-paper-1 p-3">
+```
+
+`shrink-0` stays: the composer is the fixed foot of a flex column and must not compress when the thread grows. `p-3` stays: spec 5d changes the ground and the border, not the padding.
+
+- [ ] **Step 3: Restyle the textarea**
+
+Replace lines 53 to 68, the whole `<textarea>` element from its opening tag through the self-closing `/>`, with:
+
+```tsx
+        <textarea
+          id="tutor-composer"
+          ref={box}
+          rows={1}
+          value={value}
+          disabled={busy}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              if (canSend) onSend();
+            }
+          }}
+          placeholder="Ask the tutor..."
+          className="min-w-0 flex-1 resize-none rounded-input bg-paper-0 px-3 py-2 text-ui text-ink placeholder:text-ink-faint disabled:opacity-60"
+        />
+```
+
+Everything above the `className` is retyped unchanged so the element stays contiguous. Diff it against what was there: `id`, `ref`, `rows`, `value`, `disabled`, `onChange`, the entire `onKeyDown` body and `placeholder` must all be byte-identical to the original. The only edited line is the last one, where `border border-ink-faint` is gone, `text-[13px]` became `text-ui`, and `leading-snug` came off.
+
+`disabled:opacity-60` stays. It is a hyphenated opacity utility, not an alpha colour, so it is neither what spec 5d removes nor what step 8's grep hunts.
+
+- [ ] **Step 4: Swap the Send button for the primitive**
+
+Replace lines 69 to 76, the whole `<button>` element from `<button` through `</button>`, with:
+
+```tsx
+        <Button
+          variant="primary"
+          size="sm"
+          tone="plum"
+          onClick={onSend}
+          disabled={!canSend}
+          className="shrink-0"
+        >
+          Send
+        </Button>
+```
+
+`variant="primary"` is the default and is written out anyway, so a reader checking this call against spec 5d sees all three of "sm", "primary" and "plum" without having to know plan A's defaults. `type="button"` is not written because `Button` already defaults to it. `className="shrink-0"` is layout only and merges with the base classes through `cx`; it is there because the row is `flex items-end` and the label must never wrap.
+
+- [ ] **Step 5: Retype the hint line**
+
+Replace line 78 with:
+
+```tsx
+      <p className="mt-1 px-0.5 text-meta text-ink-soft">
+```
+
+The copy on line 79 and the closing tag on line 80 are unchanged: "Enter sends, Shift plus Enter adds a line." stays exactly as written, spelled out rather than punctuated, because it is describing keys.
+
+- [ ] **Step 6: Gate**
+
+Run: `npm run typecheck && npm run lint`
+Expected: no errors.
+
+Likely trips and their fixes:
+- `Property 'tone' does not exist on type ...` means plan A Task 4 shipped `Button` without the `tone` prop. That is a plan A defect: add `tone?: "brand" | "plum"` and its `PRIMARY_TONE` entry there, gated to `variant === "primary"`, rather than hand-rolling a plum fill here.
+- `Property 'onClick' does not exist` or `Property 'disabled' does not exist` means plan A's `ButtonProps` is not extending `ComponentPropsWithoutRef<"button">`. Fix it in `Button.tsx` by extending it and spreading `...rest` onto the real `<button>`, because every other call site in stages B, C and D needs the same thing. Do not fall back to a bare `<button>` here.
+- An unused-import error on `Button` means step 1 was applied but step 4 was not.
+
+- [ ] **Step 7: Visual and keyboard check**
+
+In the dev preview at 1440x900, open http://localhost:3010/learn and click the Tutor chip in the top bar. Resolve tokens with `getComputedStyle(document.documentElement).getPropertyValue('--color-paper-1')` and friends when a bullet says "the token".
+
+Set the two handles first, in `javascript_tool`:
+
+```js
+const box = document.querySelector('#tutor-composer');
+const bar = box.parentElement.parentElement;
+const send = [...bar.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Send');
+```
+
+Ground:
+
+- `getComputedStyle(bar).borderTopWidth` is `"0px"`.
+- `getComputedStyle(bar).backgroundColor` is the `paper-1` token.
+- `getComputedStyle(bar).backgroundImage` is `"none"`, proving the `stock-textured` layer is gone.
+
+Textarea:
+
+- `getComputedStyle(box).borderTopWidth`, `borderRightWidth`, `borderBottomWidth` and `borderLeftWidth` are all `"0px"`.
+- `getComputedStyle(box).borderRadius` is `"6px"`.
+- `getComputedStyle(box).backgroundColor` is the `paper-0` token.
+- `getComputedStyle(box).fontSize` is `"14px"` and `fontWeight` is `"400"`.
+- `getComputedStyle(box).lineHeight` is not `"normal"`. If it is, plan A's `text-ui` sets size only: put `leading-snug` back on the textarea in step 3 and re-run this bullet.
+
+Send:
+
+- `getComputedStyle(send).backgroundColor` is the `plum` token at alpha `1`, and `color` is the `paper-0` token.
+- `getComputedStyle(send).borderRadius` is `"6px"`.
+- `send.getBoundingClientRect().height` is `24`. If it is not, plan A's `sm` size is not 24px: take the real value from `SIZE.sm` in `Button.tsx` and treat that as correct, since the size scale is plan A's to own.
+- Bottom aligned with the box, because the row is `items-end`: `Math.abs(send.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom)` is at most `1`.
+
+Hint:
+
+- For `const hint = bar.querySelector('p')`, `getComputedStyle(hint).fontSize` equals the `--text-meta` token and `getComputedStyle(hint).color` is the `ink-soft` token at alpha `1`, proving the `text-ink/60` alpha is gone.
+
+Keyboard contract, all four parts, driven through the browser rather than by setting `value` in script, since a React-controlled textarea ignores a scripted assignment:
+
+- **Disabled when empty.** With the box empty, `box.value === ''` and `send.disabled === true`. Click Send once and confirm no turn is added.
+- **Enter sends.** Click the box, `computer` `type` `Test one`, then `computer` `key` `Enter`. A user bubble reading `Test one` appears in the thread and `box.value === ''`.
+- **Shift plus Enter does not send.** Record `const before = document.querySelectorAll('#tutor-drawer .justify-end').length` and `const h = box.getBoundingClientRect().height`. Then `computer` `type` `line one`, `computer` `key` `shift+Enter`, `computer` `type` `line two`. Now `box.value === 'line one\nline two'`, the turn count still equals `before`, and `box.getBoundingClientRect().height` is greater than `h`, proving the auto-grow effect still runs. `send.disabled === false`.
+- **Send is reachable and still works.** With that two-line draft in the box, press `Tab` and confirm `document.activeElement === send`. Press `Enter` to activate the focused button: the two-line message is sent as one turn and `box.value === ''`.
+
+Then:
+
+- `read_console_messages` with `onlyErrors: true` is clean after all of the above.
+- Focus ring: `Tab` back to Send and confirm a visible ring on the plum stock. If none appears, that is plan A's `Button` focus style (spec 6c), not this file's: record it for Task 8 rather than patching it here.
+- Task 1's plum band and Task 2's bubbles are unchanged by this task: the band is still 48px and the user bubble is still solid plum.
+
+- [ ] **Step 8: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-ink-faint/40|bg-kraft|stock-textured|/60\b|/70\b|/85\b|chat-prose|doc-prose" src/components/chat/ChatComposer.tsx ; grep -n $'\xe2\x80\x94' src/components/chat/ChatComposer.tsx
+```
+
+Both print nothing. `disabled:opacity-60` does not match `/60\b`, which needs a literal slash, so the textarea's disabled state is correctly left alone.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/components/chat/ChatComposer.tsx
+git status --short
+git commit -m "Restyle the tutor composer onto paper (stage D, spec 5d)"
+```
+
+`git status --short` before the commit lists exactly that one file, as ` M`.
+
+---
