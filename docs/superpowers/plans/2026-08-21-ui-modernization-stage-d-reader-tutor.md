@@ -1097,3 +1097,381 @@ git commit -m "Rebuild the doc reader shell on the reading sheet (stage D, spec 
 `git status --short` before the commit lists exactly those two files, as ` M`.
 
 ---
+
+### Task 6: `DocReader` and `ModelHeading` (spec 3d, second half)
+
+**Files:**
+- Create: `src/components/learn/ModelHeading.tsx`
+- Create: `src/components/learn/DocReader.tsx`
+- Modify: `src/app/(tabs)/learn/[topicId]/page.tsx`: the local import group (the `MarkdownMath` line goes, a `DocReader` line arrives) and the single `<MarkdownMath>{doc.contentMd}</MarkdownMath>` line inside the reading sheet's `<div className="px-8 py-8">` body container. Nothing else in the file is rewritten.
+- **Line drift:** Task 5 already rewrote this file, so the pre-edit line numbers in the Global Constraints no longer hold. Both edit sites are named by content above, and step 5 greps for them rather than trusting a number. Before Task 5, the import was line 7 and the call site was line 78.
+- **Task 7's boundary:** the `<div className="hidden xl:block">` that wraps `<DocMiniTOC entries={index} accent={accent} />` at the end of the `article` stays exactly as stage B left it. Task 7 is the task that moves it to `lg` and rewrites `DocMiniTOC`. This task neither reads nor edits `DocMiniTOC.tsx`.
+- **`src/lib/modelIndex.ts` is read only for the whole stage** (File Structure, "Not touched in this stage"). This task imports the `ModelIndexEntry` type from it and adds nothing to it: the fence test and the heading test `DocReader` needs are file local, and the behaviour contract explains why that is not a silent fork.
+- **`src/components/shared/MarkdownMath.tsx` is not edited.** Its `variant` prop is plan A Task 2's change and arrives before this stage runs.
+- No Test line: there is no test runner in this repo (D-054). Verification is steps 5 to 8.
+
+**Interfaces:**
+- Consumes: `CornerNumeral` from `src/components/ui/CornerNumeral.tsx` (plan A Task 4): `CornerNumeral({ n: number | string, color: string, size?: 56 | 30, onStock?: boolean, className? })`, absolutely positioned at the top right of the nearest positioned ancestor, `display-cut`, `aria-hidden`, `pointer-events-none`, opacity 0.16 by default and 0.12 with `onStock`, so the spec's "accent at 16%" is the default and no opacity is written at the call site. `Icon({ name: IconName, size?: number, className?: string, title?: string })` from `src/components/ui/Icon.tsx` (plan A Task 3), where `IconName` includes `"copy"`; without a `title` the svg is `aria-hidden`, which is what this task wants, because the button carries the label. `Toast({ kind: "info" | "success" | "warning" | "error", message: string, action?: ReactNode, onDismiss: () => void, duration?: number, className? })` from `src/components/ui/Toast.tsx` (plan A Task 7): a kraft slip with `shadow-lift` and `role="status"` that auto-dismisses after `duration` ms (default 3200) by calling `onDismiss`, and whose positioning is the consumer's job through `className`. `MarkdownMath({ children, variant?: "reading" | "ui" | "chat", className? })` from `src/components/shared/MarkdownMath.tsx` (plan A Task 2), which applies `doc-prose` plus the variant class itself, so no prose class is ever written at a call site. `cx` from `src/lib/cx.ts` (plan A Task 1). Type utilities from plan A Task 1: `text-h2` (22/700). Radius role from plan A: `rounded-chip` is the 4px one. From the repo, unchanged: `ModelIndexEntry` is `{ number: number; title: string; anchor: string }` (`src/lib/modelIndex.ts:15`) and `anchor` is `model-n` with no leading hash (`anchorForModel`, line 27); `deserializeModelIndex(json: string): ModelIndexEntry[]` (line 77) is what the page already calls into the local `index`; `ACCENT_VAR: Record<AccentName, string>` and `accentForRoot` (`src/lib/topicColors.ts:23` and `:41`), and the page already holds `const accent = accentForRoot(topic.path[0] ?? topic.name);`. From Task 5, unchanged: the reading sheet is `<Sheet tone="paper-0" className="animate-enter-sheet overflow-hidden">` whose last child is `<div className="px-8 py-8">`, holding `<ModelMissList misses={misses} />` and then the body element this task replaces.
+- Produces: `ModelHeading({ entry: ModelIndexEntry; accent: AccentName; flush?: boolean; onCopied: (ok: boolean) => void })` and `DocReader({ contentMd: string; models: ModelIndexEntry[]; accent: AccentName })`, both client components, plus the pure `splitModelSections(contentMd: string, models: ModelIndexEntry[]): { preamble: string; sections: { entry: ModelIndexEntry; body: string }[] }` exported from `DocReader.tsx`. **For Task 7:** the `#model-n` anchor element is no longer the `h2` that `MarkdownMath` emitted; it is `ModelHeading`'s wrapper `<div id="model-n">`, it carries `scroll-mt-20`, and there is exactly one per index entry, in index order. An IntersectionObserver over `document.getElementById(entry.anchor)` therefore still finds every heading, and the elements exist on first paint because they are server rendered. **For Task 9:** this task adds a fifth D-053 entry, unconditional: the reader splits the document against the parsed index instead of adding a splitter to `src/lib/modelIndex.ts`, and a model heading reads "Model n: title" because the em-dash the seeded exemplar uses is banned in new copy.
+
+**No primitive edit is needed in this task.** `CornerNumeral`, `Icon` and `Toast` are consumed exactly as plan A ships them, and `MarkdownMath` is called with the variant plan A added.
+
+Behaviour contract:
+
+- The document renders in the same order, with the same content, as it does today. The only markdown that disappears is each `## Model n` heading line itself, which becomes a `ModelHeading` element instead of an `h2` emitted by `MarkdownMath`.
+- Sections come from the index the page has already parsed, never from a second parse of the markdown. A heading line becomes a split point only when its captured number equals the next unconsumed index entry, so `sections.length === models.length` on every document, and a `## Model n` line inside a fenced code block never splits anything.
+- That reconciliation is why the file-local `MODEL_HEADING_START` may be looser than `MODEL_HEADING` in `src/lib/modelIndex.ts`: it finds candidates, the index decides. A line the index rejected (`## Model 3 with no separator`) cannot become a section, because it will not match the number the index expects next.
+- A document with no indexed models renders exactly as it does today: one preamble block, no sections, no numerals, no copy buttons.
+- Everything before the first accepted heading is the preamble and gets its own `MarkdownMath variant="reading"` block. An empty preamble renders nothing at all.
+- The `#model-n` anchor moves from the `h2` to `ModelHeading`'s wrapper and carries `scroll-mt-20`, the same 5rem `.doc-prose h2` carries at `src/app/globals.css:151`. Deep links from the miss list, from the TOC and from a pasted URL all still land clear of the sticky top bar. Nothing is added to `globals.css`.
+- The heading reads "Model n" when the index entry has no title and "Model n: title" when it has one. A colon is used because the em-dash the seeded exemplar uses is banned by the Global Constraints, and `parseModelIndex` already accepts a colon as a separator, so the form is one this codebase recognises.
+- The numeral is the accent at 16%, which is `CornerNumeral`'s default, so no opacity is written here. It is `aria-hidden` and `pointer-events-none` inside the primitive, so it never takes a click and never reaches a screen reader.
+- The numeral paints behind the heading text because the `h2` is `relative` and follows the numeral in DOM order. No `z-index` is written anywhere in this task.
+- The copy button sits inline after the heading text rather than at the top right, so it can never collide with the numeral, which the primitive pins to `top-1 right-3`.
+- The button is `opacity-0` at rest and becomes visible on `group-hover` and on `focus`. It stays in the tab order at all times, which is what makes it reachable by keyboard and by touch, and it carries no transition (Global Constraints: the copy-link icon appears without transition).
+- `ModelHeading` does the clipboard write and nothing else with the result: it reports success or failure upward and `DocReader` owns the toast. A rejected `navigator.clipboard.writeText` (an insecure origin, a denied permission) shows an error toast rather than failing silently.
+- The toast is keyed by a counter, so copying a second link restarts the 3200ms timer instead of leaving a stale slip on screen. `Toast` dismisses itself by calling `onDismiss`; positioning is the consumer's job, so `DocReader` supplies the fixed bottom-centre class.
+- KaTeX is untouched: the same `MarkdownMath` renders every block, with the same plugins and the same delimiters. Splitting the string cannot split a math region, because a split only ever happens on a `## Model n` line and no math region begins on one.
+- Written fallback, heading line height: if the computed line height on the `h2` comes back `normal`, `text-h2` is a size-only token in plan A and `leading-tight` goes on the `h2` next to it, which is the 1.25 `.doc-prose h2` uses today.
+
+- [ ] **Step 1: Create `src/components/learn/ModelHeading.tsx`**
+
+```tsx
+"use client";
+
+import { useCallback } from "react";
+
+import { CornerNumeral } from "@/components/ui/CornerNumeral";
+import { Icon } from "@/components/ui/Icon";
+import { cx } from "@/lib/cx";
+import type { ModelIndexEntry } from "@/lib/modelIndex";
+import { ACCENT_VAR, type AccentName } from "@/lib/topicColors";
+
+export type ModelHeadingProps = {
+  entry: ModelIndexEntry;
+  accent: AccentName;
+  /** True for the first heading when no preamble sits above it, so the sheet body is not pushed down. */
+  flush?: boolean;
+  /** Reports the clipboard result upward. DocReader owns the toast. */
+  onCopied: (ok: boolean) => void;
+};
+
+/**
+ * One `## Model n` heading, lifted out of the markdown so it can carry the
+ * accent numeral behind it and a copy-link button beside it (spec 3d).
+ *
+ * The wrapper is the `#model-n` anchor: it holds the id and the
+ * scroll-margin-top that `.doc-prose h2` holds for headings still inside the
+ * prose (src/app/globals.css:151). The mini-TOC and the miss list both link
+ * here, so this element must exist for every index entry.
+ */
+export function ModelHeading({ entry, accent, flush = false, onCopied }: ModelHeadingProps) {
+  const copyLink = useCallback(async () => {
+    const url = new URL(window.location.href);
+    url.hash = entry.anchor;
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      onCopied(true);
+    } catch {
+      onCopied(false);
+    }
+  }, [entry.anchor, onCopied]);
+
+  return (
+    <div
+      id={entry.anchor}
+      className={cx("group relative mb-3 scroll-mt-20", flush ? "mt-0" : "mt-9")}
+    >
+      <CornerNumeral n={entry.number} color={ACCENT_VAR[accent]} />
+      <h2 className="display-cut relative text-h2 text-ink">
+        Model {entry.number}
+        {entry.title ? `: ${entry.title}` : ""}
+        <button
+          type="button"
+          onClick={copyLink}
+          aria-label={`Copy link to model ${entry.number}`}
+          className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-chip align-middle text-ink-soft opacity-0 hover:text-plum focus:opacity-100 group-hover:opacity-100"
+        >
+          <Icon name="copy" size={14} />
+        </button>
+      </h2>
+    </div>
+  );
+}
+
+export default ModelHeading;
+```
+
+The `relative` on the `h2` is load bearing: both it and the numeral are positioned, so DOM order decides which paints on top, and the numeral is written first. The `group` on the wrapper is what the button's `group-hover` reads.
+
+- [ ] **Step 2: Create `src/components/learn/DocReader.tsx`**
+
+The fence regex below contains three backticks, so this block is fenced with four.
+
+````tsx
+"use client";
+
+import { useCallback, useMemo, useState } from "react";
+
+import { ModelHeading } from "@/components/learn/ModelHeading";
+import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { Toast } from "@/components/ui/Toast";
+import type { ModelIndexEntry } from "@/lib/modelIndex";
+import type { AccentName } from "@/lib/topicColors";
+
+/** Fenced regions contribute no headings, the same rule parseModelIndex follows. */
+const FENCE = /^[ \t]*(?:```|~~~)/;
+
+/**
+ * The start of a `## Model n` heading line. Deliberately looser than
+ * MODEL_HEADING in src/lib/modelIndex.ts, which this stage may not edit: a
+ * match becomes a split point only when its number equals the next entry the
+ * index recorded, so the sections stay one for one with the index and a line
+ * the index rejected cannot slip in.
+ */
+const MODEL_HEADING_START = /^##[ \t]+Model[ \t]+(\d+)\b/;
+
+export type DocSection = { entry: ModelIndexEntry; body: string };
+
+export function splitModelSections(
+  contentMd: string,
+  models: ModelIndexEntry[],
+): { preamble: string; sections: DocSection[] } {
+  const preamble: string[] = [];
+  const bodies: string[][] = [];
+  const entries: ModelIndexEntry[] = [];
+  let inFence = false;
+
+  const keep = (line: string) => {
+    const body = bodies[bodies.length - 1];
+    (body ?? preamble).push(line);
+  };
+
+  for (const line of contentMd.split(/\r?\n/)) {
+    if (FENCE.test(line)) {
+      inFence = !inFence;
+      keep(line);
+      continue;
+    }
+
+    if (!inFence) {
+      const match = MODEL_HEADING_START.exec(line);
+      const next = models[entries.length];
+      if (match && next && Number.parseInt(match[1], 10) === next.number) {
+        entries.push(next);
+        bodies.push([]);
+        continue;
+      }
+    }
+
+    keep(line);
+  }
+
+  return {
+    preamble: preamble.join("\n").trim(),
+    sections: entries.map((entry, i) => ({ entry, body: (bodies[i] ?? []).join("\n").trim() })),
+  };
+}
+
+type ToastState = { id: number; kind: "success" | "error"; message: string };
+
+export type DocReaderProps = {
+  contentMd: string;
+  models: ModelIndexEntry[];
+  accent: AccentName;
+};
+
+/**
+ * The reading sheet's body (spec 3d). One ModelHeading plus one
+ * MarkdownMath per model section, so each heading is a real element that can
+ * carry a numeral and a copy link without MarkdownMath changing.
+ */
+export function DocReader({ contentMd, models, accent }: DocReaderProps) {
+  const { preamble, sections } = useMemo(
+    () => splitModelSections(contentMd, models),
+    [contentMd, models],
+  );
+  const [toast, setToast] = useState<ToastState | null>(null);
+
+  const handleCopied = useCallback((ok: boolean) => {
+    setToast((prev) => ({
+      id: (prev?.id ?? 0) + 1,
+      kind: ok ? "success" : "error",
+      message: ok ? "Link copied" : "Could not copy the link",
+    }));
+  }, []);
+
+  const hideToast = useCallback(() => setToast(null), []);
+
+  return (
+    <>
+      {preamble ? <MarkdownMath variant="reading">{preamble}</MarkdownMath> : null}
+
+      {sections.map((section, i) => (
+        <section key={`${i}-${section.entry.anchor}`}>
+          <ModelHeading
+            entry={section.entry}
+            accent={accent}
+            flush={i === 0 && preamble.length === 0}
+            onCopied={handleCopied}
+          />
+          {section.body ? <MarkdownMath variant="reading">{section.body}</MarkdownMath> : null}
+        </section>
+      ))}
+
+      {toast ? (
+        <Toast
+          key={toast.id}
+          kind={toast.kind}
+          message={toast.message}
+          onDismiss={hideToast}
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2"
+        />
+      ) : null}
+    </>
+  );
+}
+
+export default DocReader;
+````
+
+- [ ] **Step 3: Swap `DocReader` in for `MarkdownMath` on the page**
+
+In `src/app/(tabs)/learn/[topicId]/page.tsx`, inside the reading sheet Task 5 built, replace the one line
+
+```tsx
+              <MarkdownMath>{doc.contentMd}</MarkdownMath>
+```
+
+with
+
+```tsx
+              <DocReader contentMd={doc.contentMd} models={index} accent={accent} />
+```
+
+so the body container reads:
+
+```tsx
+            <div className="px-8 py-8">
+              <ModelMissList misses={misses} />
+              <DocReader contentMd={doc.contentMd} models={index} accent={accent} />
+            </div>
+```
+
+`index` is the local `deserializeModelIndex(doc.modelIndexJson)` result the page already computes and already hands to `DocMiniTOC`; `accent` is the local `accentForRoot(...)` result at the top of the component. Neither is added, neither is moved.
+
+- [ ] **Step 4: Update the page's import block**
+
+`MarkdownMath` now has no call site in this file, so its import goes and `DocReader` takes a place in the local group. Leave every other line exactly as Task 5 left it, so the group reads:
+
+```tsx
+import { DocCard } from "@/components/learn/DocCard";
+import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
+import { DocReader } from "@/components/learn/DocReader";
+import { ModelMissList } from "@/components/learn/ModelMissList";
+import { ButtonLink } from "@/components/ui/Button";
+import { Sheet } from "@/components/ui/Sheet";
+import { modelMissCounts } from "@/lib/attempts";
+import { prisma } from "@/lib/db";
+import { deserializeModelIndex } from "@/lib/modelIndex";
+import { getTopicDetail } from "@/lib/topics";
+import { accentForRoot } from "@/lib/topicColors";
+```
+
+The two Next imports above this group, `Link` included, stay: the subtopic branch and the `Breadcrumb` helper still use them.
+
+- [ ] **Step 5: Confirm both edit sites landed and nothing else moved**
+
+```bash
+GIT_LITERAL_PATHSPECS=1 grep -n "MarkdownMath\|DocReader\|DocMiniTOC" "src/app/(tabs)/learn/[topicId]/page.tsx"
+```
+
+Expected: no `MarkdownMath` line at all, one `DocReader` import, one `DocReader` call site, and the `DocMiniTOC` import and call site untouched inside their `hidden xl:block` wrapper, which is Task 7's.
+
+```bash
+grep -rn "doc-prose\|chat-prose" src/components/learn/DocReader.tsx src/components/learn/ModelHeading.tsx
+```
+
+Expected: nothing. The prose class belongs to `MarkdownMath`, and a call site that writes it is a Global Constraints violation.
+
+- [ ] **Step 6: Gate**
+
+Run: `npm run typecheck && npm run lint`
+Expected: no errors.
+
+Likely trips and their fixes:
+- `Property 'variant' does not exist on type 'MarkdownMathProps'` means plan A Task 2 has not been executed in this checkout. Stage A must be merged before stage D starts (Global Constraints); do not work around it by writing a prose class here.
+- `Cannot find module '@/components/ui/CornerNumeral'` or `'@/components/ui/Toast'` means the same thing for plan A Task 4 and Task 7: take the real paths from `ls src/components/ui/`.
+- `Type 'string | undefined' is not assignable to type 'string'` on `match[1]` or on `bodies[i]` means this checkout has `noUncheckedIndexedAccess` on, which `src/lib/modelIndex.ts:44` shows it did not when that file was written. Write `Number.parseInt(match[1] ?? "", 10)` and keep the `bodies[i] ?? []` that is already there.
+- `'MarkdownMath' is defined but never used` in the page means step 4 was skipped.
+- `React Hook useCallback has a missing dependency: 'entry.anchor'` means the dependency array was trimmed. Keep both `entry.anchor` and `onCopied`.
+
+- [ ] **Step 7: Reader body check**
+
+In the dev preview at 1440x900, open http://localhost:3010/learn, open the Algebra topic and open the Distance-Rate-Time document, so the URL carries `?doc=`.
+
+Set the handles first, in `javascript_tool`:
+
+```js
+const article = document.querySelector('article');
+const sheet = article.querySelector('h1').parentElement;
+const strip = sheet.querySelector('h1').nextElementSibling;
+const body = sheet.lastElementChild;
+const heads = [...body.querySelectorAll('[id^="model-"]')];
+const h2 = heads[0].querySelector('h2');
+const numeral = heads[0].firstElementChild;
+const copy = heads[0].querySelector('button');
+```
+
+The sections:
+
+- `heads.length >= 1`, and `heads.length === Number(strip.textContent.match(/(\d+) models?/)[1])`, so the number of headings rendered equals the number the kraft strip reports from the same index.
+- `new Set(heads.map((el) => el.id)).size === heads.length` and every id matches `/^model-\d+$/`.
+- `getComputedStyle(heads[0]).scrollMarginTop === '80px'`, the 5rem that keeps an anchor jump clear of the sticky top bar.
+- No literal heading markup survives outside a code block: `[...body.querySelectorAll('*')].filter((el) => !el.closest('pre') && el.children.length === 0 && el.textContent.trim().startsWith('## Model')).length === 0`.
+- `body.querySelector('.katex') !== null`, proving KaTeX still renders across the split blocks.
+
+The heading, the numeral and the button:
+
+- `getComputedStyle(h2).fontSize === '22px'` and `getComputedStyle(h2).fontWeight === '700'`. If `getComputedStyle(h2).lineHeight` comes back `'normal'`, apply the written fallback from the contract and put `leading-tight` on the `h2`.
+- `h2.textContent.trim().startsWith('Model ')`, so a reader landing on a deep link still sees which model this is.
+- `getComputedStyle(numeral).position === 'absolute'`, `getComputedStyle(numeral).opacity === '0.16'`, `numeral.getAttribute('aria-hidden') === 'true'` and `getComputedStyle(numeral).pointerEvents === 'none'`.
+- `getComputedStyle(h2).position === 'relative'`, which is what puts the heading text over the numeral. Read the two visually as well: the numeral is a watermark behind the heading and the body text under it stays readable.
+- `getComputedStyle(copy).opacity === '0'` at rest. Hover the heading (`computer` hover on `heads[0]`) and it reads `'1'`. Then `copy.focus()` and it reads `'1'` again with the pointer away.
+- `getComputedStyle(copy).transitionDuration === '0s'`: the Global Constraints say this icon appears without transition.
+- Tab from the "History" link: focus reaches the first copy button and the button is visible while focused.
+
+The copy action:
+
+- Click `copy`. Within a second an element with `role="status"` appears, its text is either "Link copied" or "Could not copy the link", and `location.hash` is unchanged (the button copies, it does not navigate).
+- If the text is the error string, this origin is not a secure context or clipboard permission was denied. That is an environment fact, not a bug: record it and move on, the failure path is the one being proved.
+- The slip sits at the bottom centre of the viewport and is gone about 3.2 seconds later without another click.
+- Click a second copy button while the first slip is still up: the slip's text stays correct and its timer restarts rather than the slip vanishing early.
+- Every miss-list link still resolves against the new anchors: for each `a` in `sheet.querySelector('[role="alert"]')`, `document.getElementById(a.getAttribute('href').slice(1)) !== null`. If this environment has no diagnosed attempts there is no alert to check: assert `sheet.querySelector('[role="alert"]') === null` instead and defer this bullet to Task 8, exactly as Task 5 deferred its pair.
+- `read_console_messages` with `onlyErrors: true` is clean after all of the above.
+
+- [ ] **Step 8: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|chat-prose|doc-prose|stock-textured|bg-kraft" src/components/learn/ModelHeading.tsx src/components/learn/DocReader.tsx ; grep -n $'\xe2\x80\x94' src/components/learn/ModelHeading.tsx src/components/learn/DocReader.tsx
+```
+
+Both print nothing. These two files are entirely this task's, so any hit is this task's bug. `stock-textured` and `bg-kraft` are back in the pattern here, unlike Task 5's page grep: the screen's one kraft strip lives in the page, and neither of these files may add a second one. The kraft in the toast belongs to the `Toast` primitive's own file, which this task does not touch.
+
+```bash
+GIT_LITERAL_PATHSPECS=1 grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|chat-prose|doc-prose" "src/app/(tabs)/learn/[topicId]/page.tsx"
+```
+
+Prints nothing. This is Task 5's reduced pattern, without `stock-textured` and `bg-kraft`, because the page legitimately carries the one kraft strip.
+
+- [ ] **Step 9: Commit**
+
+```bash
+GIT_LITERAL_PATHSPECS=1 git add src/components/learn/ModelHeading.tsx src/components/learn/DocReader.tsx "src/app/(tabs)/learn/[topicId]/page.tsx"
+git status --short
+git commit -m "Render model headings with the accent numeral and a copy link (stage D, spec 3d)"
+```
+
+`git status --short` before the commit lists exactly three files: the two new components as `??` and the page as ` M`.
+
+---
