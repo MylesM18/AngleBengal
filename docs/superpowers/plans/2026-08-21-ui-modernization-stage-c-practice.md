@@ -801,7 +801,7 @@ Expected: no errors. Likely trips and their fixes: `chipClasses` not exported fr
 
 In the dev preview at 1440x900, open http://localhost:3010/practice/<drtId>. Draw first where a step needs strokes: `computer` `left_click_drag` across the canvas inside `[aria-label="Sketchpad"]` makes one stroke.
 
-- One kraft strip: `document.querySelector('[data-sketchpad] > div').className.includes('bg-kraft')` is `true` and `document.querySelectorAll('[data-sketchpad] .bg-kraft').length` is `1` (the `PracticePanel` header outside the sketchpad keeps its kraft until Task 5; `document.querySelectorAll('[data-practice-workspace] .bg-kraft').length` is `1` only after that task). `document.querySelector('[data-sketchpad] > div').className.includes('border-ink-faint/40')` is `false`.
+- One kraft strip: `document.querySelector('[data-sketchpad] > div').className.includes('bg-kraft')` is `true` and `document.querySelectorAll('[data-sketchpad] .bg-kraft').length` is `1` (the `PracticePanel` header outside the sketchpad keeps its kraft until Task 5; after that task the one kraft STRIP in `[data-practice-workspace]` is this toolbar, so count strips rather than `.bg-kraft` elements: the model-tag meta chips are kraft surfaces too, per spec lines 25, 63 and 214, and Task 5's check excludes them by tag name). `document.querySelector('[data-sketchpad] > div').className.includes('border-ink-faint/40')` is `false`.
 - Tool chips: `[...document.querySelectorAll('[aria-label="Tool"] button')].map(b => [b.getAttribute('aria-label'), b.getAttribute('aria-pressed'), b.textContent.trim()])` is `[["Pen","true",""],["Eraser","false",""]]`; each contains an `svg`; `document.querySelector('[aria-label="Tool"] button').getBoundingClientRect().height` is `24`.
 - Width chips: `[...document.querySelectorAll('[aria-label="Stroke width"] button span')].map(s => s.getBoundingClientRect().width)` is `[3, 5, 8]`; the `aria-label`s are `Stroke width S`, `Stroke width M`, `Stroke width L`; clicking L flips its `aria-pressed` to `"true"` and the dot colour to paper-0 (`getComputedStyle(s).backgroundColor` equals the chip's `color`).
 - Ink dots: `document.querySelectorAll('[aria-label="Ink color"] button').length` is `4`; the pressed one has no `transform` (`getComputedStyle(document.querySelector('[aria-label="Ink color"] [aria-pressed="true"]')).transform` is `"none"`) and its `boxShadow` is not `"none"` (the inset ring); the others have `boxShadow` `"none"`.
@@ -1312,5 +1312,363 @@ git commit -m "Restyle the difficulty chips and give the DiagnosisCard an action
 ```
 
 `git status --short` before the commit lists exactly those two files (both ` M`).
+
+---
+### Task 5: Problem panel states and one primary action (spec 4c)
+
+**Files:**
+- Rewrite: `src/components/practice/PracticePanel.tsx` (447 lines today). Two regions change and nothing else: the import block (lines 1 to 27) and the whole `return (...)` body (lines 238 to 447). Every hook, every piece of state, `refreshCounts`, `loadProblem`, the fetch effect, `submit`, `reveal`, `generate`, `solutionShown` and `locked` (lines 29 to 237) are left exactly as they are. The panel's own props do not change, so `PracticeWorkspace.tsx` (rewritten in Task 1) is not touched again.
+- Delete: `src/components/practice/PoolEmptyState.tsx` (57 lines: a `stock-textured bg-kraft` box with `text-[17px]` / `text-[13px]` / `text-[12.5px]` copy, an inline last-run line, an inline red-border error paragraph and a hand-styled brand button). Its only importer is `PracticePanel.tsx`, so deleting it and dropping that one import is the whole removal.
+
+**Interfaces:**
+- Consumes:
+  - `Sheet({ tone?: "paper-0" | "paper-1" | "kraft", lift?: boolean, as?: SheetTag, className?, ...rest })` from `src/components/ui/Sheet.tsx`. Base classes are `rounded-card shadow-sheet` plus the tone; it adds no `relative` and no `overflow-hidden`, so the problem card asks for both in `className`.
+  - `CornerNumeral({ n: number | string, color: string, size?: 56 | 30, onStock?: boolean, className? })` from `src/components/ui/CornerNumeral.tsx`: top-right absolutely positioned, `display-cut`, `aria-hidden`, accent at opacity 0.16 on paper (0.12 with `onStock`). This task passes `size={30}` (spec 4c) where today's markup hard-codes `text-[56px]`.
+  - `BaseBand({ color: string, className? })` from `src/components/ui/BaseBand.tsx`: a 16px band absolutely positioned at the bottom of a `relative overflow-hidden` sheet. `color` is a CSS color expression.
+  - `Button({ variant?: "primary" | "secondary" | "tertiary" | "destructive", size?: "sm" | "md", tone?: "brand" | "plum", icon?: IconName, loading?: boolean, className?, children, ...ComponentPropsWithoutRef<"button"> })` from `src/components/ui/Button.tsx`. Defaults are `variant="primary"`, `size="md"`, `type="button"`. `md` is `h-8 px-3.5`, `sm` is `h-6 px-2.5`. `primary` is `bg-brand shadow-sheet text-paper-0` with a `brand-deep` hover; `secondary` is the cut sticker (`border-[1.5px] border-ink bg-paper-0`); `tertiary` is `px-1 text-cobalt` with a hover underline and no background; `destructive` is `bg-red text-paper-0`. `loading` sets `disabled={disabled || loading}` and `aria-busy`, so a loading button needs no separate `disabled`.
+  - `Notice({ kind: "info" | "success" | "warning" | "error", action?: ReactNode, className?, children })` from `src/components/ui/Notice.tsx`: `relative flex items-start gap-3 overflow-hidden rounded-input py-2.5 pr-3 pl-4 text-ui text-ink` with a 4px `before:` accent tab, the kind's tint background, `role="alert"` for `error` and `role="status"` for the rest. Children go in a `min-w-0 flex-1` div; `action` goes in a `flex shrink-0 items-center gap-2` div on the right.
+  - `EmptyState({ title: string, line?: string, action?: ReactNode, shape?: "triangle" | "circle" | "wedge" (default "wedge"), accent: string, className? })` from `src/components/ui/EmptyState.tsx`: renders `Sheet as="section" aria-label={title}` with `flex items-start gap-4 p-5`, a 56px `DieCutWindow` in the accent, an `h3.font-expanded.text-ui-lg`, an optional `p.mt-1.text-ui.text-ink-soft` and an optional `div.mt-3.flex.flex-wrap.gap-2` action row. `line` is a plain string, not a node, which is why the last-run and failure notices sit below the component rather than inside it (spec 4c: "staged progress and failure `Notice` below").
+  - `chipClasses({ variant: "nav" | "meta" | "action" | "toggle", active?: boolean, className? })` from `src/components/ui/Chip.tsx`. The model tags are links, and `ChipLink`'s variant union is `"nav" | "action"` only, so the meta look reaches a `next/link` through `chipClasses` rather than through `ChipLink`. `meta` is `stock-textured bg-kraft text-meta font-medium text-ink` on the 24px chip base.
+  - `DiagnosisCard({ diagnosis, actions?: ReactNode })` from Task 4: `actions` renders as `<div className="flex flex-wrap gap-2 border-t border-hairline px-4 py-3">`, the card's second and last child.
+  - `DifficultySelector({ value, counts, disabled, onChange })` from Task 4: the same four props as today, now drawn as `Chip variant="toggle"` controls.
+  - `MarkdownMath({ children, variant?: "reading" | "ui" | "chat", className? })` from `src/components/shared/MarkdownMath.tsx`. `reading` is the 17px serif reading measure (the default variant after stage A, but this task names it explicitly on both call sites so the intent is on the page).
+  - `ACCENT_VAR: Record<AccentName, string>` and `accentForRoot(rootName: string): AccentName` from `src/lib/topicColors.ts` (both exist today, neither is edited).
+  - Unchanged local values used by the new markup: `topicPath`, `difficulty`, `counts`, `generating`, `submitting`, `loading`, `problem`, `outcome`, `revealedSolution`, `lastRun`, `error`, `confirmReveal`, `solutionShown`, `locked`, `loadProblem()`, `submit()`, `reveal()`, `generate()`, `setOutcome`, `setError`, `setConfirmReveal`, `setDifficulty`, `setRevealedSolution`, `onAnswerChange`, `emptyAnswer`, `AnswerInput`, `ProblemSkeleton`, `SketchpadUnavailableNote`, `useSketchStore`.
+- Produces:
+  - `PracticePanel({ topicId, topicPath, initialCounts, answer, onAnswerChange })`: the export name, the prop names and the prop types are all unchanged. Task 1's call site keeps compiling untouched.
+  - `src/components/practice/PoolEmptyState.tsx` no longer exists, and `PoolEmptyState` is no longer exported anywhere. Any later task that wants an empty pool renders `EmptyState`.
+  - Selectors Task 6 relies on: `section[aria-label="Problem"] header` is the panel header, `paper-1`, 45px tall, with no `bg-kraft` and no `border-ink-faint/40`; it holds exactly one `p` (the topic path) and the difficulty group, and no `button` outside that group. The problem card is `section[aria-label="Problem"] .bg-paper-0` carrying one `[aria-hidden]` numeral at 30px and one 16px base band in the accent. The actions row is the panel's only place with an enabled `Submit`. In every terminal state the block that ends the flow contains exactly one `bg-brand` button reading "Next problem".
+- FINDING (verified while writing this task, stated here because Task 5's implementer sees only Task 5): the model-tag chips are kraft on purpose and they do not break the one-kraft-strip rule. Spec line 25 restricts persistent kraft STRIPS to one per screen and sends other kraft uses to "paper-1 or chips"; spec line 63 assigns model tags to the `meta` chip, which is kraft with ink text; spec line 214 lists meta chips among the allowed kraft surfaces for the `stock-textured` grep. Task 2's kraft check therefore counts strips, not `.bg-kraft` elements: after this task `[data-practice-workspace]` holds one kraft strip (the sketch toolbar) plus however many model-tag chips the current problem carries. Task 2's parenthetical note was corrected in the same commit as this task for exactly this reason.
+
+Behaviour contract (read before editing):
+- The panel's outer shape is unchanged: `<div className="flex h-full min-h-0 flex-col">`, a `shrink-0` header, then a `min-h-0 flex-1 overflow-y-auto p-5` scroller ending with `<SketchpadUnavailableNote />`. Task 1 already wrapped this div in a `Sheet as="section" aria-label="Problem"`, so the panel adds no background of its own.
+- Header (spec 4c): kraft, texture and the `border-ink-faint/40` rule all go. It becomes `bg-paper-1` with `border-b border-hairline`, the topic path as a single truncating `p.text-meta.text-ink` (ink, not ink-soft: the contrast gate in spec 8 asks meta at 12/500 to clear 4.5:1, and ink is the value that clearly does), then `DifficultySelector` with today's four props and today's onChange body. The "New problem" button is deleted outright (D-052): it called the same `loadProblem()` as Skip and as Next problem, so the pre-answer exit is Skip and the post-answer exit is Next problem. Nothing else may be added to this row.
+- The accent is derived, not plumbed: `const accent = ACCENT_VAR[accentForRoot(topicPath[0] ?? "")]`, computed once in the component body next to `solutionShown`. `topicPath[0]` is the root topic name, which is what `accentForRoot` hashes. No new prop, no change to `PracticeWorkspace`.
+- Problem card (spec 4c): `Sheet tone="paper-0"` with `className="relative overflow-hidden pb-4"`, holding `CornerNumeral n={problem.difficulty} color={accent} size={30}`, a `p-4` body and `BaseBand color={accent}`. The band and the numeral both move from hard-coded brand to the topic accent, which is the visible change on a non-Calculus topic. The statement is `MarkdownMath variant="reading"`, the panel's one serif element.
+- Model tags keep their list markup and their hrefs and become meta chips: `<Link className={chipClasses({ variant: "meta", className: "font-semibold" })}>`. That replaces `text-[11px] font-semibold` and the hand-written `rounded-chip bg-kraft px-2 py-1 transition-shadow hover:shadow-sheet` with the 24px chip base at 12/500. The label string `M{n} · {title}` is unchanged.
+- Actions row (spec 4c): one `Button` primary at `md`, `loading={submitting}`, `disabled={locked}`, labelled "Checking..." while submitting and "Submit" otherwise; `Button variant="tertiary"` "Skip" calling `loadProblem()`; and, only while `!locked`, `Button variant="tertiary"` "Show solution" setting `confirmReveal`. Skip and Show solution stop being a bordered box and a bare cobalt span respectively and become the same tertiary control. Submit is the row's only primary.
+- Reveal confirm (spec 4c, replacing lines 348 to 361): `Notice kind="warning"` whose children are the copy "This counts as unsolved. Show it anyway?" and whose `action` holds `Button variant="destructive" size="sm"` "Show solution" calling `reveal()` and `Button variant="tertiary" size="sm"` "Keep trying" calling `setConfirmReveal(false)`. Both live in the `action` slot because the confirm is a decision about one thing, so the two answers belong beside the question.
+- Inline error: the hand-rolled red left-border paragraph becomes `Notice kind="error"` with the message as its children. It renders in both branches of the panel, the empty pool and the loaded problem, exactly as today.
+- The one-primary rule, stated exactly so the four terminal states stay honest: `locked` is already true in precisely the states where a solution is on screen (`locked = Boolean(outcome?.correct) || revealedSolution !== null`, and `solutionShown` is non-null under the same condition, because `Outcome.solutionMd` is a required string). So the plan is: when a solution sheet is on screen it owns the single "Next problem" primary, and when one is not, the terminal actions row owns it. Concretely, `const terminalActions = outcome && !outcome.correct && !locked ? (Try again, then Next problem) : null`. That yields correct = success `Notice` then the solution sheet with Next problem; wrong with diagnosis = the card carrying Try again and Next problem in its `actions` slot; wrong without diagnosis = an error `Notice` with the same two buttons in a row under it; solution revealed = the solution sheet with Next problem and no orphan row above it. The orphan "Try again" row at line 419 and the Next problem that was reachable only through the solution sheet are both gone as separate blocks.
+- Try again keeps today's handler exactly (`setOutcome(null); setError(null)`) and is `variant="secondary"`, so the primary sits last in every row (spec 4c and Task 4's Produces block).
+- The `Notice` terminal states put their buttons in a sibling row rather than in the `action` slot: the panel is allowed to be 360px wide (Task 1's `lg:min-w-[360px]`), and `Notice`'s action slot is `shrink-0`, so two buttons there would push the copy past the sheet. The confirm above is the exception because it is one short line with two short answers.
+- Success copy: the `Notice kind="success"` says "Correct" and nothing else, replacing today's check-glyph row. The kind's tab is the green accent, so the glyph is redundant.
+- Wrong-without-diagnosis copy is kept verbatim from today, minus the em-dash-free rewrap it already has: "Not quite" as the first line and "Nothing here points clearly at one model, so this is not attributed to one. Try again, or show the solution." as the second.
+- Empty pool (spec 4c): `EmptyState` with the accent, the default wedge die-cut, today's two title strings, today's two body strings, and `action={<Button loading={generating} onClick={() => void generate()}>}` labelled "Working..." while generating and "Generate 5 problems" otherwise. The staged progress line becomes `Notice kind="info"` below it (rendered only when `lastRun && !generating`), and the failure becomes the same `Notice kind="error"` used elsewhere. The three sit in a `flex flex-col gap-3` column so the notices are clearly below the sheet.
+- Motion (spec 1e): the die-cut inside `EmptyState` plays `animate-cut-reveal` when the empty state mounts, and Task 4's diagnosis die-cut plays it when a diagnosis lands. Buttons and chips have their own press and hover transitions from the primitives. This task adds no animation of its own.
+- Not touched: `submit`, `reveal`, `generate`, `refreshCounts`, `loadProblem`, the fetch effect and its cleanup, `clearActiveProblem` on unmount, `AnswerInput` and its `partResults`, `snapshotSketch`, `useSketchStore.getState().resetForNewProblem()` inside the difficulty handler, the OCR path, the answer comparison and the diagnosis API.
+
+- [ ] **Step 1: Replace the import block in `src/components/practice/PracticePanel.tsx`**
+
+Replace lines 1 to 27 (everything from `"use client";` through the `PoolEmptyState` import) with:
+
+```tsx
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+
+import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { snapshotSketch } from "@/components/sketchpad/Sketchpad";
+import { SketchpadUnavailableNote } from "@/components/sketchpad/SketchpadUnavailableNote";
+import { BaseBand } from "@/components/ui/BaseBand";
+import { Button } from "@/components/ui/Button";
+import { chipClasses } from "@/components/ui/Chip";
+import { CornerNumeral } from "@/components/ui/CornerNumeral";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Notice } from "@/components/ui/Notice";
+import { Sheet } from "@/components/ui/Sheet";
+import { ProblemSkeleton } from "@/components/ui/Skeleton";
+import {
+  clearActiveProblem,
+  markRevealed,
+  setActiveProblem,
+} from "@/lib/practiceSession";
+import { useSketchStore } from "@/lib/sketch/store";
+import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
+
+import {
+  AnswerInput,
+  answerIsEmpty,
+  emptyAnswer,
+  serializeAnswer,
+  type AnswerShape,
+  type AnswerValue,
+} from "./AnswerInput";
+import { DiagnosisCard } from "./DiagnosisCard";
+import { DifficultySelector } from "./DifficultySelector";
+```
+
+The `PoolEmptyState` import is gone. `Link` stays (the model tags still use it). `ProblemSkeleton`, `snapshotSketch`, `SketchpadUnavailableNote`, the `practiceSession` trio, `useSketchStore` and the `AnswerInput` group are all unchanged imports that simply moved into alphabetical order alongside the new ones.
+
+- [ ] **Step 2: Add the accent line beside `solutionShown`**
+
+Find these two lines (line 235 and 236 today, immediately above `return (`):
+
+```tsx
+  const solutionShown = outcome?.correct ? outcome.solutionMd : revealedSolution;
+  const locked = Boolean(outcome?.correct) || revealedSolution !== null;
+```
+
+Append one line under them:
+
+```tsx
+  /** The root topic's accent drives the card's numeral and base band (docs/08). */
+  const accent = ACCENT_VAR[accentForRoot(topicPath[0] ?? "")];
+```
+
+- [ ] **Step 3: Replace the render body**
+
+Replace everything from `return (` (line 238 today) through the file's final `}` with:
+
+```tsx
+  const terminalActions =
+    outcome && !outcome.correct && !locked ? (
+      <>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setOutcome(null);
+            setError(null);
+          }}
+        >
+          Try again
+        </Button>
+        <Button onClick={() => loadProblem()}>Next problem</Button>
+      </>
+    ) : null;
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline bg-paper-1 px-4 py-2.5">
+        <p className="min-w-0 flex-1 truncate text-meta text-ink">{topicPath.join("  ›  ")}</p>
+        <DifficultySelector
+          value={difficulty}
+          counts={counts}
+          disabled={generating || submitting}
+          onChange={(level) => {
+            // A difficulty switch loads a different problem, so the canvas is
+            // stale work for a question no longer on screen (docs/06 §4).
+            useSketchStore.getState().resetForNewProblem();
+            setOutcome(null);
+            setRevealedSolution(null);
+            onAnswerChange(emptyAnswer);
+            setDifficulty(level);
+          }}
+        />
+      </header>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {loading ? (
+          <ProblemSkeleton />
+        ) : !problem ? (
+          <div className="flex flex-col gap-3">
+            <EmptyState
+              title={generating ? "Writing and checking problems" : "No problems ready"}
+              line={
+                generating
+                  ? "Each problem is solved a second time, independently, before it can be shown to you. Problems the check disagrees with are discarded."
+                  : `Nothing verified and unsolved at difficulty ${difficulty} yet.`
+              }
+              accent={accent}
+              action={
+                <Button loading={generating} onClick={() => void generate()}>
+                  {generating ? "Working..." : "Generate 5 problems"}
+                </Button>
+              }
+            />
+
+            {lastRun && !generating && (
+              <Notice kind="info">
+                Last run: generated {lastRun.requested}, verifying passed{" "}
+                <strong>{lastRun.verified}</strong>
+                {lastRun.discarded > 0 && `, discarded ${lastRun.discarded}`}.
+              </Notice>
+            )}
+
+            {error && <Notice kind="error">{error}</Notice>}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <Sheet tone="paper-0" className="relative overflow-hidden pb-4">
+              <CornerNumeral n={problem.difficulty} color={accent} size={30} />
+              <div className="p-4">
+                <MarkdownMath variant="reading">{problem.statementMd}</MarkdownMath>
+
+                {problem.modelTags.length > 0 && (
+                  <ul className="mt-3 flex flex-wrap gap-1.5">
+                    {problem.modelTags.map((tag) => (
+                      <li key={`${tag.docId}-${tag.modelNumber}`}>
+                        <Link
+                          href={`/learn/${tag.topicId}?doc=${tag.docId}#model-${tag.modelNumber}`}
+                          className={chipClasses({ variant: "meta", className: "font-semibold" })}
+                        >
+                          M{tag.modelNumber} · {tag.title}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <BaseBand color={accent} />
+            </Sheet>
+
+            <section className="flex flex-col gap-3">
+              <AnswerInput
+                shape={problem}
+                value={answer}
+                disabled={submitting || locked}
+                partResults={outcome && !outcome.correct ? outcome.parts : null}
+                onChange={onAnswerChange}
+                onSubmit={() => void submit()}
+              />
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button loading={submitting} disabled={locked} onClick={() => void submit()}>
+                  {submitting ? "Checking..." : "Submit"}
+                </Button>
+                <Button variant="tertiary" disabled={submitting} onClick={() => loadProblem()}>
+                  Skip
+                </Button>
+                {!locked && (
+                  <Button
+                    variant="tertiary"
+                    disabled={submitting}
+                    onClick={() => setConfirmReveal(true)}
+                  >
+                    Show solution
+                  </Button>
+                )}
+              </div>
+
+              {confirmReveal && (
+                <Notice
+                  kind="warning"
+                  action={
+                    <>
+                      <Button variant="destructive" size="sm" onClick={() => void reveal()}>
+                        Show solution
+                      </Button>
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        onClick={() => setConfirmReveal(false)}
+                      >
+                        Keep trying
+                      </Button>
+                    </>
+                  }
+                >
+                  This counts as unsolved. Show it anyway?
+                </Notice>
+              )}
+
+              {error && <Notice kind="error">{error}</Notice>}
+            </section>
+
+            {outcome?.correct && <Notice kind="success">Correct</Notice>}
+
+            {outcome && !outcome.correct && outcome.diagnosis && (
+              <DiagnosisCard diagnosis={outcome.diagnosis} actions={terminalActions} />
+            )}
+
+            {outcome && !outcome.correct && !outcome.diagnosis && (
+              <Notice kind="error">
+                <p className="font-semibold">Not quite</p>
+                <p className="mt-1 max-w-[52ch] text-ink-soft">
+                  Nothing here points clearly at one model, so this is not attributed to one.
+                  Try again, or show the solution.
+                </p>
+              </Notice>
+            )}
+
+            {outcome && !outcome.correct && !outcome.diagnosis && terminalActions && (
+              <div className="flex flex-wrap gap-2">{terminalActions}</div>
+            )}
+
+            {solutionShown && (
+              <Sheet tone="paper-0" className="p-4">
+                <p className="meta-caps mb-2 text-ink-soft">Solution</p>
+                <MarkdownMath variant="reading">{solutionShown}</MarkdownMath>
+                <Button className="mt-3" onClick={() => loadProblem()}>
+                  Next problem
+                </Button>
+              </Sheet>
+            )}
+          </div>
+        )}
+
+        {/* Below `lg` the sketchpad pane is display:none, so this explains the
+            absence. Inside the scroll flow rather than pinned to the viewport
+            bottom, so it follows the content it refers to. */}
+        <SketchpadUnavailableNote />
+      </div>
+    </div>
+  );
+}
+```
+
+Note the two guards that keep the one-primary rule true. `terminalActions` is `null` whenever a solution sheet is on screen, so the diagnosis card renders no row in that case and the wrong-without-diagnosis row does not render at all. The solution sheet's "Next problem" is unconditional, because the sheet only ever renders when `solutionShown` is set.
+
+- [ ] **Step 4: Delete `PoolEmptyState.tsx`**
+
+```bash
+git rm src/components/practice/PoolEmptyState.tsx
+grep -rn "PoolEmptyState" src
+```
+
+The grep prints nothing. If it prints a line, the import in Step 1 was not fully removed.
+
+- [ ] **Step 5: Gate**
+
+```bash
+npm run typecheck
+npm run lint
+```
+
+Both exit 0. `typecheck` is what proves `Sheet` accepts `tone` and `className`, that `CornerNumeral`'s `size` union includes 30, that `Button` accepts `loading` beside `disabled`, that `Notice` accepts a fragment in `action`, that `EmptyState`'s `line` is a string in both branches, that `chipClasses` accepts the `meta` variant, and that `DiagnosisCard` now takes `actions`. It also fails loudly if `PoolEmptyState` is still imported.
+
+- [ ] **Step 6: Visual and keyboard check**
+
+In the dev preview at 1440x900, open http://localhost:3010/practice/<drtId>. Use `javascript_tool` for each expression.
+
+- Header: `const head = document.querySelector('section[aria-label="Problem"] header')`. `getComputedStyle(head).backgroundColor` is `rgb(241, 234, 220)` (paper-1), not `rgb(203, 178, 129)` (kraft); `head.className.includes('stock-textured')` is `false`; `head.className.includes('border-ink-faint/40')` is `false`; `getComputedStyle(head).borderBottomColor` is the hairline token's value and `borderBottomWidth` is `"1px"`; `Math.round(head.getBoundingClientRect().height)` is `45` (24px chips + 20px padding + the 1px hairline; it grows only if the topic path wraps, which it does not at this width).
+- No header button: `head.querySelectorAll('button').length` is `5` and every one of them is inside `[role="group"][aria-label="Difficulty"]`; `head.textContent.includes('New problem')` is `false`. The topic path: `head.querySelector('p').textContent` reads the seeded path and `getComputedStyle(head.querySelector('p')).fontSize` is `"12px"`.
+- One kraft strip: `[...document.querySelectorAll('[data-practice-workspace] .bg-kraft')].filter(el => el.tagName !== 'A').length` is `1`, and that element is the sketch toolbar from Task 2. The `A` elements excluded there are the model-tag meta chips, which are kraft by design (spec 63).
+- Problem card: `const card = document.querySelector('section[aria-label="Problem"] .bg-paper-0')`. `getComputedStyle(card).backgroundColor` is `rgb(249, 245, 236)`; `getComputedStyle(card).overflow` is `"hidden"`; `getComputedStyle(card).paddingBottom` is `"16px"`.
+- Numeral: `const num = card.querySelector('[aria-hidden="true"]')`; `getComputedStyle(num).fontSize` is `"30px"`; `getComputedStyle(num).opacity` is `"0.16"`; `num.textContent.trim()` equals the problem's difficulty; `getComputedStyle(num).color` is the root topic's accent (`rgb(181, 82, 46)` for a Calculus root, and the DRT seed sits under Calculus).
+- Base band: `const band = [...card.querySelectorAll('span,div')].find(el => Math.round(el.getBoundingClientRect().height) === 16 && getComputedStyle(el).position === 'absolute')`. `getComputedStyle(band).backgroundColor` equals the numeral's color, and `band.getBoundingClientRect().bottom` equals `card.getBoundingClientRect().bottom`.
+- Statement: `const stmt = card.querySelector('.p-4')`; `getComputedStyle(stmt.querySelector('p')).fontSize` is `"17px"` and its `fontFamily` contains the serif reading family. `card.querySelector('.katex')` is non-null on a problem whose statement carries math.
+- Model tags: `const tags = [...card.querySelectorAll('li a')]`. Each `getBoundingClientRect().height` is `24`; `getComputedStyle(tags[0]).fontSize` is `"12px"`; `getComputedStyle(tags[0]).backgroundColor` is `rgb(203, 178, 129)` (kraft); `tags[0].getAttribute('href')` still matches `/learn/<topicId>?doc=<docId>#model-<n>` and clicking it opens that model.
+- Actions row: `const row = [...document.querySelectorAll('section[aria-label="Problem"] .flex.flex-wrap.items-center')].pop()`; `[...row.querySelectorAll('button')].map(b => b.textContent.trim())` is `["Submit","Skip","Show solution"]`; `Math.round(row.querySelector('button').getBoundingClientRect().height)` is `32`; `getComputedStyle(row.querySelectorAll('button')[0]).backgroundColor` is `rgb(181, 82, 46)` (brand); `getComputedStyle(row.querySelectorAll('button')[1]).backgroundColor` is `rgba(0, 0, 0, 0)` and its color is the cobalt token; `row.querySelectorAll('button.bg-brand').length` is `1`.
+- Submitting: enter a wrong answer and click Submit. While the request is in flight `document.querySelector('[aria-busy="true"]').textContent.trim()` is `"Checking..."` and that button is disabled. After it returns the label is `"Submit"` again.
+- Reveal confirm: click "Show solution". `const warn = document.querySelector('[role="status"]')` whose text starts with "This counts as unsolved"; `[...warn.querySelectorAll('button')].map(b => b.textContent.trim())` is `["Show solution","Keep trying"]`; `getComputedStyle(warn.querySelector('button')).backgroundColor` is `rgb(168, 58, 50)` (red, the destructive variant); both buttons are 24px tall. Click "Keep trying": the notice disappears and focus stays inside the panel. Press Show solution then confirm: the solution sheet appears.
+- Correct state: solve a problem correctly. `document.querySelector('[role="status"]').textContent.trim()` is `"Correct"`; its background is the green tint and its `before` tab is green. The solution sheet is below it. `[...document.querySelectorAll('section[aria-label="Problem"] button')].filter(b => b.textContent.trim() === 'Next problem').length` is `1`, it lives inside the solution sheet, and `document.querySelectorAll('section[aria-label="Problem"] button.bg-brand:not(:disabled)').length` is `1` (Submit is disabled once locked).
+- Wrong with diagnosis: submit a plainly wrong answer until `document.querySelector('section[aria-label="Diagnosis"]')` is non-null. Call it `dcard`. `dcard.children.length` is `2`; `[...dcard.lastElementChild.querySelectorAll('button')].map(b => b.textContent.trim())` is `["Try again","Next problem"]`; the second is `bg-brand` and the first is the paper-0 cut sticker with a 1.5px ink border; the row has a `border-t` hairline. There is no separate Try again row anywhere else: `[...document.querySelectorAll('section[aria-label="Problem"] button')].filter(b => b.textContent.trim() === 'Try again').length` is `1`.
+- Wrong without diagnosis: submit wrong answers until a wrong verdict arrives with no card. `const err = document.querySelector('[role="alert"]')`; its first `p` reads "Not quite"; the row directly under it reads `["Try again","Next problem"]` with the primary last; `err.querySelectorAll('button').length` is `0` (the buttons are the sibling row, not the notice's action slot).
+- Solution revealed after a wrong answer: with a diagnosis card on screen, click Show solution and confirm. The solution sheet appears with its single "Next problem", and `dcard.children.length` is back to `1` (no orphan Try again under a locked input). Panel-wide, `[...document.querySelectorAll('section[aria-label="Problem"] button')].filter(b => b.textContent.trim() === 'Next problem').length` is `1` in this state and in all four terminal states.
+- Empty pool: switch to a difficulty whose chip title reads 0 ready. `const empty = document.querySelector('section[aria-label="No problems ready"]')` is non-null; `getComputedStyle(empty).backgroundColor` is `rgb(241, 234, 220)`; `const cut = empty.querySelector('[aria-hidden="true"]')` has `getBoundingClientRect().width` `56`, a `clipPath` starting with `polygon(`, `animationName` `"cut-reveal"` and a background equal to the topic accent; `empty.querySelector('button').textContent.trim()` is `"Generate 5 problems"` and it is `bg-brand`. `document.querySelector('.stock-textured.bg-kraft.p-6')` is `null` (the old box is gone).
+- Generating: click Generate 5 problems. The section's `aria-label` becomes "Writing and checking problems", the button reads "Working..." and carries `aria-busy="true"`. When the run returns, `document.querySelector('[role="status"]').textContent` starts with "Last run: generated". If the run fails, `document.querySelector('[role="alert"]')` carries the message and the empty state stays on screen.
+- Narrow panel: drag Task 1's split handle until the panel is at its 360px minimum. The actions row wraps rather than overflowing; the diagnosis actions row wraps; `document.querySelector('section[aria-label="Problem"]').scrollWidth <= document.querySelector('section[aria-label="Problem"]').clientWidth` is `true`.
+- Keyboard: from the topic path, Tab walks the five difficulty chips, then the answer input, then Submit, Skip and Show solution, then whatever terminal buttons are on screen, all in DOM order with a visible focus ring on each. Enter on Submit submits. Escape does nothing here (the panel has no overlay of its own).
+- `read_console_messages` with `onlyErrors: true` is clean after all of the above.
+
+- [ ] **Step 7: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-\[1\.5px\]|border-ink-faint/(25|40)|/60\b|/70\b|/85\b|bg-kraft|stock-textured|window\.confirm|rounded-input bg-brand" src/components/practice/PracticePanel.tsx ; grep -n $'\xe2\x80\x94' src/components/practice/PracticePanel.tsx ; grep -rn "PoolEmptyState" src ; ls src/components/practice/PoolEmptyState.tsx
+```
+
+The first three print nothing. The `ls` prints "No such file or directory", which is the point. `max-w-[52ch]` survives on purpose: only `text-[` is a banned arbitrary value in this stage.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/components/practice/PracticePanel.tsx
+git status --short
+git commit -m "Rebuild the problem panel on primitives with one primary action per state (stage C, spec 4c)"
+```
+
+`git status --short` lists exactly two entries: ` M src/components/practice/PracticePanel.tsx` and `D  src/components/practice/PoolEmptyState.tsx` (the deletion is already staged by `git rm` in Step 4).
 
 ---
