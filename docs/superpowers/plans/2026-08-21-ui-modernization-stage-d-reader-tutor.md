@@ -1741,3 +1741,307 @@ git commit -m "Show the mini-TOC from lg and mark the model being read (stage D,
 `git status --short` before the commit lists exactly two files, both as ` M`.
 
 ---
+
+### Task 8: Stage-wide verification pass (spec 6b.1 to 6b.5 and spec 6c)
+
+**Files:**
+- **This task edits nothing.** It is the stage's verification pass, not an edit task: it runs the gates, the greps, the browser passes and the a11y checklist over what Tasks 1 to 7 produced, and it clears the five items those tasks deferred to it. The only way a file changes here is a deferred item or a pass failing, and then the fix lands in the file that owns the defect, named in the step that found it. Step 12 is the only step that may commit.
+- Read only, the ten files that are the whole of stage D's surface, with the task that owns each: `src/lib/text.ts` and `src/components/chat/ChatDrawer.tsx` (Task 1), `src/components/chat/ChatMessageList.tsx` (Task 2), `src/components/chat/ChatComposer.tsx` (Task 3), `src/components/chat/SessionMenu.tsx` (Task 4), `src/app/(tabs)/learn/[topicId]/page.tsx` and `src/components/learn/ModelMissList.tsx` (Task 5), `src/components/learn/ModelHeading.tsx` and `src/components/learn/DocReader.tsx` (Task 6), `src/components/learn/DocMiniTOC.tsx` (Task 7).
+- Possible fix sites, none of them expected: `src/components/ui/Button.tsx` (step 4), `src/components/ui/Toast.tsx` (step 8) and `src/app/globals.css` (step 11) all belong to plan A, and `src/components/chat/ChatDrawer.tsx`'s Escape and focus return belongs to stage B. A defect proven in one of those is fixed there, in that file, and never worked around inside a stage D component.
+- **Not touched under any outcome:** the chat API route, `src/lib/chat/*`, `src/components/chat/useChatContext.ts`, `src/lib/modelIndex.ts`, `src/lib/topicColors.ts`, `src/lib/mathDelimiters.ts`, and the stage B half of the reader page (the types, `params`, `selectedDocId`, the D-008 redirect, the subtopic branch and the `Breadcrumb` helper).
+- No Test line: there is no test runner in this repo (D-054), which is exactly why this task exists. Steps 1 to 11 are the verification, and every one of them is a command or a reading with a stated expected result.
+
+**Interfaces:**
+- Consumes: everything Tasks 1 to 7 produced, by name. `truncateMiddle(value, head, tail)` from `src/lib/text.ts` (Task 1). `ModelHeading({ number, title, anchor, accent })` and `DocReader({ doc, index, accent })` (Task 6). `DocMiniTOC({ entries: ModelIndexEntry[]; accent: AccentName })` (Task 7). The `#model-n` anchor contract: one server rendered `<div id="model-n">` per index entry, in index order, carrying `scroll-mt-20` (Task 6), which both the miss-list links (Task 5) and the observer (Task 7) resolve against. From plan A: `Sheet`, `Chip`, `Button`, `Icon`, `Notice`, `Toast`, `CornerNumeral`, `MarkdownMath` and `cx`. From stage B: the drawer's positioning, `inert`, Escape and focus return, and the Tutor chip that opens it.
+- Produces: nothing importable, and no new component or function. What it hands forward is a written result, and Task 9 depends on one part of it. **For Task 9, the fallback ledger:** which of the three conditional `D-053` entries were actually taken during Tasks 1 to 7, namely Task 2's per-corner radius fallback, Task 2's hover-weight no-reflow reservation (which Task 7 may have extended to `DocMiniTOC.tsx` as a second site), and Task 4's `shadow-lift!` cascade fallback. Task 9 records only the ones taken, alongside its two unconditional entries. **This task opens no new `D-053` entry of its own**, whatever it finds: a defect fixed here is a defect, not a decision.
+
+**No primitive edit is needed in this task**, and none is expected. Steps 4, 8 and 11 each name one plan A file that a proven failure would send the implementer into, and each says what the proof has to be first.
+
+Behaviour contract:
+
+- **This task changes no behaviour. It proves stage D's behaviour.** Every assertion below reads what Tasks 1 to 7 already built. If an assertion fails, the failure is a bug in the task that owns the file, and the fix belongs there.
+- **`npm run build` runs here**, not in Task 9. The Global Constraints put `build` at the end of the last task, and Task 9 touches only markdown (`DECISIONS.md`, `docs/06-ui-spec.md`, `docs/08-design-theme.md`), so this is the last task that can break a build.
+- **The ten files listed above are the whole of stage D's surface.** Step 2's grep over exactly those ten is the proof that nothing outside them was edited and that nothing inside them carries a banned pattern.
+- **The reader page takes the reduced grep pattern**, without `stock-textured` and without `bg-kraft`, because that page legitimately carries the screen's one kraft strip: the doc meta strip under the title. The other nine files take the full pattern, because none of them may add a second kraft surface.
+- **Each of the five deferred items ends in exactly one of three states: passed, fixed, or recorded as unobservable in this environment.** "Unobservable" is never written up as "passed". Steps 6 and 7 are the two whose preconditions may genuinely not be reproducible, and each says what to record instead.
+- **Any fix made in steps 4 to 11 re-runs step 1 in full and re-runs step 2 for the touched file** before step 12 commits. A verification pass that ends with an unverified edit in the tree has not verified anything.
+- **Contrast is computed inline, with no dependency** (Global Constraints: no new dependencies, and that includes tooling for this pass). Step 10 carries the relative-luminance math as plain JavaScript run through `javascript_tool`. The text colour is composited over its surface before the ratio is taken, because `ink-soft` carries an alpha; the surface tokens themselves (`paper-0`, `paper-1`, `kraft`, `plum`) are opaque, so only the text side needs compositing.
+- **Reduced motion means nothing on these two surfaces moves, and the drawer still opens and closes** (spec 6b.4). The three moving things stage D inherits are the reading sheet's `animate-enter-sheet`, the drawer's 220ms open and close, and the pending three-dot indicator. All three guards live outside stage D's ten files, so step 11 escalates rather than patches.
+- **Both surfaces are checked at 1440x900, drawer closed and drawer open** (spec 6b.3). The drawer is an overlay: the reader underneath it does not resize, which is the 2b goal, and on a 1280px screen the drawer covering most of the workspace is accepted (spec 8, risk 8).
+- **The seed data this pass assumes** is the one the Global Constraints name: the DRT root with its exemplar document and 12 verified problems, plus the six doc-only topics. D-008 redirects a single-document topic into the doc branch, so `/learn/<drtId>` lands on the reading sheet directly.
+- Steps 9 and 10 cover only stage D's half of spec 6b.5 and spec 6c. The B and C halves of the keyboard pass (nav chips, tree arrows, rail search, separator arrows, background radiogroup, Clear popover, Cmd/Ctrl+Z, Submit) belong to those stages' own verification tasks and are not re-run here.
+
+- [ ] **Step 1: Gate (spec 6b.1)**
+
+Run: `npm run typecheck && npm run lint && npm run build`
+Expected: all three green, no errors and no warnings that name any of the ten files.
+
+Likely trips and their fixes:
+- `You're importing a component that needs useState` or `useEffect` during the build, naming a stage D file, means that file lost its `"use client"` directive. `typecheck` and `lint` both pass without it and only `build` catches it, which is why `build` is here. The client files in this stage are `ModelHeading.tsx`, `DocReader.tsx`, `DocMiniTOC.tsx`, `ChatDrawer.tsx`, `ChatMessageList.tsx`, `ChatComposer.tsx` and `SessionMenu.tsx`. Put the directive back on line 1; do not convert the component to a server component to silence it.
+- A prerender error on `/learn/[topicId]` means something reads `window` or `document` during render rather than inside an effect. The observer in `DocMiniTOC.tsx` and the clipboard write in `ModelHeading.tsx` are the two places that touch either, and both are inside handlers or effects by design.
+- `'truncateMiddle' is declared but its value is never read`, or a build warning that `src/lib/text.ts` has no importer, means Task 1's drawer band is not actually calling it. The band's context label is its one consumer.
+- `react-hooks/exhaustive-deps` naming `DocMiniTOC.tsx` means the effect's dependency array was widened from the joined anchor string to the `entries` array. Task 7's contract explains why it is the string; restore it rather than silencing the rule.
+
+- [ ] **Step 2: Banned-pattern grep over the ten stage D files (spec 6b.2)**
+
+The nine files that take the full pattern, in one command:
+
+```bash
+grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|chat-prose|doc-prose|stock-textured|bg-kraft" \
+  src/lib/text.ts \
+  src/components/chat/ChatDrawer.tsx \
+  src/components/chat/ChatMessageList.tsx \
+  src/components/chat/ChatComposer.tsx \
+  src/components/chat/SessionMenu.tsx \
+  src/components/learn/ModelMissList.tsx \
+  src/components/learn/ModelHeading.tsx \
+  src/components/learn/DocReader.tsx \
+  src/components/learn/DocMiniTOC.tsx
+```
+
+Prints nothing. A `text-[` hit is a hard-coded size that should be one of the six type tokens. A `/60`, `/70` or `/85` hit is an arbitrary alpha where `ink-soft`, `ink-faint` or `hairline` belongs. A `chat-prose` or `doc-prose` hit is a prose class hand-applied at a call site, where `MarkdownMath variant="chat"` or `variant="reading"` belongs. A `stock-textured` or `bg-kraft` hit is a second kraft surface.
+
+The reader page, which takes the reduced pattern:
+
+```bash
+GIT_LITERAL_PATHSPECS=1 grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|chat-prose|doc-prose" "src/app/(tabs)/learn/[topicId]/page.tsx"
+```
+
+Prints nothing. `stock-textured` and `bg-kraft` are out of this one pattern, and only this one, because the page carries the screen's single kraft strip. The `GIT_LITERAL_PATHSPECS=1` prefix does nothing for `grep` and is kept only so every command in this plan that names this path reads the same way; the quotes around the path are the part zsh actually needs, because of the brackets.
+
+That the strip is single:
+
+```bash
+GIT_LITERAL_PATHSPECS=1 grep -c "bg-kraft" "src/app/(tabs)/learn/[topicId]/page.tsx"
+```
+
+Prints `1` if the strip carries the class directly, or `0` if stage B's `BaseBand` carries it for the page. Either passes. `2` or more is the failure this checks for, and step 3 confirms the count by eye.
+
+Em-dashes across all ten:
+
+```bash
+grep -n $'\xe2\x80\x94' \
+  src/lib/text.ts \
+  src/components/chat/ChatDrawer.tsx \
+  src/components/chat/ChatMessageList.tsx \
+  src/components/chat/ChatComposer.tsx \
+  src/components/chat/SessionMenu.tsx \
+  src/components/learn/ModelMissList.tsx \
+  src/components/learn/ModelHeading.tsx \
+  src/components/learn/DocReader.tsx \
+  src/components/learn/DocMiniTOC.tsx \
+  "src/app/(tabs)/learn/[topicId]/page.tsx"
+```
+
+Prints nothing. This covers copy and code comments alike (CLAUDE.md).
+
+- [ ] **Step 3: Visual pass at 1440x900, both surfaces, drawer closed and open (spec 6b.3)**
+
+Set `resize_window` to 1440x900. Open http://localhost:3010/learn, open the Algebra topic and open the Distance-Rate-Time document, so the reading sheet is on screen with `?doc=` in the URL. Take a `computer` `screenshot` of the reader with the drawer closed, then click the Tutor chip and take a second one with the drawer open.
+
+Read both screenshots against this list, which is the stage's visual contract in one place:
+
+- Exactly one kraft surface on the whole screen: the doc meta strip under the title, carrying the "Exemplar" chip if the document is the exemplar, "n models" and "last practiced", and nothing else. The TOC column, the miss list, the drawer, its band, the composer and the session menu are all paper or plum.
+- The accent appears sparingly: the `CornerNumeral` behind each model heading at 16%, and the number on the one active TOC row. Nowhere else in the column.
+- The drawer band is plum, square inside the drawer's top edge, with the mark, "Tutor", the truncated context label, "Chats" and Close. The drawer has no kraft anywhere.
+- The reader underneath the open drawer has not resized or reflowed: the sheet, its title and the TOC column sit at the same coordinates in both screenshots.
+
+Then the measurements, in `javascript_tool`, with the drawer closed:
+
+```js
+const sheet = document.querySelector('article');
+const h1 = sheet.querySelector('h1');
+const nav = document.querySelector('nav[aria-label="Models in this document"]');
+```
+
+- `getComputedStyle(h1).fontSize` is `"30px"`, the reading sheet's title size.
+- `document.documentElement.scrollWidth <= window.innerWidth`: the page does not scroll sideways.
+- `nav.querySelectorAll('[aria-current="location"]').length === 1`: the TOC has exactly one active row.
+- `document.querySelectorAll('[role="alert"]').length` is `0` or `1`, never more.
+
+Open the drawer and repeat the two that can change:
+
+- `document.documentElement.scrollWidth <= window.innerWidth` still holds with the overlay open.
+- `sheet.getBoundingClientRect().width` is unchanged from the closed reading, proving the workspace never resizes.
+
+`read_console_messages` with `onlyErrors: true` is clean after both states.
+
+- [ ] **Step 4: Deferred item 1, the Send button's focus ring on plum (deferred by Task 3)**
+
+Precondition: Task 3's step ran `Tab` back to Send and looked for a visible ring on the plum stock, and recorded that none appeared. If Task 3 saw a ring, this step is already satisfied: note that and move to step 5.
+
+Open the drawer, click into the composer textarea, then press `computer` `key` `Tab` once so focus lands on Send by keyboard, which is what `:focus-visible` needs. Then:
+
+```js
+const send = document.activeElement;
+const ring = getComputedStyle(send);
+```
+
+- `send.textContent.trim()` is `Send`, confirming Tab landed where expected.
+- At least one of `ring.outlineStyle !== 'none'` with a non-zero `ring.outlineWidth`, or a `ring.boxShadow` that is not `'none'`, is true. Read the screenshot too: the ring has to be visible against plum, which means it is the `paper-0` ring, not the ink one (spec 6c: focus ring visible on every paper tone, and `paper-0` ring on plum and ink stock).
+
+If there is still no visible ring, the defect is plan A's `Button` focus style for `tone="plum"`, not this stage's, and the fix goes in `src/components/ui/Button.tsx`: the plum and ink tones get the `paper-0` ring, every paper tone keeps the ink one. Do not add a ring class at the composer's call site. After the fix, re-run step 1 and re-run step 2's nine-file grep, then re-read this step's two bullets.
+
+- [ ] **Step 5: Deferred item 2, Escape from a menu item that Tab moved focus onto (deferred by Task 4)**
+
+Precondition: none. Task 4 recorded this path as today's behaviour, predating that task, and left it rather than adding focus management to `SessionMenu.tsx`. This step decides it for the stage.
+
+Open the drawer, click "Chats" to open the panel, press `computer` `key` `Tab` once so focus moves from the trigger onto the first menu item, then press `computer` `key` `Escape`.
+
+- Reproduce it: `document.querySelector('[role="menu"]') === null` (the panel closed), the trigger's `aria-expanded` is `"false"`, and `document.activeElement === document.body` (focus fell to the body, because the focused button unmounted).
+- Confirm the two paths that must be correct still are. Reopen the panel and press Escape without Tabbing first: focus returns to the trigger. Reopen it and click on the thread area above the composer: the panel closes and `aria-expanded` is `"false"`.
+- **Accepted, no code change.** Spec 5e asks for `role="menu"` semantics and Escape, not a focus trap, and spec 7 puts new focus management out of scope for this work. Record it in step 12's summary.
+- One escalation, and only this one. Press Escape a second time from the body. If the drawer then closes without returning focus to the Tutor chip, that is a regression against the contract stage B shipped, and the fix belongs in `src/components/chat/ChatDrawer.tsx`: its Escape handler must return focus to the chip whatever had focus inside the drawer. If focus does return to the chip, there is nothing to fix.
+
+- [ ] **Step 6: Deferred item 3, the current-session row's four measurements (deferred by Task 4)**
+
+Precondition: Task 4 could not persist a chat session in its environment, so the session list was empty and it deferred these four measurements here rather than blocking. If Task 4 measured them, this step is already satisfied: note that and move to step 7.
+
+Open the drawer, type one message into the composer and press Enter so a session is created, wait for the reply to finish, then click "Chats" to open the panel, which refetches on open. Then:
+
+```js
+const panel = document.querySelector('[role="menu"]');
+const current = panel.querySelector('[aria-current="true"]');
+const tab = current.querySelector('span[aria-hidden="true"]');
+```
+
+- `getComputedStyle(current).backgroundColor` is the `paper-1` token.
+- All four of `getComputedStyle(current).borderTopWidth`, `borderRightWidth`, `borderBottomWidth` and `borderLeftWidth` are `"0px"`, proving the marker is not a border on the row.
+- `getComputedStyle(tab).width` is `"4px"`, `getComputedStyle(tab).backgroundColor` is the `plum` token at alpha `1`, and `Math.abs(tab.getBoundingClientRect().height - current.getBoundingClientRect().height)` is at most `1`, proving `inset-y-0` runs the tab the full height of the row.
+- `getComputedStyle(current).fontWeight` is `"500"`, the same as every other row, proving weight no longer marks the current session. If a second session exists, its row has no `span[aria-hidden="true"]` child and its `backgroundColor` is `"rgba(0, 0, 0, 0)"` until hovered.
+
+If the chat route still cannot persist a session in this environment, so the panel keeps showing "No earlier chats.", record these four measurements as unobservable in step 12's summary, naming the reason, and do not report the stage pass as complete without that line. Do not fabricate a session row in the DOM to satisfy the reading.
+
+- [ ] **Step 7: Deferred item 4, the miss-list links (two bullets deferred by Task 5, one by Task 6)**
+
+Precondition: the environment had no diagnosed attempts when Task 5 and Task 6 ran, so both asserted the empty case (`sheet.querySelector('[role="alert"]') === null`) and deferred the real check here, which runs after a practice session has produced a diagnosis. If both tasks saw a miss list and checked it, this step is already satisfied: note that and move to step 8.
+
+Produce a diagnosis first: open http://localhost:3010/practice, pick the Distance-Rate-Time topic, answer one problem deliberately wrong, submit, and let the diagnosis finish. Then return to the DRT document.
+
+Task 5's two bullets, on the reading sheet:
+
+- `const alert = sheet.querySelector('[role="alert"]')` is not null, it sits above the prose (`alert.compareDocumentPosition(sheet.querySelector('.doc-prose, article p')) & Node.DOCUMENT_POSITION_FOLLOWING` is truthy), every `alert.querySelectorAll('a')` href matches `/^#model-\d+$/`, and for each one `document.getElementById(href.slice(1)) !== null`, so no link is dead.
+- Click the first of those links: `location.hash` becomes `#model-n` and the matching heading is inside the viewport.
+
+Task 6's bullet, which is the same links re-checked against the anchors `ModelHeading` now renders:
+
+- For each `a` in `sheet.querySelector('[role="alert"]')`, `document.getElementById(a.getAttribute('href').slice(1)) !== null`.
+
+One more, because the two halves of the stage now meet here: after clicking a miss-list link, the TOC's active row is the model that was jumped to, not the one above it. `scroll-mt-20` parks the target at 80px, above the observer's 96px line.
+
+If a diagnosis still cannot be produced (no API key in this environment, or the diagnosis call fails), assert the empty case once more (`sheet.querySelector('[role="alert"]') === null`) and record all four bullets as unobservable in step 12's summary, naming the reason. An unproduced diagnosis is not a passing miss list.
+
+- [ ] **Step 8: Deferred item 5, the miss list's `role="alert"` announcing on load (deferred by Task 5)**
+
+Precondition: none, though it is only observable when a miss list is on screen, so run it right after step 7 while the diagnosis exists. Task 5 accepted the announcement rather than overriding it: the block is the page's one warning and spec 3d names `kind=error` explicitly. What this step checks is that the one announcement stays one.
+
+- `document.querySelectorAll('[role="alert"]').length === 1` on the reading sheet. A second assertive region on the same screen would make the two announcements race on load.
+- Trigger the copy-link on a model heading, so the "Link copied" toast appears, and read it: `document.querySelector('[role="status"]')` is the toast, and `document.querySelectorAll('[role="alert"]').length` is still `1`. The toast is polite and the miss list is assertive, so they do not compete.
+- If the toast comes back as `role="alert"`, that is a defect against spec 6c, which specifies `role="status"` toasts, and the fix belongs in plan A's `src/components/ui/Toast.tsx`, not in `DocReader.tsx`. After the fix, re-run step 1.
+- The accepted behaviour, written down so it is not rediscovered as a bug: with a miss list present, a screen reader announces it once on load. `Notice kind="error"` owns that role, and no stage D call site passes a `role` of its own.
+
+- [ ] **Step 9: Keyboard pass, stage D's half of spec 6b.5**
+
+Spec 6b.5 for this stage is: heading copy-link reachable and visible on focus, TOC active state while scrolling, starter rows, session menu items, composer Enter and Shift+Enter. Drive all of it with `computer` `key`, never with the mouse, and never with `element.focus()`, because `:focus-visible` is the thing under test.
+
+On the reading sheet:
+
+- Tab forward from the top of the sheet. The copy-link button inside each model heading is reachable, and it is visible when focused even though it is hidden until hover: `getComputedStyle(document.activeElement).opacity` is `"1"` and the button is inside the viewport. Press Enter on it and the "Link copied" toast appears.
+- Tab into the TOC column. Each row is a link and takes focus in document order, and the focused row shows a visible ring. Press Enter on one: the page jumps to that heading and, after the jump settles, that row is the one carrying `aria-current="location"`.
+- Scroll with the keyboard (`PageDown`, then `End`). The active row tracks the scroll and lands on the last model at the bottom of the document, the same result the mouse gesture in Task 7 gave.
+
+In the drawer, opened from the Tutor chip:
+
+- On an empty thread, Tab reaches every starter row in order, each shows a ring, and Enter on one puts its text into the composer exactly as a click does.
+- Tab to "Chats" and press Enter: the panel opens, and Tab walks the menu items in order with a visible ring on each. Escape closes it and focus returns to the trigger (step 5 owns the one path that does not).
+- In the composer, type a line and press Enter: it sends. Type a line and press Shift+Enter: it inserts a newline and does not send. Both are unchanged from today and both must still hold.
+- Tab from the composer reaches Send, and Escape anywhere in the drawer closes it and returns focus to the Tutor chip (stage B's contract).
+
+- [ ] **Step 10: A11y checklist, stage D's surfaces (spec 6c)**
+
+Contrast first. Run this in `javascript_tool` on the reading sheet with the drawer open, so both surfaces are live:
+
+```js
+const rgba = (c) => c.match(/[\d.]+/g).map(Number);
+const surface = (el) => {
+  for (let n = el; n; n = n.parentElement) {
+    const c = getComputedStyle(n).backgroundColor;
+    if (c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') return c;
+  }
+  return 'rgb(255, 255, 255)';
+};
+const lum = (v) => {
+  const [r, g, b] = v.map((x) => {
+    const s = x / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const ratio = (el) => {
+  const b = rgba(surface(el)).slice(0, 3);
+  const f = rgba(getComputedStyle(el).color);
+  const a = f.length > 3 ? f[3] : 1;
+  const over = [0, 1, 2].map((i) => f[i] * a + b[i] * (1 - a));
+  const [hi, lo] = [lum(over), lum(b)].sort((m, n) => n - m);
+  return (hi + 0.05) / (lo + 0.05);
+};
+```
+
+`ratio(el)` is at least `4.5` on each of these, which are the pairs spec 6c names, sampled where stage D actually puts them:
+
+- The doc meta strip's text, which is `text-meta` at 12/500 on kraft. This is the pair the spec calls out by name, because 12px is the smallest text in the stage.
+- An inactive TOC row (`ink-soft` on `paper-0`) and the active one (ink on `paper-0`).
+- The drawer band's "Tutor" and its context chip (`paper-0` on plum).
+- A user bubble's text (`paper-0` on plum) and an assistant bubble's (ink on `paper-0`).
+- The composer's hint line (`ink-soft` on `paper-1`) and a session menu item (ink on `paper-0`, and on `paper-1` for the current row).
+
+Then semantics and sizes, on the same two surfaces:
+
+- `document.querySelector('[role="menu"]')` exists while the session panel is open, and every row inside it is `role="menuitem"`.
+- The toast is `role="status"`, the miss list is `role="alert"`, and the active TOC row is `aria-current="location"`.
+- With the drawer closed, its container carries both `inert` and `aria-hidden="true"`, and `document.querySelectorAll('[inert] a, [inert] button')` are all unreachable by Tab.
+- Every icon-only control carries both `aria-label` and `title`: the copy-link button, Close (`aria-label="Close tutor"`) and the "Chats" trigger's chevron. Check with `[...document.querySelectorAll('button')].filter((b) => !b.textContent.trim() && !(b.getAttribute('aria-label') && b.getAttribute('title')))`, which is empty on both surfaces.
+- Every chip is 24px tall with at least a 32px width: for each `el` in the band's chips, `getComputedStyle(el).height` is `"24px"` and `el.getBoundingClientRect().width >= 32`.
+- All math is rendered, nowhere raw. On the reading sheet and inside a chat bubble that contains math, `document.querySelectorAll('.katex').length > 0` and `/\\(frac|sqrt|times|cdot)/.test(document.body.innerText) === false`. No `$$` survives in visible text either.
+
+- [ ] **Step 11: Reduced-motion pass (spec 6b.4)**
+
+Emulate `prefers-reduced-motion: reduce` and reload the reading sheet. Nothing moves, and the drawer still opens and closes.
+
+- The reading sheet does not animate in on the route change: `getComputedStyle(sheet).animationDuration` is `"0s"`, or the sheet's `getBoundingClientRect().top` is identical on two readings one frame apart right after navigation.
+- The TOC active state does not animate: `getComputedStyle(row).transitionDuration` is `"0s"` on every row, in both states. Nothing in that component was ever animated, so this holds without a guard.
+- Row and chip hovers do not animate: hover a starter row and a band chip and read `transitionDuration`, which is `"0s"` on both.
+- The drawer still opens and closes from the Tutor chip and from Escape, and focus still returns to the chip. It arrives without the 220ms slide, which is the point: reduced motion removes the movement, not the feature.
+- The pending three-dot indicator keeps its existing guard: send a message and watch the wait state, which is static.
+- Scroll the document. The TOC active row still tracks, because the observer is state, not motion, and nothing about it is guarded.
+- If the reading sheet or the drawer still moves under reduced motion, the missing guard is a `@media (prefers-reduced-motion: reduce)` rule in `src/app/globals.css`, which belongs to plan A, or the drawer's transition, which belongs to stage B. Fix it there. Stage D adds nothing to `globals.css` (Global Constraints), so do not add a guard inside a stage D component.
+
+`read_console_messages` with `onlyErrors: true` is clean after the whole step.
+
+- [ ] **Step 12: Record the result, and commit only if something was fixed**
+
+Write the stage's verification summary. It has three parts, and Task 9 consumes the third:
+
+1. The gates and greps: step 1 green, step 2 silent on all ten files.
+2. The five deferred items, one line each, each ending in passed, fixed (naming the file and what changed) or unobservable (naming the reason). Step 5's finding goes here as accepted with no code change.
+3. **The fallback ledger for Task 9:** of the three conditional `D-053` entries, which were actually taken during Tasks 1 to 7. Task 2's per-corner radius fallback, Task 2's hover-weight no-reflow reservation and whether Task 7 extended it to `DocMiniTOC.tsx` as a second site, and Task 4's `shadow-lift!` cascade fallback. Read each task's step notes rather than guessing: an entry is recorded in Task 9 only if that fallback was actually taken.
+
+If steps 4 to 11 changed no file, which is the expected outcome:
+
+```bash
+git status --short
+```
+
+Prints nothing. There is nothing to commit, and this task ends here.
+
+If a fix was made, re-run step 1 in full and re-run step 2 for the touched file, then commit that file alone by explicit path. For example, if step 4 sent the implementer into plan A's `Button`:
+
+```bash
+git add src/components/ui/Button.tsx
+git status --short
+git commit -m "Give the plum and ink button tones the paper-0 focus ring (spec 6c)"
+```
+
+`git status --short` before the commit lists exactly the files the fix touched, and no others. One commit per fix, each naming what the verification pass found.
+
+---
