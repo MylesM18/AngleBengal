@@ -1672,3 +1672,267 @@ git commit -m "Rebuild the problem panel on primitives with one primary action p
 `git status --short` lists exactly two entries: ` M src/components/practice/PracticePanel.tsx` and `D  src/components/practice/PoolEmptyState.tsx` (the deletion is already staged by `git rm` in Step 4).
 
 ---
+### Task 6: Whole-screen verification pass (spec 4a to 4e, 8)
+
+**Files:**
+- Read only (no edit unless a check below fails): `src/lib/practice/splitRatio.ts`, `src/components/practice/useSplitRatio.ts`, `src/components/practice/SplitHandle.tsx`, `src/components/practice/PracticeWorkspace.tsx`, `src/components/practice/DifficultySelector.tsx`, `src/components/practice/DiagnosisCard.tsx`, `src/components/practice/PracticePanel.tsx`, `src/components/sketchpad/SketchToolbar.tsx`, `src/components/sketchpad/Sketchpad.tsx`, `src/components/sketchpad/CleanCopyPanel.tsx`. Those ten files are the whole of what Tasks 1 to 5 create or edit; `src/components/practice/PoolEmptyState.tsx` was deleted in Task 5 and must not exist.
+- Modify (one edit, forced by FINDING 1 below): `src/components/practice/PracticePanel.tsx`, four lines in total (one import line, one `useRef` declaration, one `ref` attribute, one `onClick` body). Step 5 carries the exact code.
+- Creates nothing, deletes nothing, changes no prop, no export and no interface. `DECISIONS.md` and the two doc addenda belong to Task 7, not here.
+
+**Interfaces:**
+- Consumes (the full selector inventory Tasks 1 to 5 produce; every check below is written against these and nothing else):
+  - Task 1: `[data-practice-workspace]` is the workspace root and carries the `--split` inline custom property; its first element child is the problem pane `section`, then `[role="separator"]`, then the sketchpad pane `section`. The separator carries `aria-orientation="vertical"`, `aria-label="Resize the problem panel"`, `tabIndex=0`, `aria-valuenow` / `aria-valuemin` / `aria-valuemax` as integer percent strings, `cursor: col-resize`, and is 8px wide. Constants from `src/lib/practice/splitRatio.ts`: `SPLIT_STORAGE_KEY` is `"ab:practice-split"`, `SPLIT_DEFAULT` is `0.45`, `SPLIT_STEP` is `0.05`, `PANEL_MIN_PX` is `360`, `SKETCH_MIN_PX` is `420`, `GUTTER_PX` is `8`. At a 1440px viewport the bounds read `aria-valuemin="25"` and `aria-valuemax="71"`.
+  - Task 2: `[data-sketchpad]` is the sketchpad root (`tabIndex={-1}`, `outline-none`, `bg-paper-0`); `[data-sketchpad] > div` is the kraft strip (`stock-textured bg-kraft`, `border-b border-hairline`); `[data-sketchpad] > div > button:last-child` is the "Clean up" `Button size="sm"` primary; the Clear chip is the screen's only `button[aria-haspopup="dialog"]` and the Undo chip is its `previousElementSibling`; the popover is the screen's only `[role="dialog"]`, holding the sentence "Clear the whole canvas? This cannot be undone." and the buttons "Clear" then "Keep"; the background group is the screen's only `[role="radiogroup"]`; the other toolbar groups are `[aria-label="Tool"]` (2 chips), `[aria-label="Stroke width"]` (3 chips), `[aria-label="Ink color"]` (4 dots), `[aria-label="Background"]` (3 chips).
+  - Task 3: the clean copy slip is the only `section[aria-label="Clean copy"]` (`rounded-card bg-paper-1 shadow-lift`, `position: absolute`), its label is `.meta-caps` reading "Clean copy", its buttons read "Dismiss" then "Use as answer" and "Copy" per math block; the toast is the only `[data-sketchpad] [role="status"]`, kraft, `position: absolute`, gone 3.2 seconds after it appears.
+  - Task 4: `DifficultySelector` renders `[role="group"][aria-label="Difficulty"]` holding exactly five `Chip variant="toggle"` buttons with `aria-pressed`, in ascending difficulty order, each carrying a `title` naming its ready count. `DiagnosisCard` renders `section[aria-label="Diagnosis"]` whose optional `actions` slot is its second and last child, `div.flex.flex-wrap.gap-2.border-t.border-hairline.px-4.py-3`, and whose die-cut is a 72px `DieCutWindow` with `animate-cut-reveal`.
+  - Task 5: `section[aria-label="Problem"]` is the panel; `section[aria-label="Problem"] header` is the `bg-paper-1` header (45px, `border-b border-hairline`, one truncating `p.text-meta`, no button outside the difficulty group); `section[aria-label="Problem"] .bg-paper-0` is the problem card with a 30px `CornerNumeral` at opacity 0.16 and a 16px `BaseBand` in the topic accent; the model tags are `card li a` meta chips; the actions row reads `["Submit","Skip","Show solution"]`; the reveal confirm is a `Notice kind="warning"` whose action slot holds "Show solution" (destructive) then "Keep trying"; the empty pool is `section[aria-label="No problems ready"]` or `section[aria-label="Writing and checking problems"]`; `terminalActions` is the fragment holding "Try again" then "Next problem", and it is `null` exactly when a solution sheet is on screen.
+  - Token values every check compares against: ink `rgb(50, 41, 33)`, ink-soft `rgb(107, 95, 82)`, ink-faint `rgb(166, 155, 138)`, hairline `rgba(50, 41, 33, 0.1)`, desk `rgb(227, 218, 198)`, paper-0 `rgb(249, 245, 236)`, paper-1 `rgb(241, 234, 220)`, kraft `rgb(203, 178, 129)`, brand `rgb(181, 82, 46)`, red `rgb(168, 58, 50)`, green `rgb(46, 125, 91)`.
+- Produces: no code and no new name. What this task produces is the stage's recorded green light: every check below run once and its result written into the task's checkboxes, plus the one `PracticePanel.tsx` fix. Task 7 (D-052 and the two doc addenda) assumes this pass ran and passed.
+- FINDING 1 (verified against Task 5's own code while writing this task, stated here because Task 6's runner may not have read Task 5): Task 5 renders the reveal confirm as `{confirmReveal && <Notice kind="warning" action={...}>}` with "Keep trying" bound to `() => setConfirmReveal(false)` and nothing else. The `Notice` unmounts on that click while the clicked button is still the active element, so `document.activeElement` becomes `document.body` and the keyboard user is dropped to the top of the page. Task 5's browser bullet says "focus stays inside the panel", which is what the screen should do and not what the code does. Step 5 below makes it true with a ref on the "Show solution" trigger. The trigger itself renders under `{!locked && ...}` and `confirmReveal` does not hide it, so it is still mounted when "Keep trying" is clicked and can take focus synchronously inside the handler.
+- FINDING 2 (same verification): Task 5's keyboard bullet lists the panel's tab order as the five difficulty chips, then the answer input, then Submit, Skip and Show solution. The model tags are `next/link` anchors with real `href`s inside the problem card, and the card sits above the answer input, so on any problem that carries model tags (every seeded DRT problem does) those anchors are tabbable and land between the difficulty chips and the answer input. That is correct behaviour, not a defect: the tags are navigation into the model docs and they should be reachable. Task 5's list is incomplete rather than wrong, and Step 4 below asserts the full order including them.
+- FINDING 3 (accepted, recorded so a later reviewer does not "fix" it): confirming the reveal (clicking the destructive "Show solution" inside the confirm) sets `locked`, which unmounts both the confirm and its trigger in the same commit, so focus falls to `document.body`. Spec 6b.5 asks stage C for separator arrows and double-click reset, the background radiogroup, Clear popover Escape plus focus return, Cmd/Ctrl+Z, and Submit as the form default; it does not ask for a focus move on a confirmed reveal, and D-052 keeps that confirm an inline notice rather than a dialog. This pass records the behaviour and leaves it alone.
+
+Behaviour contract (read before starting):
+- Nothing here is a redesign. Every check either passes on the code Tasks 1 to 5 already wrote, or it names the one file that owns the failure. The one exception is FINDING 1, which is a known failure with its fix written out in Step 5.
+- The one-primary rule is per block, not per screen. Spec 4c asks each terminal state to show exactly one primary "Next problem" at the bottom of its block; it does not ask Submit to disappear while a wrong answer is still retryable. So the counts this pass expects are: the actions row holds exactly one `bg-brand` (Submit); each terminal block holds exactly one `bg-brand` ("Next problem"); the sketchpad holds exactly one `bg-brand` ("Clean up"); and panel-wide, an unlocked terminal state legitimately shows two enabled `bg-brand` buttons (Submit and Next problem) while a locked state shows one. Step 3 states the expected number for each of the four states.
+- The one-kraft-strip rule counts strips, not elements with `.bg-kraft`. Meta chips and the toast are kraft surfaces by design (spec lines 25, 63 and 214), so every kraft count below filters them out by tag name or by role, exactly as Task 5's check does.
+- The reduced-motion guard in `src/app/globals.css` (the `@media (prefers-reduced-motion: reduce)` block at line 288) sets `animation-duration: 0.01ms !important` and `transition-duration: 0.01ms !important`. It does not clear `animation-name`. So every reduced-motion check below reads `animationDuration`, never `animationName`. Reading the name would pass whatever the guard did and prove nothing.
+- Run the whole pass in one preview session in this order: 1440x900 first (Steps 2 to 6), then the two pane minimums (Step 7), then reduced motion (Step 8). Re-running an earlier step after a drag is fine; the split ratio is the only state that persists between reloads, and `localStorage.removeItem('ab:practice-split')` plus a reload returns the screen to 45/55.
+- If a check fails, fix it in the file the inventory above attributes it to, re-run `npm run typecheck` and `npm run lint`, re-run that single check, and commit that file by explicit path with its own message. Do not batch unrelated fixes into one commit.
+
+- [ ] **Step 1: Open the preview and pin the viewport**
+
+Start the dev server through the launch config `anglebengal-dev` (never from Bash) and open http://localhost:3010/practice/<drtId>. Find `<drtId>` with `read_page` on `/practice`: the topic picker links to `/practice/<drtId>`, and the same id appears on the DRT cover card's `/learn/<drtId>` href.
+
+```js
+// Reset the persisted ratio so the sweep starts from the default, then reload.
+localStorage.removeItem('ab:practice-split');
+location.reload();
+```
+
+Then `resize_window` with `preset: "desktop"`, then `resize_window` with `width: 1440, height: 900`. Confirm the starting state before measuring anything:
+
+```js
+[
+  document.querySelector('[data-practice-workspace]') !== null,
+  document.querySelector('[data-practice-workspace]').style.getPropertyValue('--split'),
+  document.querySelector('[role="separator"]').getAttribute('aria-valuenow'),
+  document.querySelector('section[aria-label="Problem"]') !== null,
+  document.querySelector('[data-sketchpad]') !== null,
+]
+```
+
+Expected: `[true, "0.45", "45", true, true]`. If `--split` is empty the hook never wrote it and Task 1 is the owner; stop and fix that before continuing, because every width check below depends on it.
+
+- [ ] **Step 2: Sweep A, the one kraft strip, the hairline rule and the chip scale**
+
+Run each expression with `javascript_tool` at 1440x900 with a loaded problem.
+
+- One kraft strip in the workspace: `[...document.querySelectorAll('[data-practice-workspace] .bg-kraft')].filter(el => el.tagName !== 'A' && el.getAttribute('role') !== 'status').length` is `1`, and `document.querySelectorAll('[data-practice-workspace] .bg-kraft')[0].closest('[data-sketchpad]') !== null` is `true`: the one strip is the sketch toolbar. The `A` elements excluded are the model-tag meta chips and the `role="status"` element excluded is the toast, both kraft by design.
+- The panel header carries no kraft and no texture: `const head = document.querySelector('section[aria-label="Problem"] header')`; `getComputedStyle(head).backgroundColor` is `rgb(241, 234, 220)`; `head.className.includes('stock-textured')` is `false`.
+- No hand-rolled region border anywhere on the screen: `[...document.querySelectorAll('[data-practice-workspace] *')].filter(el => { const s = getComputedStyle(el); return [s.borderTopColor, s.borderRightColor, s.borderBottomColor, s.borderLeftColor].some(c => c.startsWith('rgb(166, 155, 138)') || c.startsWith('rgba(166, 155, 138')); }).length` is `0`. That is the DOM half of the `border-ink-faint/40` ban: ink-faint survives as the grip pill's background and as ink-faint text, never as a border.
+- Every rule inside a sheet is the hairline token: `[...document.querySelectorAll('[data-practice-workspace] [class*="border-b"], [data-practice-workspace] [class*="border-t"]')].map(el => getComputedStyle(el).borderBottomColor + ' | ' + getComputedStyle(el).borderTopColor)` contains only `rgba(50, 41, 33, 0.1)` and `rgb(0, 0, 0)` (the latter is the computed value of a zero-width side, which browsers report as the color property's initial value; ignore any side whose matching `borderTopWidth` or `borderBottomWidth` is `"0px"`).
+- No vertical rule between the two panes: `document.querySelectorAll('[data-practice-workspace] [class*="border-r"]').length` is `0`.
+- Chip scale (spec 6c): `const chips = [...document.querySelectorAll('[data-practice-workspace] [class*="rounded-chip"]')].filter(c => !c.closest('[aria-label="Ink color"]'))`. `chips.length` is at least `18` (5 difficulty + 2 tool + 3 width + 3 background + Undo + Clear + the model tags). `chips.every(c => Math.round(c.getBoundingClientRect().height) === 24)` is `true`. `chips.every(c => c.getBoundingClientRect().width >= 32)` is `true`. The ink dots are excluded on purpose: they are 24px round swatches, not chips, and `[...document.querySelectorAll('[aria-label="Ink color"] button')].every(d => Math.round(d.getBoundingClientRect().width) === 24 && Math.round(d.getBoundingClientRect().height) === 24)` is `true`.
+- Icon-only controls carry both labels (spec 6c): `[...document.querySelectorAll('[data-practice-workspace] button')].filter(b => b.textContent.trim() === '').every(b => b.getAttribute('aria-label') && b.getAttribute('title'))` is `true`.
+- Semantics present (spec 6c): `document.querySelectorAll('[data-practice-workspace] [role="radiogroup"]').length` is `1`; `document.querySelectorAll('[data-practice-workspace] [role="separator"]').length` is `1`; `document.querySelectorAll('[data-practice-workspace] [aria-pressed]').length` is at least `10` (5 difficulty + 2 tool + 3 width); `document.querySelectorAll('[data-practice-workspace] [role="radiogroup"] [aria-checked]').length` is `3`.
+- Contrast (spec 6c, the meta pair): `getComputedStyle(head.querySelector('p')).color` is `rgb(50, 41, 33)` and its `fontSize` is `"12px"`, so the 12/500 meta text sits at ink on paper-1 rather than ink-soft. `getComputedStyle(document.querySelector('section[aria-label="Problem"] .bg-paper-0 li a')).color` is `rgb(50, 41, 33)` on kraft, the other meta pair the spec names.
+- No raw LaTeX on any new surface (spec 6c): `document.querySelector('section[aria-label="Problem"]').textContent.includes('\\frac')` is `false` and `document.querySelector('section[aria-label="Problem"] .katex') !== null` is `true` on a problem whose statement carries math.
+
+- [ ] **Step 3: Sweep B, exactly one primary per block in every state**
+
+Toolbar first, then the actions row, then each of the four terminal states. Reach each terminal state the way Task 5's checks do.
+
+- Sketchpad: `document.querySelectorAll('[data-sketchpad] button.bg-brand').length` is `1` and its text is `"Clean up"`.
+- Actions row, fresh problem: `const row = [...document.querySelectorAll('section[aria-label="Problem"] .flex.flex-wrap.items-center')].pop()`; `row.querySelectorAll('button.bg-brand').length` is `1`; `[...row.querySelectorAll('button')].map(b => b.textContent.trim())` is `["Submit","Skip","Show solution"]`; `document.querySelectorAll('section[aria-label="Problem"] button.bg-brand:not(:disabled)').length` is `1`.
+- Correct (locked): solve a problem correctly. `document.querySelectorAll('section[aria-label="Problem"] button.bg-brand:not(:disabled)').length` is `1`; `[...document.querySelectorAll('section[aria-label="Problem"] button')].filter(b => b.textContent.trim() === 'Next problem').length` is `1`; `document.querySelector('[role="status"]').textContent.trim()` is `"Correct"`.
+- Wrong with diagnosis (not locked): submit a plainly wrong answer until `const dcard = document.querySelector('section[aria-label="Diagnosis"]')` is non-null. `dcard.children.length` is `2`; `dcard.lastElementChild.querySelectorAll('button.bg-brand').length` is `1`; `[...dcard.lastElementChild.querySelectorAll('button')].map(b => b.textContent.trim())` is `["Try again","Next problem"]`; panel-wide `document.querySelectorAll('section[aria-label="Problem"] button.bg-brand:not(:disabled)').length` is `2`, and those two are Submit in the actions row and Next problem in the card, one per block, which is what spec 4c asks for.
+- Wrong without diagnosis (not locked): submit wrong answers until a wrong verdict arrives with no card. `const err = document.querySelector('[role="alert"]')`; `err.querySelectorAll('button').length` is `0`; the row immediately after it, `err.nextElementSibling`, has `[...err.nextElementSibling.querySelectorAll('button')].map(b => b.textContent.trim())` equal to `["Try again","Next problem"]` and `err.nextElementSibling.querySelectorAll('button.bg-brand').length` equal to `1`.
+- Solution revealed (locked): with a diagnosis card on screen, click "Show solution" and confirm. `document.querySelectorAll('section[aria-label="Problem"] button.bg-brand:not(:disabled)').length` is `1`; `[...document.querySelectorAll('section[aria-label="Problem"] button')].filter(b => b.textContent.trim() === 'Next problem').length` is `1`; `[...document.querySelectorAll('section[aria-label="Problem"] button')].filter(b => b.textContent.trim() === 'Try again').length` is `0` (`terminalActions` is `null` while a solution sheet is on screen); `document.querySelector('section[aria-label="Diagnosis"]').children.length` is `1`.
+- Across all four states: `[...document.querySelectorAll('section[aria-label="Problem"] button')].filter(b => b.textContent.trim() === 'Next problem').length` is never greater than `1`, and the same is true for `"Try again"`.
+- Empty pool: switch to a difficulty whose chip `title` reads 0 ready. `document.querySelector('section[aria-label="No problems ready"] button.bg-brand').textContent.trim()` is `"Generate 5 problems"`; `document.querySelectorAll('section[aria-label="No problems ready"] button.bg-brand').length` is `1`; `document.querySelector('.stock-textured.bg-kraft.p-6')` is `null`.
+
+- [ ] **Step 4: Sweep C, the full focus order across panel, separator and toolbar**
+
+Draw one stroke on the canvas first (`computer` `left_click_drag` inside `[aria-label="Sketchpad"]`) so Undo and Clear are enabled, then return to the fresh-problem state with no terminal block on screen.
+
+```js
+const tab = [...document.querySelectorAll(
+  '[data-practice-workspace] a[href], [data-practice-workspace] button:not([disabled]), [data-practice-workspace] input:not([disabled]), [data-practice-workspace] textarea:not([disabled]), [data-practice-workspace] [tabindex="0"]'
+)];
+const sep = tab.findIndex(el => el.getAttribute('role') === 'separator');
+[
+  tab.slice(0, 5).every(el => el.closest('[role="group"][aria-label="Difficulty"]') !== null),
+  tab.slice(5, sep).filter(el => el.tagName === 'A').every(el => el.closest('section[aria-label="Problem"] .bg-paper-0') !== null),
+  tab.slice(sep - 3, sep).map(el => el.textContent.trim()),
+  tab.length - sep - 1,
+  tab.slice(sep + 1).every(el => el.closest('[data-sketchpad] > div') !== null),
+  tab[tab.length - 1].textContent.trim(),
+];
+```
+
+Expected: `[true, true, ["Submit","Skip","Show solution"], 15, true, "Clean up"]`. The 15 sketchpad controls are 2 tool chips, 3 width chips, 4 ink dots, 3 background chips, Undo, Clear and Clean up, in that order. The anchors in slice two are the model-tag meta chips (FINDING 2): they sit between the difficulty chips and the answer input because the problem card is above the input, and they are reachable on purpose.
+
+Then walk it for real: click the panel header's `p` to place focus near the top, press `computer` key `tab` twelve times, and after each press confirm `document.activeElement === tab[i]` and that `getComputedStyle(document.activeElement).outlineStyle` is not `"none"` (spec 6c asks for a visible ring on every paper tone). Take one `computer` screenshot with focus on the separator: the 2px ink-faint grip pill is visible.
+
+Separator keyboard (spec 4a and 6b.5): with focus on `[role="separator"]`, press ArrowRight once. `document.querySelector('[data-practice-workspace]').style.getPropertyValue('--split')` is `"0.5"` and `aria-valuenow` is `"50"`. Press ArrowLeft once: back to `"0.45"` and `"45"`. Double-click the separator (`computer` `double_click`): `--split` is `"0.45"` again from any starting ratio. After a drag and `pointerup`, `localStorage.getItem('ab:practice-split')` holds the committed ratio; during the drag it does not change.
+
+Submit is the form default (spec 6b.5): focus the answer input, type an answer, press Enter. The request fires and the primary shows `"Checking..."` with `aria-busy="true"`.
+
+- [ ] **Step 5: Fix the reveal-confirm focus return (FINDING 1), then re-check**
+
+In `src/components/practice/PracticePanel.tsx`, change the `react` import line to add `useRef`:
+
+```tsx
+import { useCallback, useEffect, useRef, useState } from "react";
+```
+
+Declare the ref immediately below the `accent` line added in Task 5 Step 2:
+
+```tsx
+  const revealTriggerRef = useRef<HTMLButtonElement>(null);
+```
+
+Put the ref on the actions row's "Show solution" trigger (the `{!locked && (...)}` `Button` in the actions row, not the destructive one inside the notice):
+
+```tsx
+                {!locked && (
+                  <Button
+                    ref={revealTriggerRef}
+                    variant="tertiary"
+                    disabled={submitting}
+                    onClick={() => setConfirmReveal(true)}
+                  >
+                    Show solution
+                  </Button>
+                )}
+```
+
+And return focus from "Keep trying":
+
+```tsx
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        onClick={() => {
+                          setConfirmReveal(false);
+                          revealTriggerRef.current?.focus();
+                        }}
+                      >
+                        Keep trying
+                      </Button>
+```
+
+The `.focus()` call is synchronous because the trigger never unmounts while the confirm is open: it renders under `{!locked && ...}` and `confirmReveal` does not gate it. If `npm run typecheck` rejects the `ref` prop, `Button` is not forwarding refs and stage A's `Button` is the owner; the fix there is to wrap its component body in `forwardRef<HTMLButtonElement, ButtonProps>` and spread the ref onto the `button`, which changes no call site. Do not work around it by putting the ref on a wrapper `div`.
+
+Re-check in the preview: click "Show solution", then click "Keep trying". `document.querySelector('[role="status"]')` is `null` (the warning notice is gone), `document.activeElement.textContent.trim()` is `"Show solution"`, and `document.querySelector('section[aria-label="Problem"]').contains(document.activeElement)` is `true`. Then click "Show solution" and confirm with the destructive button: the solution sheet appears, `document.activeElement` is `document.body`, and that is FINDING 3, recorded and accepted, not fixed.
+
+- [ ] **Step 6: Sweep D, Escape and focus return on both dismissables**
+
+- Clear popover (spec 6b.5): draw a stroke, click `[aria-haspopup="dialog"]`. `document.querySelector('[role="dialog"] p').textContent` is `"Clear the whole canvas? This cannot be undone."`; `document.activeElement.textContent.trim()` is `"Keep"`; the chip's `aria-expanded` is `"true"`. Press Escape (`computer` key `escape`): `document.querySelector('[role="dialog"]')` is `null`, `document.activeElement === document.querySelector('[aria-haspopup="dialog"]')` is `true`, and `aria-expanded` is `"false"`. Reopen and press Keep: the same three results. Reopen and press the destructive Clear: the dialog is gone, the canvas is blank, both chips are disabled, and `document.activeElement === document.querySelector('[data-sketchpad]')` is `true`.
+- Reveal confirm: with the confirm open, press Escape. `document.querySelector('[role="status"]')` is still the warning notice and its two buttons are still on screen. That is by design (D-052 keeps the confirm an inline notice, not a dialog, so it has no Escape contract), and the documented dismissal is "Keep trying", already checked in Step 5.
+- Only one dismissable at a time: with the Clear popover open, `document.querySelectorAll('[role="dialog"]').length` is `1`, and opening the reveal confirm does not close it (they live in different panes and neither traps focus).
+- Clean copy slip (spec 4d): with a slip on screen, `document.querySelector('section[aria-label="Clean copy"] button').textContent.trim()` is `"Dismiss"`; clicking it removes the slip and `document.querySelector('section[aria-label="Clean copy"]')` is `null`.
+- `read_console_messages` with `onlyErrors: true` is clean after Steps 2 to 6.
+
+- [ ] **Step 7: Sweep E, both pane minimums**
+
+Drag the separator fully left with `computer` `left_click_drag` from the handle to `x: 0`, then read:
+
+```js
+const ws = document.querySelector('[data-practice-workspace]');
+const panel = document.querySelector('section[aria-label="Problem"]');
+const sep = document.querySelector('[role="separator"]');
+[
+  Math.round(panel.getBoundingClientRect().width),
+  sep.getAttribute('aria-valuenow'),
+  sep.getAttribute('aria-valuemin'),
+  panel.scrollWidth <= panel.clientWidth,
+  document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+];
+```
+
+Expected: `[360, "25", "25", true, true]`. The panel refuses to go below `PANEL_MIN_PX`, so the width is exactly 360 (allow 1px of rounding) no matter how far past the edge the drag went.
+
+At 360, with a diagnosis card on screen, confirm the panel still reads: the actions row wraps to two lines rather than overflowing; the diagnosis actions row wraps; every chip is still 24px tall and at least 32px wide (re-run Step 2's chip expression); the header's topic path truncates with an ellipsis rather than wrapping, so `Math.round(document.querySelector('section[aria-label="Problem"] header').getBoundingClientRect().height)` is still `45`; the problem statement's measure is the panel width, not a fixed 70ch overflow. Take one `computer` screenshot.
+
+Then drag fully right to `x: 1440` and read:
+
+```js
+const sketch = document.querySelector('[data-sketchpad]');
+const sep = document.querySelector('[role="separator"]');
+[
+  Math.round(sketch.getBoundingClientRect().width),
+  sep.getAttribute('aria-valuenow'),
+  sep.getAttribute('aria-valuemax'),
+  document.querySelectorAll('[data-sketchpad] > div').length,
+  document.querySelector('[data-sketchpad] > div > button:last-child').getBoundingClientRect().width > 0,
+  document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+];
+```
+
+Expected: `[420, "71", "71", 1, true, true]`. At 420 the toolbar wraps onto two rows (its `flex-wrap` is intentional) and it is still one strip, not two: re-run Step 2's kraft filter and it is still `1`. The canvas does not overflow its pane, and `SketchCanvas`'s ResizeObserver has kept up, so drawing a stroke at this width still lands under the cursor.
+
+Finally clear the ratio and reload so the screen is back at 45/55 for Step 8:
+
+```js
+localStorage.removeItem('ab:practice-split'); location.reload();
+```
+
+- [ ] **Step 8: Sweep F, reduced motion (spec 6b.4)**
+
+Emulate `prefers-reduced-motion: reduce` (Chrome DevTools rendering emulation through the devtools tools, or macOS Accessibility > Display > Reduce motion) and reload the Practice screen. Get a diagnosis card and an empty-pool state on screen so both die-cuts exist.
+
+```js
+const durations = el => el && [getComputedStyle(el).animationDuration, getComputedStyle(el).transitionDuration];
+[
+  durations(document.querySelector('.animate-enter-sheet')),
+  durations(document.querySelector('section[aria-label="Diagnosis"] [aria-hidden="true"]')),
+  durations(document.querySelector('[role="group"][aria-label="Difficulty"] button')),
+];
+```
+
+Expected: every reading is `"0.01ms"`. Read `animationDuration`, not `animationName`: the guard at `src/app/globals.css:288` zeroes durations and leaves the names in place, so `animationName` still reads `"enter-sheet"` and `"cut-reveal"` and would tell you nothing.
+
+Then confirm nothing is broken by the suppression: the die-cut wedge inside `section[aria-label="No problems ready"]` is still 56px and still filled with the topic accent; the diagnosis die-cut is still 72px; the sheet is visible without having animated in; chip hover still changes the background instantly; the Clear popover still opens and closes; the separator still drags. Take one `computer` screenshot with reduced motion on.
+
+Also confirm the two things that must not animate at any setting: with reduced motion switched back off, `getComputedStyle(document.querySelector('[role="separator"]')).animationName` is `"none"` (spec: the split handle does not animate) and `getComputedStyle(document.querySelector('[role="dialog"]')).animationName` is `"none"` with the Clear popover open (spec 1e: the popover appears without transition).
+
+- [ ] **Step 9: Stage-wide banned-pattern grep**
+
+```bash
+grep -rnE "text-\[|border-ink-faint/(25|40)|/60\b|/70\b|/85\b|window\.confirm" src/lib/practice/splitRatio.ts src/components/practice/useSplitRatio.ts src/components/practice/SplitHandle.tsx src/components/practice/PracticeWorkspace.tsx src/components/practice/DifficultySelector.tsx src/components/practice/DiagnosisCard.tsx src/components/practice/PracticePanel.tsx src/components/sketchpad/SketchToolbar.tsx src/components/sketchpad/Sketchpad.tsx src/components/sketchpad/CleanCopyPanel.tsx
+grep -rn $'\xe2\x80\x94' src/lib/practice src/components/practice src/components/sketchpad
+grep -rn "window\.confirm" src
+grep -rn "border-ink-faint/40" src
+grep -rn "PoolEmptyState" src ; ls src/components/practice/PoolEmptyState.tsx
+grep -rn "stock-textured" src/components/practice src/components/sketchpad
+```
+
+Expected, line by line: the first five print nothing (the `ls` prints "No such file or directory", which is the point of that line); the last prints exactly one hit, the strip element in `SketchToolbar.tsx`. The third and fourth are the stage-wide versions the goal asks for: after Task 2 the string `window.confirm` appears nowhere under `src/`, and after Task 5 no hand-rolled `border-ink-faint/40` region border survives anywhere under `src/`. `max-w-[52ch]`, `min-w-[360px]`, `min-w-[420px]` and `max-w-[70ch]` are untouched by these patterns and stay: only `text-[` is a banned arbitrary value in this stage.
+
+If the third command prints a hit outside the ten stage C files, it belongs to a Learn or Tutor surface and is stage D's problem, not this task's. Record it in the task's checkbox and leave it.
+
+- [ ] **Step 10: Build**
+
+```bash
+npm run typecheck
+npm run lint
+npm run build
+```
+
+All three exit 0. `build` is the gate this stage has been deferring since Task 1 (the plan's Global Constraints put it on the last task that touches code): it is what proves the client components Tasks 1 to 5 wrote still compile under the production bundler, that no `localStorage` or `document` read escaped a `useEffect` into module scope in `useSplitRatio.ts`, and that the deleted `PoolEmptyState.tsx` left no dangling import. Read the route table it prints and confirm `/practice/[topicId]` is still listed.
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add src/components/practice/PracticePanel.tsx
+git status --short
+git commit -m "Return focus to the reveal trigger after Keep trying (stage C verification pass, spec 4c)"
+```
+
+`git status --short` lists exactly one entry, ` M src/components/practice/PracticePanel.tsx`, and after the commit it is empty. That one file is the whole code output of this task: the Step 5 fix for FINDING 1.
+
+If Steps 2 to 10 turned up further failures, each one gets its own commit by explicit path, using the same shape: `git add <the one file the inventory attributes it to>`, then a message naming what was wrong and the spec section it violates. If the sweep is otherwise clean, this task ends with the tree clean and every checkbox above ticked, which is the stage's green light for Task 7.
+
+---
