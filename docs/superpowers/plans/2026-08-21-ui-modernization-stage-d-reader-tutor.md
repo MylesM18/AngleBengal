@@ -252,3 +252,196 @@ git commit -m "Add truncateMiddle and restyle the tutor drawer band (stage D, sp
 `git status --short` before the commit lists exactly those three files (one `A`, two ` M`).
 
 ---
+
+### Task 2: The empty thread and the bubbles (spec 5b, 5c)
+
+**Files:**
+- Modify: `src/components/chat/ChatMessageList.tsx` (the import block at lines 1 to 5, the empty-thread branch at lines 40 to 60, and the `Bubble` return at lines 87 to 95). Lines 61 to 86 (the populated thread, the `turns.map`, the streaming bubble, the `bottom` sentinel and the `Bubble` signature) and lines 96 to 112 (the pending indicator and the `MarkdownMath` call) are read but not rewritten.
+
+**Interfaces:**
+- Consumes: `Icon({ name: IconName, size?: number, className?: string, title?: string })` from `src/components/ui/Icon.tsx` (plan A), where `IconName` includes `"plus"`; without a `title` the svg is `aria-hidden`, which is what this task wants. Utilities from plan A Task 1: `divide-hairline` (the only separator allowed between rows inside a sheet), `text-meta`, `text-ui`, `text-ui-lg`, `ease-paper`. `MarkdownMath({ children, variant?: "reading" | "ui" | "chat", className? })` from `src/components/shared/MarkdownMath.tsx` (plan A Task 2), whose `className` is layout only and no longer sets type. Radius roles from plan A: `rounded-card` is the 10px role radius and `rounded-chip` the 4px one, so a per-corner override is written `rounded-br-chip`. From this file, unchanged: the `ChatTurn` type, the `ChatMessageList({ turns, streaming, starters, onStarter })` props, the `bottom` ref and its `scrollIntoView` effect, and the `starters: string[]` shape.
+- Produces: nothing importable. `Bubble({ role: "user" | "assistant", content: string, pending?: boolean })` keeps its exact signature, and no later task in this plan touches this file: Task 3 owns `ChatComposer.tsx`, Task 4 owns `SessionMenu.tsx`.
+
+Behaviour contract (read before editing):
+- **Plan A has already migrated line 107.** Plan A Task 2's call-site table rewrites `<MarkdownMath className="chat-prose">` to `<MarkdownMath variant="chat">` in this exact file, and stage A runs before stage D. So spec 5c's first clause is expected to be satisfied on arrival. Step 4 verifies it rather than assuming it, and repairs it in place if plan A's migration missed this call site.
+- The empty thread stops hugging the bottom: `justify-end` at line 41 becomes `justify-start`. The starters are now a sheet, and a sheet pinned to the floor of an otherwise blank drawer reads as something left behind rather than an invitation to start.
+- The starters are rows in one sheet, never chips and never individually outlined buttons. Each prompt is a full sentence, and sentence-length chips wrap into unreadable blobs. One `paper-0` sheet with `divide-y divide-hairline` between rows, no border on the sheet and no border on any row.
+- A row at rest is 14/400 ink (`text-ui`). Hover steps the text to 500 and steps the trailing `plus` icon from `ink-faint` to `plum`. Nothing else moves: no lift, no shadow change, no background change, because the row already sits inside a sheet that carries `shadow-sheet`.
+- `applyStarter` is untouched. The row's `onClick` still calls `onStarter(prompt)` with the identical string, and `ChatDrawer` keeps passing the same `starters` array. This task changes how a starter looks, never what selecting one does.
+- **The two bubble stocks swap.** Today the user turn is the paper sheet and the assistant is `plum-tint`. Spec 5c inverts that: the assistant becomes the `paper-0` sheet, because it is the long-form voice that carries markdown, headings and math, and the user turn becomes solid `plum` with `paper-0` text, because it is short and should read as the person's own mark on the page.
+- Both bubbles are radius 10 with the corner nearest their own speaker cut to 4: bottom-right for the user, bottom-left for the assistant. The current `rounded-br-none` and `rounded-bl-none` both go. A 4px corner is a cut; a 0px corner is a tear.
+- **KaTeX inherits `currentColor`**, so the user bubble's `text-paper-0` has to carry the rendered math as well as the prose. This is the one thing in this task that can regress silently, because the prose will look right while the fractions go dark on dark. Step 6 asserts the computed colour of a real `.katex` node inside a user bubble, not just the bubble's own colour.
+- The pending indicator is not rewritten. The three `ink-faint` dots and their staggered `pulse` at lines 96 to 105 stay exactly as they are, including the inline `style` that drives them, and the reduced-motion behaviour they inherit from plan A's motion budget (spec 1e) is not re-implemented here.
+
+- [ ] **Step 1: Add the `Icon` import**
+
+The file's import block is lines 1 to 5. Leave `"use client"`, the React imports and the `MarkdownMath` import as they are, and add the `Icon` import as its own group above the relative imports, so the block reads:
+
+```tsx
+"use client";
+
+import { useEffect, useRef } from "react";
+
+import { Icon } from "@/components/ui/Icon";
+import { MarkdownMath } from "@/components/shared/MarkdownMath";
+```
+
+Match the existing file: if `MarkdownMath` is imported as a default (`import MarkdownMath from ...`), keep that form and only add the `Icon` line. Plan A exports both a named `MarkdownMath` and a default, so either import style compiles.
+
+- [ ] **Step 2: Replace the empty thread**
+
+Replace lines 40 to 60 (from `return (` inside the `if (turns.length === 0 && streaming === null)` branch through its closing `);`) with:
+
+```tsx
+      return (
+        <div className="flex flex-1 flex-col justify-start gap-3 overflow-y-auto p-4">
+          <p className="text-ui text-ink-soft">
+            Ask about anything in your library. The tutor answers using your own models, by
+            name and number.
+          </p>
+          <ul className="divide-y divide-hairline overflow-hidden rounded-card bg-paper-0 shadow-sheet">
+            {starters.map((prompt) => (
+              <li key={prompt}>
+                <button
+                  type="button"
+                  onClick={() => onStarter(prompt)}
+                  className="group flex w-full items-center gap-3 px-3 py-2.5 text-left text-ui text-ink transition-colors duration-150 ease-paper hover:font-medium"
+                >
+                  <span className="min-w-0 flex-1">{prompt}</span>
+                  <Icon
+                    name="plus"
+                    size={12}
+                    className="shrink-0 text-ink-faint transition-colors duration-150 ease-paper group-hover:text-plum"
+                  />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+```
+
+Keep the indentation the surrounding function already uses: this `return` sits inside an `if` block, so it is indented one level deeper than the component's main `return` at line 63.
+
+`overflow-hidden` on the `<ul>` is load-bearing: without it the first and last rows paint their hover state over the sheet's rounded corners.
+
+- [ ] **Step 3: Restock the two bubbles**
+
+Replace lines 87 to 95 of the `Bubble` component (from `return (` through the `>` that closes the inner div's opening tag) with:
+
+```tsx
+  return (
+    <div className={isUser ? "flex justify-end" : "flex justify-start"}>
+      <div
+        className={
+          isUser
+            ? "max-w-[85%] rounded-card rounded-br-chip bg-plum px-3 py-2 text-paper-0 shadow-sheet"
+            : "max-w-[92%] rounded-card rounded-bl-chip bg-paper-0 px-3 py-2 text-ink shadow-sheet"
+        }
+      >
+```
+
+The row alignment at line 88 is already correct and is retyped here only so the block is contiguous. Do not touch `const isUser = role === "user";` at line 85 or anything from line 96 down.
+
+Spec 5c pins the user bubble at `max-w-[85%]` and says nothing about the assistant, so the assistant keeps the `max-w-[92%]` it has today: the wider measure is what lets a table or a display equation breathe.
+
+If Tailwind does not emit `rounded-br-chip` or `rounded-bl-chip` (the per-corner utilities are generated from the `--radius-chip` theme key, so this only fails if plan A named the token differently), take the real key from `grep -n "radius" src/app/globals.css` and use it; only if no 4px radius token exists, fall back to `rounded-br-[4px]` and `rounded-bl-[4px]` and note it in Task 9's D-053 entry.
+
+- [ ] **Step 4: Verify plan A's `MarkdownMath` migration landed**
+
+Run: `grep -n "MarkdownMath" src/components/chat/ChatMessageList.tsx`
+Expected: the import, plus one call site reading `<MarkdownMath variant="chat">{content}</MarkdownMath>` at about line 107.
+
+If that call site still reads `<MarkdownMath className="chat-prose">{content}</MarkdownMath>`, plan A Task 2 missed it. Fix it here by replacing that single line with:
+
+```tsx
+          <MarkdownMath variant="chat">{content}</MarkdownMath>
+```
+
+Then run `grep -rn "chat-prose" src` and expect no hits outside `src/app/globals.css`, where the now-unused rule is plan A's to remove.
+
+- [ ] **Step 5: Gate**
+
+Run: `npm run typecheck && npm run lint`
+Expected: no errors. Likely trips and their fixes: `Cannot find module '@/components/ui/Icon'` means plan A has not been executed yet or named the file differently, so take the path from `ls src/components/ui/`; `Type '"plus"' is not assignable to type 'IconName'` means plan A shipped a shorter icon set, so add `plus` to the union and its glyph in `Icon.tsx` rather than substituting another glyph, since 5b asks for a plus specifically; an unused-variable error on `Icon` means step 2 was applied but the import in step 1 was not.
+
+- [ ] **Step 6: Visual, KaTeX-on-plum and keyboard check**
+
+In the dev preview at 1440x900, open http://localhost:3010/learn and click the Tutor chip in the top bar. Click "Chats", then "New chat", so the thread is empty and the starters render.
+
+Empty thread:
+
+- Top anchored: for `const empty = document.querySelector('#tutor-drawer ul').parentElement`, `getComputedStyle(empty).justifyContent` is `"flex-start"`.
+- The intro line: for `const intro = empty.querySelector('p')`, `getComputedStyle(intro).fontSize` is `"14px"`, `fontWeight` is `"400"`, and its colour is the `ink-soft` token, not `ink`.
+- One sheet, not chips: for `const sheet = empty.querySelector('ul')`, `getComputedStyle(sheet).backgroundColor` is the `paper-0` token, `borderRadius` is `"10px"`, and `borderTopWidth` is `"0px"`.
+- Hairline rows: `const rows = [...sheet.querySelectorAll('li')]`, then `getComputedStyle(rows[1]).borderTopWidth` is `"1px"` and `borderTopColor` equals the `--color-hairline` token; `getComputedStyle(rows[0]).borderTopWidth` is `"0px"`.
+- Icon on the right: for `const first = rows[0].querySelector('button')`, `first.querySelector('svg').getBoundingClientRect().left` is greater than `first.querySelector('span').getBoundingClientRect().right`.
+- Hover steps both: read `getComputedStyle(first).fontWeight` (expect `"400"`) and `getComputedStyle(first.querySelector('svg')).color` (expect the `ink-faint` token) and `first.getBoundingClientRect().height`. Then `computer` `hover` over the row and read all three again: the weight is now `"500"`, the icon colour is the `plum` token, and **the height is unchanged**.
+- If the height does change, a prompt is rewrapping under the heavier face. Do not drop the weight step, which spec 5b requires: reserve the 500 metrics by replacing the prompt span in step 2 with
+
+```tsx
+                  <span
+                    data-text={prompt}
+                    className="min-w-0 flex-1 before:invisible before:block before:h-0 before:font-medium before:content-[attr(data-text)]"
+                  >
+                    {prompt}
+                  </span>
+```
+
+then re-run this bullet and record the addition in Task 9's D-053 entry.
+
+- `applyStarter` still works: click the first row, and the composer textarea's `value` is exactly that row's text. Then clear it.
+
+Bubbles. Type `What is $\frac{d}{28}$ in the DRT model?` into the composer and send it, then wait for the reply.
+
+- User bubble: for `const user = document.querySelector('#tutor-drawer .justify-end > div')`, `getComputedStyle(user).backgroundColor` is the `plum` token (alpha `1`, and not the `plum-tint` token), `color` is the `paper-0` token, `borderBottomRightRadius` is `"4px"`, `borderTopLeftRadius` is `"10px"`, and `borderTopWidth` is `"0px"`.
+- Assistant bubble: for `const bot = document.querySelector('#tutor-drawer .justify-start > div')`, `backgroundColor` is the `paper-0` token, `color` is the `ink` token, `borderBottomLeftRadius` is `"4px"`, `borderTopRightRadius` is `"10px"`, and `borderTopWidth` is `"0px"`.
+- **KaTeX on plum.** The user turn contains rendered math, so `user.querySelector('.katex')` is not `null`. Run this in `javascript_tool` and expect the first value to be `true` and the second at or above `4.5`:
+
+```js
+const lum = (c) => {
+  const [r, g, b] = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const ratio = (a, b) => {
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+};
+const user = document.querySelector('#tutor-drawer .justify-end > div');
+const math = user.querySelector('.katex');
+[
+  getComputedStyle(math).color === getComputedStyle(user).color,
+  ratio(getComputedStyle(math).color, getComputedStyle(user).backgroundColor),
+];
+```
+
+If the first value is `false`, something in the KaTeX cascade is setting an explicit colour instead of letting it inherit. Fix it at the source in `globals.css` (the KaTeX import is plan A Task 1's, and the correct rule is that KaTeX sets no colour at all), not by hard-coding a colour on the bubble.
+
+- Measures: `user.getBoundingClientRect().width` is at most 85% of the thread's width, and the assistant's is at most 92%.
+- Pending indicator survives: send a second message and, while the reply is still streaming, confirm three dots are present with the `ink-faint` background and that they are animating.
+- Scroll: after the reply lands, the thread is scrolled to the bottom (the `bottom` sentinel is in view), proving the effect at lines 35 to 37 still runs.
+- The drawer band from Task 1 is unchanged: it is still 48px, `plum`, and its Close chip still closes the drawer.
+- `read_console_messages` with `onlyErrors: true` is clean after all of the above.
+
+- [ ] **Step 7: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|chat-prose|doc-prose|stock-textured" src/components/chat/ChatMessageList.tsx ; grep -n $'\xe2\x80\x94' src/components/chat/ChatMessageList.tsx
+```
+
+Both print nothing. Note that `max-w-[85%]` does not match `/85\b`, which needs a literal slash, so the two measure classes are correctly left alone. `ChatComposer.tsx` still fails this grep at this point, which is expected: it is Task 3.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/components/chat/ChatMessageList.tsx
+git status --short
+git commit -m "Restyle the empty tutor thread and the chat bubbles (stage D, spec 5b, 5c)"
+```
+
+`git status --short` before the commit lists exactly that one file, as ` M`.
+
+---
