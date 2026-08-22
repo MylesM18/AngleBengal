@@ -1936,3 +1936,176 @@ git commit -m "Return focus to the reveal trigger after Keep trying (stage C ver
 If Steps 2 to 10 turned up further failures, each one gets its own commit by explicit path, using the same shape: `git add <the one file the inventory attributes it to>`, then a message naming what was wrong and the spec section it violates. If the sweep is otherwise clean, this task ends with the tree clean and every checkbox above ticked, which is the stage's green light for Task 7.
 
 ---
+### Task 7: `DECISIONS.md` D-052 and the doc addenda (spec 6b.6, 6d)
+
+**Files:**
+- Modify: `DECISIONS.md` (append one entry, `### D-052. ...`, at the end of the file; the file is 604 lines and its last entry is D-044, so the append lands directly after D-044's closing paragraph).
+- Modify: `docs/06-ui-spec.md` (append a `## Modernization` heading plus one line at the end of the file; the file is 90 lines and ends with the `## §7 States that must not be skipped` bullet list).
+- Modify: `docs/08-design-theme.md` (append a `## Modernization` heading plus one line at the end of the file; the file is 170 lines and ends with the numbered implementation-notes list).
+- Creates nothing, deletes nothing, touches no file under `src/`, no route, no prop and no export. This is the stage's documentation task and the last task in this plan.
+
+**Interfaces:**
+- Consumes (names from Tasks 1 to 5 that the D-052 prose cites by name; every one of them must already exist when this task runs, and the prose must not invent any other name):
+  - Task 1: `src/lib/practice/splitRatio.ts`, its `SPLIT_STORAGE_KEY` (`"ab:practice-split"`) and `SPLIT_DEFAULT` (`0.45`), and the hook `useSplitRatio` in `src/components/practice/useSplitRatio.ts`, which writes to `localStorage` on `pointerup` and on each keyboard commit only.
+  - Task 2: the Clear popover in `src/components/sketchpad/SketchToolbar.tsx`, the screen's only `[role="dialog"]`, holding the sentence `Clear the whole canvas? This cannot be undone.` and the buttons "Clear" then "Keep", with Escape closing it and focus returning to the Clear chip.
+  - Task 3: `src/components/sketchpad/CleanCopyPanel.tsx`, whose Expand/Collapse toggle and local `copied` boolean were removed, and the shared `Toast` primitive from stage A (`src/components/ui/Toast.tsx`, `role="status"`, 3.2 seconds) that replaced the inline copy confirmation.
+  - Task 5: `src/components/practice/PracticePanel.tsx`, whose header lost its "New problem" button and whose problem statement keeps `font-serif`.
+  - The spec itself: `docs/superpowers/specs/2026-08-21-ui-modernization-design.md`, section 4 (Practice), section 6b.6 (append a pointer addendum, do not rewrite docs/06 and docs/08), section 6d (the D-045 to D-054 numbering, where stage C owns D-052 alone).
+- Produces: no code, no export, no type and no name any later task consumes. This task is the last in the plan, so nothing downstream depends on it inside stage C. What it produces is the stage's paper trail: spec 6b.6 satisfied (both pointer addenda exist) and spec 6d satisfied for stage C (D-052 written, D-053 left to stage D, D-045 to D-051 and D-054 left to stage A).
+
+Behaviour contract (read before starting):
+- Append only. Do not edit, reflow, renumber or reorder a single existing line in any of the three files. Spec 6b.6 is explicit that docs/06 and docs/08 get a pointer rather than a rewrite, and `DECISIONS.md`'s working agreement (its own header) is that entries accumulate.
+- The number D-052 comes from the spec (6d), not from what is currently in the file. Stage A owns D-045 to D-051 and D-054; stage D owns D-053. If stages A and B have landed, D-052 follows D-051 with no gap. If they have not, `DECISIONS.md` still ends at D-044 and D-052 lands directly after it, leaving D-045 to D-051 missing. That gap is correct and expected: do not renumber this entry down to D-045, and do not write the other stages' entries here.
+- If `### D-052.` is already present in `DECISIONS.md`, or either doc already contains a `## Modernization` heading, stop. Do not append a second copy. Diff what is there against Steps 2 to 4 and report the difference instead.
+- No em-dashes in any of the three appends (CLAUDE.md and the Global Constraints). Step 5 greps for them.
+- Match each file's existing shape. `DECISIONS.md` prose wraps at roughly 78 columns and its entries are `### D-0NN. Sentence case title` followed by paragraphs, with bold lead-ins allowed. `docs/06-ui-spec.md` and `docs/08-design-theme.md` both use long single physical lines per paragraph or bullet, so each addendum is one heading and one long line.
+- All three files end with a single newline and no trailing blank line. The heredocs below open with a blank line so the append separates cleanly, and each ends with one newline. Do not add a second trailing blank line.
+- No path in this task contains `[topicId]`, so no `GIT_LITERAL_PATHSPECS=1` prefix is needed on the commit.
+
+- [ ] **Step 1: Confirm the starting state of all three files**
+
+Run from the repo root:
+
+```bash
+wc -l DECISIONS.md docs/06-ui-spec.md docs/08-design-theme.md
+grep -nE '^### D-0(4[4-9]|5[0-9])\.' DECISIONS.md
+grep -n 'Modernization' docs/06-ui-spec.md docs/08-design-theme.md
+```
+
+Expected: three line counts; a list of the `### D-0NN.` headings currently present, ending at D-044 if stages A and B have not landed or at D-051 plus D-054 if they have, and with **no** `### D-052.` line; and no output at all from the third grep (exit status 1). If the third grep prints anything, or if a `### D-052.` line already exists, stop per the contract above and report rather than appending.
+
+- [ ] **Step 2: Append the D-052 entry to `DECISIONS.md`**
+
+Run from the repo root, exactly as written:
+
+```bash
+cat >> DECISIONS.md <<'ENTRY'
+
+### D-052. Practice: the five calls the modernization spec left to the build
+
+`docs/superpowers/specs/2026-08-21-ui-modernization-design.md` section 4
+reshapes the Practice screen. Five of its choices were not derivable from
+docs/06 or docs/08, so they are recorded here in the order the build lands
+them. Nothing else about the screen moved: the sketch store, the OCR route,
+the answer comparison and the diagnosis path are untouched (spec 4e).
+
+**The split ratio persists in `localStorage`, under `ab:practice-split`.** The
+old split was a fixed 45/55 with no way to move it. It is now a drag handle
+plus arrow keys, and a ratio that does not survive a reload makes that handle
+a toy. `useSplitRatio` writes on `pointerup` and on each keyboard commit,
+never during a drag, so the pointer path stays one `requestAnimationFrame`
+setting one CSS custom property. A cookie or a database column would buy
+cross-device persistence, which a single-user local-first Phase 1 app
+(CLAUDE.md) does not need, and a database write would put the network on the
+drag path. A missing, unparseable or out-of-range stored value is clamped or
+falls back to `SPLIT_DEFAULT` (0.45) rather than throwing, and that clamp is a
+pure function in `src/lib/practice/splitRatio.ts` so a runner can cover it
+later (D-054).
+
+**The header "New problem" button is dropped.** The panel header carried a
+"New problem" button while the actions row already offered "Skip" and every
+terminal state already ended in "Next problem". Three controls competing for
+the same intent is the opposite of spec 4c, which asks each state to show one
+primary action. The header keeps only its truncating topic line, and nothing
+becomes unreachable: "Skip" moves on while a problem is open, "Next problem"
+moves on once it has been answered or revealed.
+
+**Clear asks in a popover, not `window.confirm`.** `window.confirm` blocks the
+main thread, cannot be styled or themed, reads as browser chrome inside a
+paper-textured toolbar, and is invisible to the keyboard, reduced-motion and
+visual passes the spec requires (6b.3 to 6b.5). Clear now opens a small
+`role="dialog"` popover anchored under its chip, reading "Clear the whole
+canvas? This cannot be undone." with "Clear" then "Keep"; Escape closes it and
+returns focus to the Clear chip. After this stage the string `window.confirm`
+appears nowhere under `src/`, and it is a banned pattern in the stage grep
+(spec 6b.2).
+
+**The problem statement stays serif.** The modernization moves labels, meta
+and controls onto the sans cuts, and the statement would have been swept along
+with them. It is deliberately left in the serif cut: the statement is the one
+block on this screen that is read closely rather than scanned, it carries
+inline KaTeX that is set against serif everywhere in the model docs, and
+holding that voice is what ties a problem to the document it tests. Only the
+chrome around the statement changes.
+
+**The clean copy slip loses its Expand/Collapse toggle and its `copied`
+state.** The slip used to be a collapsible panel with a local `copied` boolean
+driving an inline confirmation label. It is now an absolutely positioned sheet
+sized to its own content, carrying "Dismiss" and "Use as answer" plus one
+"Copy" per math block, so there is no collapsed height left to toggle to and
+"Dismiss" is the collapse. The copy confirmation moved onto the shared `Toast`
+primitive from stage A, which announces through `role="status"` and clears
+itself after 3.2 seconds, so the local state and its timer went with it.
+ENTRY
+```
+
+- [ ] **Step 3: Append the pointer addendum to `docs/06-ui-spec.md`**
+
+Run from the repo root, exactly as written:
+
+```bash
+cat >> docs/06-ui-spec.md <<'ADDENDUM'
+
+## Modernization
+
+The 2026-08-21 UI modernization (Direction C, "Editorial paper") is specified in `docs/superpowers/specs/2026-08-21-ui-modernization-design.md`; where that spec and this document disagree, the spec wins, and its section 4 supersedes the Practice split view described in §3. This section is a pointer, not a rewrite (spec 6b.6).
+ADDENDUM
+```
+
+- [ ] **Step 4: Append the pointer addendum to `docs/08-design-theme.md`**
+
+Run from the repo root, exactly as written:
+
+```bash
+cat >> docs/08-design-theme.md <<'ADDENDUM'
+
+## Modernization
+
+The 2026-08-21 UI modernization (Direction C, "Editorial paper") is specified in `docs/superpowers/specs/2026-08-21-ui-modernization-design.md`; it re-applies this theme rather than editing it (no color value, font or radius on this page moves), adds `--color-hairline` and a six-token type scale in its stage A, and covers the Practice screen in its section 4. This section is a pointer, not a rewrite (spec 6b.6).
+ADDENDUM
+```
+
+- [ ] **Step 5: Read the three appends back and check them**
+
+Run from the repo root:
+
+```bash
+grep -c $'\xe2\x80\x94' DECISIONS.md docs/06-ui-spec.md docs/08-design-theme.md
+grep -n '^### D-052\.' DECISIONS.md
+grep -n '^## Modernization$' docs/06-ui-spec.md docs/08-design-theme.md
+tail -n 4 docs/06-ui-spec.md
+tail -n 4 docs/08-design-theme.md
+git diff --stat DECISIONS.md docs/06-ui-spec.md docs/08-design-theme.md
+```
+
+Expected: the em-dash count is `0` for all three files (a non-zero count means the append introduced one; find it with `grep -n` and replace it with a comma, colon, parentheses or a hyphen). Exactly one `### D-052.` line. Exactly one `## Modernization` line in each doc. Each `tail` shows a blank line, the heading, a blank line, then the single pointer line. `git diff --stat` shows three files changed with insertions only and **zero deletions**; any deletion means an existing line was rewritten, which the contract forbids: `git checkout -- <file>` and redo the append.
+
+- [ ] **Step 6: Gate**
+
+```bash
+npm run typecheck
+npm run lint
+npm run build
+```
+
+Expected: all three green. This task changes no code, so `typecheck` and `lint` should be unchanged from Task 6's run; if either fails, the failure belongs to an earlier task and this task did not cause it. `npm run build` runs here because this is the last task in the stage and the Global Constraints and spec 6b.1 ask for a green build at the end of the stage, not because these three files affect it.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add DECISIONS.md docs/06-ui-spec.md docs/08-design-theme.md
+git commit -m "docs: record D-052 and point docs/06 and docs/08 at the modernization spec"
+git status --short
+```
+
+Expected: `git status --short` prints nothing.
+
+- [ ] **Step 8: Close the stage**
+
+Stage C is done when this commit lands and Task 6's pass is green. What is deliberately still open, so the next reader does not go looking for it here:
+
+- D-045 to D-051 and D-054 belong to stage A, D-053 to stage D. If they are missing from `DECISIONS.md`, those stages have not landed yet. Do not write them from this plan.
+- `docs/06-ui-spec.md` and `docs/08-design-theme.md` keep every pre-modernization sentence they had. They are correct as history plus a pointer; a rewrite is out of scope (spec 7).
+- FINDING 3 in Task 6 (focus falls to `document.body` after a confirmed reveal) is recorded and accepted, not fixed.
+
+---
