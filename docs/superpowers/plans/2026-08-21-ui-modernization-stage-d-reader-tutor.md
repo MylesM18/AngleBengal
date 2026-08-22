@@ -1475,3 +1475,269 @@ git commit -m "Render model headings with the accent numeral and a copy link (st
 `git status --short` before the commit lists exactly three files: the two new components as `??` and the page as ` M`.
 
 ---
+### Task 7: `DocMiniTOC` rewrite with the scroll observer (spec 3d, third half, and spec 6a's TOC-observer hazard)
+
+**Files:**
+- Modify (whole file replaced): `src/components/learn/DocMiniTOC.tsx`. It is 43 lines today and step 1 writes all of it, so no line numbers are needed.
+- Modify: `src/app/(tabs)/learn/[topicId]/page.tsx`: exactly one class list, `hidden xl:block` to `hidden lg:block`, on the `<div>` that wraps `<DocMiniTOC entries={index} accent={accent} />` at the end of the `article`. Nothing else in the file, not one import, is edited.
+- **Line drift:** Tasks 5 and 6 both already rewrote parts of this file, so the pre-edit line numbers in the Global Constraints no longer hold. Before Task 5 the import was line 5, the wrapper was line 82 and the `DocMiniTOC` call was line 83. Step 2 finds the wrapper by content and step 3 greps for the result rather than trusting a number.
+- **Read but not rewritten:** `<article className="flex justify-center gap-8 px-8 py-10">` and the `<div className="min-w-0 max-w-[68ch] flex-1">` main column keep the classes stage B gave them. The behaviour contract does the width arithmetic that proves they still work at `lg`; if the arithmetic held, nothing there changes.
+- **Not touched:** `src/components/learn/ModelHeading.tsx` and `src/components/learn/DocReader.tsx` are Task 6's and are complete. This task reads the anchor contract they publish and adds nothing to either file. `src/lib/modelIndex.ts` stays read only for the whole stage. Nothing is added to `src/app/globals.css`.
+- No Test line: there is no test runner in this repo (D-054). Verification is steps 3 to 6.
+
+**Interfaces:**
+- Consumes: `cx` from `src/lib/cx.ts` (plan A Task 1). Type utilities from plan A Task 1: `text-ui` (14/400), and `font-medium` written explicitly for 500 because plan A's Task 1 gate notes that an installed Tailwind which ignores `--text-*--font-weight` needs the companion weight class anyway, exactly as Task 5 wrote it on the session rows. Radius role from plan A: `rounded-input` is the 6px one. From the repo, unchanged: `meta-caps` is the existing globals utility this file already puts on its "Models" label, and stage D does not change it; `ModelIndexEntry` is `{ number: number; title: string; anchor: string }` (`src/lib/modelIndex.ts:15`) and `anchor` is `model-n` with no leading hash (`anchorForModel`, line 27); `ACCENT_VAR: Record<AccentName, string>` and `AccentName` (`src/lib/topicColors.ts:23` and `:18`). From Task 6, the anchor contract this whole task rests on: the `#model-n` element is `ModelHeading`'s wrapper `<div id="model-n">`, it carries `scroll-mt-20` (80px), there is exactly one per index entry in index order, and it is server rendered, so `document.getElementById` finds every one of them on the client's first effect without waiting for anything. From the page, unchanged: `index` is the local `deserializeModelIndex(doc.modelIndexJson)` result and `accent` is the local `accentForRoot(...)` result, and both are already passed to this component today.
+- Produces: `DocMiniTOC({ entries: ModelIndexEntry[]; accent: AccentName })`. **The props are deliberately unchanged**, so the call site keeps its exact text and the only page edit in this task is the wrapper's breakpoint. **For Task 8:** the observer is the one piece of scroll-driven state stage D adds, so 6b.4's reduced-motion pass and 6c's a11y pass both have a new surface here: nothing in this component animates in either state, and the active row is announced through `aria-current="location"` rather than through colour alone. **For Task 9:** this task adds no new `DECISIONS.md` entry of its own. If the step 5 reflow fallback is taken, it is recorded under the conditional D-053 entry Task 2 already opened for the hover-weight no-reflow reservation, naming this file as a second site; it does not open a sixth entry.
+
+**No primitive edit is needed in this task.** `cx` and the type and radius utilities are consumed exactly as plan A ships them, and no `src/components/ui/` file is opened.
+
+Behaviour contract:
+
+- The column keeps its shape: a `sticky` `w-[210px] shrink-0` `nav` labelled "Models in this document", the `meta-caps` "Models" label, and one row per index entry with the model number on the left and the title beside it. What changes is the breakpoint, the type scale, and the fact that a row can now be active.
+- The wrapper moves from `hidden xl:block` to `hidden lg:block`, which is the whole of spec 3d's "from `lg` up". At the 1024px `lg` edge the `article` spends 64px on `px-8` and 32px on `gap-8`, so the main column keeps 1024 - 64 - 32 - 210 = 718px. `max-w-[68ch]` is a ceiling, not a floor, and `min-w-0 flex-1` lets the column take that 718px, so the two-column layout holds at `lg` with no change to the `article` or to the main column.
+- Exactly one `IntersectionObserver` exists at a time, it observes only the `#model-n` elements, and the effect's cleanup calls `observer.disconnect()`. Nothing else is registered: no scroll listener, no resize listener, no timer.
+- **The observer is a scheduler, not a source of truth.** Its callback ignores the `entries` argument it is handed and recomputes the active row from the live `getBoundingClientRect()` of every heading. That is what makes it immune to the failure this hazard is named for: coalesced notifications, a batch that arrives out of order, a fast scroll that skips several headings at once, and the initial callback that fires for every target the moment it is observed all produce the same answer, because the answer is absolute rather than accumulated.
+- The active row is the last heading whose top edge has passed the reading line at 96px: the sticky top bar's 64px plus a 32px lead-in. The loop can `break` on the first heading still below the line because Task 6 renders one heading per index entry in index order, so the elements are in DOM order and their tops are monotone.
+- A deep link makes its own target active, never the one above it. `ModelHeading` carries `scroll-mt-20`, so an anchor jump parks the target at 80px, which is above the 96px line, so the target counts as reached the moment the jump lands.
+- While the reader is still in the preamble, above every heading, the first row is active. The column is never blank after mount, and the reader never sees a state that says "you are nowhere in this document".
+- The first render has no active row at all, on the server and on the client alike, because the state starts `null` and only the effect can change it. Server and client markup therefore agree and there is no hydration mismatch. The active row appears on the effect's initial callback, which the browser queues as soon as the targets are observed.
+- The effect depends on a joined string of the anchors rather than on the `entries` array, because the page rebuilds that array on every render and an array dependency would tear the observer down and build it again for no reason. The string is the only thing the effect actually reads, so nothing is captured stale.
+- If an index entry has no element in the document, it is filtered out and the observer simply never activates that row. A document with no models renders nothing at all, exactly as today, and the effect returns before creating an observer.
+- **Nothing in this component animates.** The `transition-colors` on the row goes, because the Global Constraints say the TOC active state does not animate, and a transition on the row's colour would animate the active state as well as the hover. There is nothing left for a `prefers-reduced-motion` guard to switch off.
+- Active is ink at 500 with the number in the accent; every other row, number included, is `ink-soft` and steps to `ink` on hover. That is the whole visual language of the column: colour carries position, and the accent appears once.
+- `aria-current="location"` marks the active row, so the state is not carried by colour alone. `"location"` is the value that means a position within a document, which is what this is, rather than `"page"`, which would claim the row is the current route.
+- Type moves from the hard-coded `text-[12.5px]` to `text-ui`, the same migration Task 5 made on the session rows, because `text-[` is a banned pattern. `leading-snug` comes off with it, exactly as it came off the starter rows in Task 2, the textarea in Task 3 and the session rows in Task 5, because plan A's `text-ui` carries its own line height. Written fallback: if the computed line height comes back `normal`, `text-ui` is size only in plan A and `leading-snug` goes back on the row.
+- The number keeps `font-medium` in both states, so only the title's weight changes when a row activates and the column's left edge never shifts.
+- Written fallback, active-weight reflow: the title stepping from 400 to 500 can rewrap a two-line title and make the column twitch while scrolling. Step 5 measures it. If the height moves, reserve the 500 metrics on the title span the way Task 2 reserved them on the prompt span, and record it under Task 2's existing conditional D-053 entry rather than opening a new one.
+- The `group` class comes off the row: it was there for a `group-hover` that this file has never had, and Task 6's `ModelHeading` is where the only `group` on this screen belongs.
+
+- [ ] **Step 1: Rewrite `src/components/learn/DocMiniTOC.tsx`**
+
+Replace the whole file with:
+
+```tsx
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { cx } from "@/lib/cx";
+import type { ModelIndexEntry } from "@/lib/modelIndex";
+import { ACCENT_VAR, type AccentName } from "@/lib/topicColors";
+
+/**
+ * The reading line, in px from the top of the viewport: the sticky top bar
+ * (`--header-h`, 64) plus a 32px lead-in. A heading counts as reached once its
+ * top edge has passed this line, so the active row is the last heading above
+ * it.
+ *
+ * `ModelHeading` carries `scroll-mt-20`, which parks a jumped-to heading at
+ * 80px. That is above this line, so a deep link always makes its own target
+ * active rather than the model before it.
+ */
+const ACTIVE_LINE = 96;
+
+/**
+ * Sticky mini-TOC on doc pages (docs/06 §2, spec 3d): the models by number and
+ * name, with the one the reader is currently inside marked.
+ *
+ * Anchors resolve against the `id="model-n"` wrapper that `ModelHeading`
+ * renders, one per index entry, on the server. The observer below is a
+ * scheduler only: its callback recomputes the active row from live rects
+ * instead of trusting the entries it is handed, so a coalesced or skipped
+ * notification cannot leave the column pointing at the wrong model.
+ */
+export function DocMiniTOC({
+  entries,
+  accent,
+}: {
+  entries: ModelIndexEntry[];
+  accent: AccentName;
+}) {
+  const [activeAnchor, setActiveAnchor] = useState<string | null>(null);
+  const anchorKey = entries.map((entry) => entry.anchor).join("|");
+
+  useEffect(() => {
+    const anchors = anchorKey.length > 0 ? anchorKey.split("|") : [];
+    const heads = anchors
+      .map((anchor) => document.getElementById(anchor))
+      .filter((el): el is HTMLElement => el !== null);
+    if (heads.length === 0) return;
+
+    const recompute = () => {
+      let currentId = heads[0]?.id ?? null;
+      for (const head of heads) {
+        if (head.getBoundingClientRect().top > ACTIVE_LINE) break;
+        currentId = head.id;
+      }
+      setActiveAnchor(currentId);
+    };
+
+    const observer = new IntersectionObserver(recompute, {
+      rootMargin: `-${ACTIVE_LINE}px 0px 0px 0px`,
+      threshold: 0,
+    });
+    for (const head of heads) observer.observe(head);
+
+    return () => observer.disconnect();
+  }, [anchorKey]);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <nav aria-label="Models in this document" className="sticky top-6 w-[210px] shrink-0">
+      <p className="meta-caps mb-2 text-ink-soft">Models</p>
+      <ul className="flex flex-col gap-1">
+        {entries.map((entry) => {
+          const isActive = entry.anchor === activeAnchor;
+          return (
+            <li key={entry.anchor}>
+              <a
+                href={`#${entry.anchor}`}
+                aria-current={isActive ? "location" : undefined}
+                className={cx(
+                  "flex gap-2 rounded-input py-1 pr-1 text-ui",
+                  isActive ? "font-medium text-ink" : "text-ink-soft hover:text-ink",
+                )}
+              >
+                <span
+                  className="mt-px shrink-0 font-medium tabular-nums"
+                  style={isActive ? { color: ACCENT_VAR[accent] } : undefined}
+                >
+                  {entry.number}
+                </span>
+                <span className="min-w-0">{entry.title}</span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+```
+
+Three things to diff against what was there, because they are the edits and everything else is carried over: the row's class list lost `group`, `text-[12.5px]`, `leading-snug` and `transition-colors` and gained `text-ui` plus the active branch; the number span went from `font-bold` with an unconditional accent colour to `font-medium` with the accent only when active; and the `useState` plus `useEffect` above the early return are new. The `nav`, the `meta-caps` label, the `ul`, the `li` key and the title span are unchanged.
+
+- [ ] **Step 2: Move the TOC wrapper to `lg` on the page**
+
+In `src/app/(tabs)/learn/[topicId]/page.tsx`, at the end of the `article`, replace the one line
+
+```tsx
+        <div className="hidden xl:block">
+```
+
+with
+
+```tsx
+        <div className="hidden lg:block">
+```
+
+so the tail of the `article` reads:
+
+```tsx
+        <div className="hidden lg:block">
+          <DocMiniTOC entries={index} accent={accent} />
+        </div>
+      </article>
+```
+
+The `<DocMiniTOC entries={index} accent={accent} />` line is byte-identical to what stage B shipped, because this task did not change the props. The import at the top of the file is untouched.
+
+- [ ] **Step 3: Confirm both edit sites landed and nothing else moved**
+
+```bash
+GIT_LITERAL_PATHSPECS=1 grep -n "DocMiniTOC\|hidden lg:block\|hidden xl:block" "src/app/(tabs)/learn/[topicId]/page.tsx"
+```
+
+Expected: one `DocMiniTOC` import, one `hidden lg:block` wrapper, one `DocMiniTOC` call site, and no `hidden xl:block` anywhere in the file.
+
+```bash
+grep -nE "text-\[|transition|leading-snug|font-bold|\bgroup\b" src/components/learn/DocMiniTOC.tsx
+```
+
+Expected: nothing. All five are things step 1 removed, and a hit means the old class list survived the rewrite.
+
+```bash
+GIT_LITERAL_PATHSPECS=1 git diff --stat src/components/learn/DocMiniTOC.tsx "src/app/(tabs)/learn/[topicId]/page.tsx"
+```
+
+Expected: two files, and the page shows one insertion and one deletion. A larger page diff means step 2 edited more than the wrapper line.
+
+- [ ] **Step 4: Gate**
+
+Run: `npm run typecheck && npm run lint`
+Expected: no errors.
+
+Likely trips and their fixes:
+- `Type 'HTMLElement | undefined' is not assignable to type 'HTMLElement'` on `heads[0]` means this checkout has `noUncheckedIndexedAccess` on. The `heads[0]?.id ?? null` in step 1 already covers it; do not replace it with a non-null assertion.
+- `React Hook useEffect has a missing dependency: 'entries'` means the dependency array was changed to read `entries` directly inside the effect. Keep the effect reading `anchorKey` only: that is the whole point of the joined string, and depending on the array rebuilds the observer on every page render.
+- `Cannot find module '@/lib/cx'` means plan A Task 1 has not been executed in this checkout. Stage A must be merged before stage D starts (Global Constraints); do not work around it by hand-writing a template string.
+- `'ACCENT_VAR' is defined but never used` means the active branch of the number span was dropped. The accent appears exactly once in this file, on the active row's number.
+- `Property 'location' is not assignable` on `aria-current` means the value was quoted wrong. React's type for `aria-current` accepts the literal `"location"`; the ternary must yield `"location" | undefined`, not `string | undefined`.
+
+- [ ] **Step 5: TOC and observer check**
+
+In the dev preview, open http://localhost:3010/learn, open the Algebra topic and open the Distance-Rate-Time document, so the URL carries `?doc=` and the reading sheet is on screen.
+
+First the breakpoint, with `resize_window`:
+
+- At 1280x900 the column is visible: `document.querySelector('nav[aria-label="Models in this document"]').offsetParent !== null`.
+- At 1024x900, the `lg` edge, it is still visible, and the main column has not collapsed: `document.querySelector('article > div').getBoundingClientRect().width` is roughly 718 and the page body does not scroll sideways (`document.documentElement.scrollWidth <= window.innerWidth`).
+- At 1023x900 it is hidden: `offsetParent === null`. That is the `hidden` half of the class doing its job below `lg`.
+
+Then back at 1440x900, set the handles in `javascript_tool`:
+
+```js
+const nav = document.querySelector('nav[aria-label="Models in this document"]');
+const rows = [...nav.querySelectorAll('a')];
+const heads = [...document.querySelectorAll('[id^="model-"]')];
+const active = () => nav.querySelector('[aria-current="location"]');
+```
+
+The column at rest:
+
+- `rows.length === heads.length` and `rows.map((a) => a.getAttribute('href').slice(1))` deep-equals `heads.map((el) => el.id)`, so every row points at a heading that exists and the two orders agree.
+- `getComputedStyle(rows[0]).fontSize` equals the `--text-ui` token, 14px, proving the `text-[12.5px]` is gone.
+- `getComputedStyle(rows[0]).lineHeight` is not `"normal"`. If it is, plan A's `text-ui` sets size only: put `leading-snug` back on the row in step 1 and re-run this bullet.
+- `getComputedStyle(rows[0]).transitionDuration === '0s'` on every row. The Global Constraints say the active state does not animate.
+- `getComputedStyle(nav).position === 'sticky'`, and after scrolling the article the column is still on screen and is not sliding under the top bar. If it is, `top-6` is smaller than the bar: change it to `top-24` in step 1 and re-check.
+
+The active state:
+
+- Scroll to the top of the document. `active()` is the first row, even while the preamble is on screen: the column is never blank.
+- `getComputedStyle(active()).fontWeight === '500'` and its colour is the ink token at alpha `1`. For its number span, `getComputedStyle(active().firstElementChild).color` is the accent, and for any other row's number span it is `ink-soft`. Read it visually too: exactly one accent mark in the column.
+- `nav.querySelectorAll('[aria-current]').length === 1` at all times. Two active rows means the recompute is accumulating instead of recomputing.
+- Scroll slowly through the document. The active row steps forward one at a time and never skips or flickers back. At the moment a heading's top passes 96px from the viewport top, that heading's row becomes active.
+- Scroll hard from the top to the bottom in one gesture, so several headings cross the line inside a single frame: the active row lands on the last model, not on some model in the middle. This is the hazard bullet; a callback that trusted its `entries` argument is what fails here.
+- Click the last row. The page jumps, and `active()` is that row, not the one above it: `scroll-mt-20` parks the target at 80px, which is above the 96px line.
+- Reload the page with `#model-3` already in the URL. After the jump settles, `active()` is the model 3 row.
+- Reflow check: with the first row active, record `nav.getBoundingClientRect().height`, scroll until a row with a title long enough to wrap becomes active, and read the height again. If it changed, apply the written fallback from the contract and reserve the 500 metrics on the title span, then re-read both heights.
+- Navigate to a second document in the same topic and back. `nav.querySelectorAll('a').length` matches the new document's model count each time, and the active row still tracks the scroll: the effect rebuilt on the new anchor string.
+- With `prefers-reduced-motion` emulated, scroll again: the active row still tracks and nothing in the column moves or fades, because nothing here was ever animated.
+- `read_console_messages` with `onlyErrors: true` is clean after all of the above.
+
+- [ ] **Step 6: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|chat-prose|doc-prose|stock-textured|bg-kraft" src/components/learn/DocMiniTOC.tsx ; grep -n $'\xe2\x80\x94' src/components/learn/DocMiniTOC.tsx
+```
+
+Both print nothing. Step 1 rewrote this file end to end, so any hit is this task's bug. `stock-textured` and `bg-kraft` are in the pattern here, as they were for Task 6's two files: the screen's one kraft strip lives in the page, and the TOC column may not add a second one.
+
+```bash
+GIT_LITERAL_PATHSPECS=1 grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|chat-prose|doc-prose" "src/app/(tabs)/learn/[topicId]/page.tsx"
+```
+
+Prints nothing. This is Task 5's reduced pattern, without `stock-textured` and `bg-kraft`, because the page legitimately carries the one kraft strip.
+
+- [ ] **Step 7: Commit**
+
+```bash
+GIT_LITERAL_PATHSPECS=1 git add src/components/learn/DocMiniTOC.tsx "src/app/(tabs)/learn/[topicId]/page.tsx"
+git status --short
+git commit -m "Show the mini-TOC from lg and mark the model being read (stage D, spec 3d)"
+```
+
+`git status --short` before the commit lists exactly two files, both as ` M`.
+
+---
