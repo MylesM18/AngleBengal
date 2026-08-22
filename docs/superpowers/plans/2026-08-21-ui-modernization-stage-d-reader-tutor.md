@@ -62,3 +62,193 @@ Both greps must print nothing. Any path containing `[topicId]` is quoted in the 
 Seed URLs used below: the reading sheet at `/learn/<drtId>` (find the id with `read_page` on `/learn`: the DRT cover card's `href` is `/learn/<drtId>`; a single-document topic redirects into the doc branch by D-008, so this URL is the reader). The drawer opens from the Tutor chip in the top bar on any screen; open it from the reading sheet so the band's context label has a long path to truncate.
 
 ---
+
+### Task 1: `truncateMiddle` and the tutor drawer band (spec 5a)
+
+**Files:**
+- Create: `src/lib/text.ts`
+- Modify: `src/components/chat/ChatDrawer.tsx` (imports at lines 1 to 9, and the band at lines 239 to 261: the `h-12 ... bg-plum` div and everything inside it)
+- Modify: `src/components/chat/SessionMenu.tsx:64-73` (the "Chats" trigger button only; the panel at line 78 belongs to Task 4 and is left exactly as it is in this task)
+
+**Interfaces:**
+- Consumes: `Chip` and `chipClasses` from `src/components/ui/Chip.tsx` (plan A): `Chip` renders a `<button>` and takes `variant: "nav" | "meta" | "action" | "toggle"`, `pressed?`, `icon?: IconName`, plus the native button attributes (`onClick`, `type`, `aria-label`, `aria-expanded`, `aria-haspopup`, `title`, `className`, `children`) through `...rest`; `chipClasses({ variant, active, className })` returns the same class string for a non-button element. `Icon({ name: IconName, size?, className?, title? })` from `src/components/ui/Icon.tsx`, with `IconName` including `chevron`, `close` and `copy`. Chips are 24px tall, min-width 32px, radius 4. From the existing drawer file, unchanged: `contextChip` (the `useTopicLabel` string), `onClose`, `sessionId`, `loadSession`, `startNew`, `sessionsKey`, and the `Image` import.
+- Produces: `truncateMiddle(value: string, head: number, tail: number): string` in `src/lib/text.ts`. No later task in this plan imports it: the band's context label at 14 and 14 is its only call site. Task 4 rewrites `SessionMenu`'s panel and must keep the trigger this task writes.
+
+Behaviour contract (read before editing):
+- The band is 48px tall (`h-12`, the same value as `--header-h`), `bg-plum`, square: no radius, no border, and it sits inside the drawer's top edge, so the drawer's own `border-l` and `bg-paper-1` at line 235 stay untouched.
+- Everything stage B shipped on this file stays: the `ref`, `id="tutor-drawer"`, `aria-label`, `aria-hidden`, `inert`, the `w-[420px]` panel classes and the `transition-[margin]` open and close at lines 229 to 238, and the Escape key and focus-return effects further up the file. This task edits the band only. `ChatMessageList` and `ChatComposer` below the band are Tasks 2 and 3.
+- The context label is not interactive: it is a `<span>` wearing `chipClasses({ variant: "action" })` rather than a `Chip` button, because there is nothing for a click to do and a focusable control that does nothing is worse than a label. It carries `role="note"` so that assistive technology honours its `aria-label` (a bare `<span>` drops `aria-label`), `title={contextChip}` for the pointer tooltip, and `aria-label={contextChip}` so the full path is read out even though the visible text is middle-truncated.
+- `truncateMiddle` is pure and touches no DOM (D-054), so a runner can cover it later. It returns `value` unchanged whenever shortening it would not save anything: the truncated form is `head + 1 + tail` characters long, so any value of that length or shorter is returned as it is.
+- The band carries no ad hoc opacity: the three `/85` and `/70` values at lines 243, 257 and 71 of `SessionMenu.tsx` all disappear. Both chips are `paper-0` surfaces with ink text, which is what makes them legible on plum.
+- Because the chips sit on plum, their focus ring is forced to `paper-0` (`focus-visible:ring-paper-0`) rather than inheriting the system brand ring, which is not guaranteed to clear 3:1 against the plum stock. This is a band-local override and applies to no other chip in the app.
+
+- [ ] **Step 1: Create `src/lib/text.ts`**
+
+```ts
+/**
+ * Pure string helpers (D-054). No DOM here so a test runner can cover them
+ * later.
+ */
+
+/**
+ * Shorten `value` from the middle, keeping the first `head` and the last
+ * `tail` characters, so both ends of a path stay readable:
+ * "Distance-Rate-Time / Model 3" keeps the topic and the model number.
+ * Values that are already short enough are returned untouched.
+ */
+export function truncateMiddle(value: string, head: number, tail: number): string {
+  if (head < 0 || tail < 0) return value;
+  if (value.length <= head + tail + 1) return value;
+  return `${value.slice(0, head)}…${value.slice(value.length - tail)}`;
+}
+```
+
+- [ ] **Step 2: Add the two imports to `src/components/chat/ChatDrawer.tsx`**
+
+The file's import block today is lines 1 to 9. Leave `"use client"`, `Image`, the React hooks and the three relative imports as they are, and add the two new lines so the block reads:
+
+```tsx
+"use client";
+
+import Image from "next/image";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { Chip, chipClasses } from "@/components/ui/Chip";
+import { truncateMiddle } from "@/lib/text";
+
+import { ChatComposer } from "./ChatComposer";
+import { ChatMessageList, type ChatTurn } from "./ChatMessageList";
+import { SessionMenu } from "./SessionMenu";
+import { useChatContext, useTopicLabel } from "./useChatContext";
+```
+
+If plan A exported the chip module under a different file name, take the path from `ls src/components/ui/` rather than guessing; the export names `Chip` and `chipClasses` are fixed by plan A's Interfaces block.
+
+- [ ] **Step 3: Replace the band in `src/components/chat/ChatDrawer.tsx`**
+
+Replace lines 239 to 261 (the `<div className="flex h-12 ... bg-plum px-3">` element and its five children, up to and including its closing `</div>`) with:
+
+```tsx
+      <div className="flex h-12 shrink-0 items-center gap-2 bg-plum px-3">
+        <Image src="/anglebengal-mark-dark.svg" alt="" width={20} height={20} className="shrink-0" />
+        <span className="font-expanded text-ui-lg text-paper-0">Tutor</span>
+        {/*
+          Not a Chip button: there is nothing to click. role="note" is what
+          makes the aria-label carry the untruncated path to a screen reader.
+        */}
+        <span
+          role="note"
+          title={contextChip}
+          aria-label={contextChip}
+          className={chipClasses({
+            variant: "action",
+            className: "ml-1 min-w-0 shrink bg-paper-0 text-ink",
+          })}
+        >
+          {truncateMiddle(contextChip, 14, 14)}
+        </span>
+
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <SessionMenu
+            currentSessionId={sessionId}
+            onSelect={(id) => void loadSession(id)}
+            onNew={startNew}
+            refreshKey={sessionsKey}
+          />
+          <Chip
+            variant="action"
+            onClick={onClose}
+            aria-label="Close tutor"
+            icon="close"
+            className="bg-paper-0 text-ink focus-visible:ring-paper-0"
+          />
+        </div>
+      </div>
+```
+
+Notes for the implementer. `h-12` is 48px, the same value as `--header-h`; it is written as `h-12` rather than as a variable because the band must not resize if the shell header ever changes independently. If `chipClasses` in plan A's final signature does not take a `className` key, call it as `chipClasses({ variant: "action" })` and join the extra classes with `cx()` from `src/lib/cx.ts`. If `Chip` renders nothing when it has an `icon` and no children, pass the icon as a child instead: `<Chip variant="action" onClick={onClose} aria-label="Close tutor" className="bg-paper-0 text-ink focus-visible:ring-paper-0"><Icon name="close" size={12} /></Chip>`, importing `Icon` from `@/components/ui/Icon`.
+
+- [ ] **Step 4: Restyle the "Chats" trigger in `src/components/chat/SessionMenu.tsx`**
+
+Replace lines 64 to 73 (the `<button type="button" onClick={() => setOpen(...)}` element through its `</button>`) with:
+
+```tsx
+      <Chip
+        variant="action"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        icon="chevron"
+        className="bg-paper-0 text-ink focus-visible:ring-paper-0"
+      >
+        Chats
+      </Chip>
+```
+
+Add `import { Chip } from "@/components/ui/Chip";` to the file's import block (today lines 1 to 3, under the `"use client"` line and above the `/** Recent chats plus New chat (docs/06 §5). */` comment, as a separate group from the React import). Leave the wrapping `<div ref={wrapper} className="relative">` at line 63, the outside-click and Escape effects at lines 55 to 61, and the whole `{open && (...)}` panel from line 75 down exactly as they are: the panel is Task 4's.
+
+If `Chip` places its `icon` before the children and the chevron therefore lands to the left of the word, drop the `icon` prop and write the chevron as a trailing child instead: `Chats<Icon name="chevron" size={12} className="ml-1" />`, importing `Icon` from `@/components/ui/Icon`.
+
+- [ ] **Step 5: Gate**
+
+Run: `npm run typecheck && npm run lint`
+Expected: no errors. Likely trips and their fixes: `Chip` rejecting `title`, `aria-expanded` or `aria-haspopup` means its props type does not spread `ButtonHTMLAttributes`, so widen the call to the `chipClasses` plus plain `<button>` form used for the context label; `chipClasses` reported as not exported means plan A named it differently, so take the real name from `grep -n "^export" src/components/ui/Chip.tsx`; an unused-import error on `Image` means the mark line was dropped by mistake, so restore it.
+
+- [ ] **Step 6: Visual, contrast and keyboard check**
+
+In the dev preview at 1440x900, open http://localhost:3010/learn/<drtId> (the reading sheet, so the context label is a long path), then click the Tutor chip in the top bar to open the drawer.
+
+- Band geometry and stock: with `const band = document.querySelector('#tutor-drawer > div')`, `band.getBoundingClientRect().height` is `48`, `getComputedStyle(band).borderRadius` is `"0px"`, and `getComputedStyle(band).backgroundColor` equals `getComputedStyle(document.documentElement).getPropertyValue('--color-plum').trim()` once both are normalised to rgb (compare by painting the token into a throwaway element if the variable is a hex string).
+- The mark is 20px: `document.querySelector('#tutor-drawer img').getBoundingClientRect().width` is `20`, and its `src` still ends with `anglebengal-mark-dark.svg`.
+- "Tutor" is `text-ui-lg` and expanded: for `const t = [...band.querySelectorAll('span')].find(s => s.textContent === 'Tutor')`, `getComputedStyle(t).fontSize` is `"15px"` and `getComputedStyle(t).fontFamily` names the expanded face, not the body face.
+- Contrast on plum, both pairs. Run this in `javascript_tool` and expect both numbers at or above 4.5:
+
+```js
+const lum = (c) => {
+  const [r, g, b] = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const ratio = (a, b) => {
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+};
+const band = document.querySelector('#tutor-drawer > div');
+const title = [...band.querySelectorAll('span')].find((s) => s.textContent === 'Tutor');
+const label = band.querySelector('[role="note"]');
+[
+  ratio(getComputedStyle(title).color, getComputedStyle(band).backgroundColor),
+  ratio(getComputedStyle(label).color, getComputedStyle(label).backgroundColor),
+];
+```
+
+- The context label: `label.getAttribute('title')` and `label.getAttribute('aria-label')` are both the full path (they contain both the topic name and the model number in full), `label.textContent.length` is at most `29`, and when the full path is longer than 29 characters `label.textContent` contains `…` with 14 characters on each side of it. `getComputedStyle(label).fontSize` is `"11px"`; if the action chip renders at a different size, add `text-meta` to its class list and re-check. Its background is the paper-0 token, not a translucent white: `getComputedStyle(label).backgroundColor` has an alpha of `1`.
+- Ordering: the label's right edge is left of the "Chats" chip's left edge, and "Chats" is left of the Close chip, which ends within 12px of the band's right edge (`band.getBoundingClientRect().right - closeChip.getBoundingClientRect().right` is between `8` and `16`).
+- The Close chip is icon-only and named: `closeChip.getAttribute('aria-label')` is `"Close tutor"`, and it contains an `svg`.
+- Focus ring on plum: `computer` `key` Tab until `document.activeElement` is the "Chats" chip, then read `getComputedStyle(document.activeElement).boxShadow` (or `outlineColor` if plan A's ring is an outline). The ring colour must be the paper-0 token, and its contrast against the band background, measured with the `ratio` helper above, must be at or above 3. Repeat with the Close chip.
+- Stage B behaviour is intact: `document.getElementById('tutor-drawer').hasAttribute('inert')` is `false` while open; press Escape via `computer` `key`, the drawer closes, `hasAttribute('inert')` is `true`, and `document.activeElement` is the top bar's Tutor chip again. Reopen it.
+- The session menu still opens: click "Chats", `document.querySelector('#tutor-drawer [role="menu"]')` is present and `document.querySelector('[aria-haspopup="menu"]').getAttribute('aria-expanded')` is `"true"`; click outside, it closes. Its panel still looks like the old rounded card, which is correct at this point: Task 4 restyles it.
+- Close works: click the Close chip, the drawer closes.
+- `read_console_messages` with `onlyErrors: true` is clean after all of the above.
+
+- [ ] **Step 7: Banned-pattern grep**
+
+```bash
+grep -nE "text-\[|border-ink-faint/40|/60\b|/70\b|/85\b|window\.confirm|chat-prose|doc-prose|stock-textured" src/lib/text.ts src/components/chat/ChatDrawer.tsx src/components/chat/SessionMenu.tsx ; grep -n $'\xe2\x80\x94' src/lib/text.ts src/components/chat/ChatDrawer.tsx src/components/chat/SessionMenu.tsx
+```
+
+Both print nothing. `ChatMessageList.tsx` and `ChatComposer.tsx` still fail this grep at this point, which is expected: they are Tasks 2 and 3.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/lib/text.ts src/components/chat/ChatDrawer.tsx src/components/chat/SessionMenu.tsx
+git status --short
+git commit -m "Add truncateMiddle and restyle the tutor drawer band (stage D, spec 5a)"
+```
+
+`git status --short` before the commit lists exactly those three files (one `A`, two ` M`).
+
+---
