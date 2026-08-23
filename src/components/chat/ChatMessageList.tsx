@@ -104,7 +104,7 @@ function Bubble({
             ))}
           </span>
         ) : (
-          <MarkdownMath className="chat-prose">{content}</MarkdownMath>
+          <MarkdownMath variant="chat">{content}</MarkdownMath>
         )}
       </div>
     </div>

@@ -136,7 +136,7 @@ export function AnswerInput({
         </div>
         {value.single.trim() && (
           <div className="rounded-input bg-paper-0 px-3 py-1.5">
-            <MarkdownMath className="text-[13px]">{`$${value.single}$`}</MarkdownMath>
+            <MarkdownMath variant="ui">{`$${value.single}$`}</MarkdownMath>
           </div>
         )}
       </div>

@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "katex/dist/katex.min.css";
+@import "katex/dist/katex.min.css" layer(base);
 
 /*
  * The "Swatch Book" theme (docs/08). Every color, radius and shadow in the app
@@ -180,168 +180,244 @@ body {
   border-radius: 2px;
 }
 
-/* ---- Long-form model doc reading surface ---- */
+@layer components {
+  /* ---- Long-form model doc reading surface ---- */
 
-.doc-prose {
-  font-family: var(--font-serif);
-  font-size: 17px;
-  line-height: 1.7;
-  color: var(--color-ink);
-}
+  .doc-prose {
+    font-family: var(--font-serif);
+    font-size: 17px;
+    line-height: 1.7;
+    color: var(--color-ink);
+  }
 
-.doc-prose h1 {
-  font-family: var(--font-display);
-  font-stretch: normal;
-  font-weight: 700;
-  font-size: 30px;
-  line-height: 1.2;
-  letter-spacing: 0;
-  margin: 0 0 0.5rem;
-}
+  .doc-prose h1 {
+    font-family: var(--font-display);
+    font-stretch: normal;
+    font-weight: 700;
+    font-size: 30px;
+    line-height: 1.2;
+    letter-spacing: 0;
+    margin: 0 0 0.5rem;
+  }
 
-.doc-prose h2 {
-  font-family: var(--font-display);
-  font-stretch: normal;
-  font-weight: 700;
-  letter-spacing: 0;
-  font-size: 22px;
-  line-height: 1.25;
-  margin: 2.25rem 0 0.75rem;
-  scroll-margin-top: 5rem; /* clears the sticky top bar on anchor jumps */
-}
+  .doc-prose h2 {
+    font-family: var(--font-display);
+    font-stretch: normal;
+    font-weight: 700;
+    letter-spacing: 0;
+    font-size: 22px;
+    line-height: 1.25;
+    margin: 2.25rem 0 0.75rem;
+    scroll-margin-top: 5rem; /* clears the sticky top bar on anchor jumps */
+  }
 
-.doc-prose h3 {
-  font-family: var(--font-sans);
-  font-weight: 700;
-  font-size: 16px;
-  letter-spacing: 0.01em;
-  margin: 1.5rem 0 0.5rem;
-}
+  .doc-prose h3 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.01em;
+    margin: 1.5rem 0 0.5rem;
+  }
 
-.doc-prose p,
-.doc-prose ul,
-.doc-prose ol,
-.doc-prose blockquote {
-  margin: 0 0 1rem;
-}
+  .doc-prose p,
+  .doc-prose ul,
+  .doc-prose ol,
+  .doc-prose blockquote {
+    margin: 0 0 1rem;
+  }
 
-.doc-prose ul,
-.doc-prose ol {
-  padding-left: 1.35rem;
-}
+  .doc-prose ul,
+  .doc-prose ol {
+    padding-left: 1.35rem;
+  }
 
-.doc-prose ul {
-  list-style: disc;
-}
+  .doc-prose ul {
+    list-style: disc;
+  }
 
-.doc-prose ol {
-  list-style: decimal;
-}
+  .doc-prose ol {
+    list-style: decimal;
+  }
 
-.doc-prose li {
-  margin-bottom: 0.35rem;
-}
+  .doc-prose li {
+    margin-bottom: 0.35rem;
+  }
 
-.doc-prose blockquote {
-  border-left: 3px solid var(--color-brand);
-  padding: 0.25rem 0 0.25rem 1rem;
-  color: var(--color-ink-soft);
-  font-style: italic;
-}
+  .doc-prose blockquote {
+    border-left: 3px solid var(--color-brand);
+    padding: 0.25rem 0 0.25rem 1rem;
+    color: var(--color-ink-soft);
+    font-style: italic;
+  }
 
-.doc-prose strong {
-  font-weight: 700;
-}
+  .doc-prose strong {
+    font-weight: 700;
+  }
 
-.doc-prose em {
-  font-style: italic;
-}
+  .doc-prose em {
+    font-style: italic;
+  }
 
-.doc-prose hr {
-  border: 0;
-  border-top: 1px solid var(--color-ink-faint);
-  margin: 2rem 0;
-}
+  .doc-prose hr {
+    border: 0;
+    border-top: 1px solid var(--color-ink-faint);
+    margin: 2rem 0;
+  }
 
-.doc-prose code {
-  font-family: var(--font-mono);
-  font-size: 0.86em;
-  background: var(--color-paper-1);
-  padding: 0.1em 0.35em;
-  border-radius: var(--radius-chip);
-}
+  .doc-prose code {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    background: var(--color-paper-1);
+    padding: 0.1em 0.35em;
+    border-radius: var(--radius-chip);
+  }
 
-.doc-prose pre {
-  background: var(--color-paper-1);
-  border-radius: var(--radius-card);
-  padding: 0.9rem 1rem;
-  overflow-x: auto;
-  margin: 0 0 1rem;
-}
+  .doc-prose pre {
+    background: var(--color-paper-1);
+    border-radius: var(--radius-card);
+    padding: 0.9rem 1rem;
+    overflow-x: auto;
+    margin: 0 0 1rem;
+  }
 
-.doc-prose pre code {
-  background: none;
-  padding: 0;
-}
+  .doc-prose pre code {
+    background: none;
+    padding: 0;
+  }
 
-.doc-prose a {
-  color: var(--color-cobalt);
-  text-decoration: none;
-}
+  .doc-prose a {
+    color: var(--color-cobalt);
+    text-decoration: none;
+  }
 
-.doc-prose a:hover {
-  text-decoration: underline;
-}
+  .doc-prose a:hover {
+    text-decoration: underline;
+  }
 
-/* Tables: GitHub markdown, marigold-tint header row (docs/08). */
-.doc-prose table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0 0 1.25rem;
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
-  display: block;
-  overflow-x: auto;
-}
+  /* Tables: GitHub markdown, marigold-tint header row (docs/08). */
+  .doc-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 1.25rem;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    display: block;
+    overflow-x: auto;
+  }
 
-.doc-prose thead {
-  background: var(--color-marigold-tint);
-}
+  .doc-prose thead {
+    background: var(--color-marigold-tint);
+  }
 
-.doc-prose th {
-  text-align: left;
-  font-weight: 700;
-  padding: 0.5rem 0.7rem;
-  border: 1px solid var(--color-ink-faint);
-}
+  .doc-prose th {
+    text-align: left;
+    font-weight: 700;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--color-ink-faint);
+  }
 
-.doc-prose td {
-  padding: 0.5rem 0.7rem;
-  border: 1px solid var(--color-ink-faint);
-  vertical-align: top;
-}
+  .doc-prose td {
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--color-ink-faint);
+    vertical-align: top;
+  }
 
-/* KaTeX: never restyle the glyphs, only the color and block breathing room. */
-.doc-prose .katex {
-  color: var(--color-ink);
-}
+  /* KaTeX: never restyle the glyphs, only the color and block breathing room. */
+  .doc-prose .katex {
+    color: var(--color-ink);
+  }
 
-.doc-prose .katex-display {
-  margin: 0.5rem 0;
-  padding: 8px 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
+  .doc-prose .katex-display {
+    margin: 0.5rem 0;
+    padding: 8px 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
 
-/* Bad LaTeX renders as subtle mono rather than crashing (docs/06 §7). */
-.doc-prose .katex-error {
-  font-family: var(--font-mono);
-  font-size: 0.9em;
-  color: var(--color-ink-soft);
-  background: var(--color-paper-1);
-  padding: 0.1em 0.35em;
-  border-radius: var(--radius-chip);
+  /* Bad LaTeX renders as subtle mono rather than crashing (docs/06 §7). */
+  .doc-prose .katex-error {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    color: var(--color-ink-soft);
+    background: var(--color-paper-1);
+    padding: 0.1em 0.35em;
+    border-radius: var(--radius-chip);
+  }
+
+
+  /* UI voice for panel chrome: history rows, answer preview, clean copy, the
+     diagnosis explanation (spec 1d, D-047). Tight margins, Archivo, 14px. */
+  .doc-prose.ui-prose {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .doc-prose.ui-prose > :last-child {
+    margin-bottom: 0;
+  }
+
+  .doc-prose.ui-prose p,
+  .doc-prose.ui-prose ul,
+  .doc-prose.ui-prose ol,
+  .doc-prose.ui-prose blockquote {
+    margin-bottom: 0.5rem;
+  }
+
+  .doc-prose.ui-prose h1,
+  .doc-prose.ui-prose h2,
+  .doc-prose.ui-prose h3 {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 600;
+    font-stretch: normal;
+    margin: 0.6rem 0 0.25rem;
+  }
+
+  .doc-prose.ui-prose table {
+    font-size: 12px;
+  }
+
+  .doc-prose.ui-prose .katex-display {
+    margin: 0.35rem 0;
+    padding: 4px 0;
+  }
+
+  /* Chat bubbles reuse the doc renderer at a tighter, sans-serif scale. */
+  .doc-prose.chat-prose {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .doc-prose.chat-prose > :last-child {
+    margin-bottom: 0;
+  }
+
+  .doc-prose.chat-prose p,
+  .doc-prose.chat-prose ul,
+  .doc-prose.chat-prose ol {
+    margin-bottom: 0.55rem;
+  }
+
+  .doc-prose.chat-prose h1,
+  .doc-prose.chat-prose h2,
+  .doc-prose.chat-prose h3 {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-stretch: normal;
+    margin: 0.7rem 0 0.3rem;
+  }
+
+  .doc-prose.chat-prose table {
+    font-size: 12px;
+  }
+
+  .doc-prose.chat-prose .katex-display {
+    margin: 0.35rem 0;
+    padding: 4px 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -368,40 +444,6 @@ body {
   border-width: 0;
 }
 
-/* Chat bubbles reuse the doc renderer at a tighter, sans-serif scale. */
-.doc-prose.chat-prose {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.doc-prose.chat-prose > :last-child {
-  margin-bottom: 0;
-}
-
-.doc-prose.chat-prose p,
-.doc-prose.chat-prose ul,
-.doc-prose.chat-prose ol {
-  margin-bottom: 0.55rem;
-}
-
-.doc-prose.chat-prose h1,
-.doc-prose.chat-prose h2,
-.doc-prose.chat-prose h3 {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-stretch: normal;
-  margin: 0.7rem 0 0.3rem;
-}
-
-.doc-prose.chat-prose table {
-  font-size: 12px;
-}
-
-.doc-prose.chat-prose .katex-display {
-  margin: 0.35rem 0;
-  padding: 4px 0;
-}
 
 @keyframes pulse {
   0%, 100% { opacity: 0.25; }

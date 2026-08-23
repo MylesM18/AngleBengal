@@ -109,7 +109,7 @@ export default async function HistoryPage({
                 </div>
 
                 <div className="mt-1.5 max-w-[70ch] text-ink-soft">
-                  <MarkdownMath className="text-[12.5px]">
+                  <MarkdownMath variant="ui">
                     {attempt.statementMd}
                   </MarkdownMath>
                 </div>

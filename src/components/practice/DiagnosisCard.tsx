@@ -52,7 +52,7 @@ export function DiagnosisCard({
             Model {diagnosis.modelNumber}: {diagnosis.modelTitle} failed
           </p>
 
-          <MarkdownMath className="mt-2.5 text-[13px]">
+          <MarkdownMath variant="ui" className="mt-2.5">
             {diagnosis.explanationMd}
           </MarkdownMath>
 

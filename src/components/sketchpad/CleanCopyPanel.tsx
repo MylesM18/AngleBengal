@@ -70,7 +70,7 @@ export function CleanCopyPanel({
             >
               <div className="min-w-0 flex-1">
                 {block.kind === "math" ? (
-                  <MarkdownMath className="text-[13px]">{`$$${block.latex}$$`}</MarkdownMath>
+                  <MarkdownMath variant="ui">{`$$${block.latex}$$`}</MarkdownMath>
                 ) : (
                   <p className="text-[12.5px] leading-snug text-ink-soft">{block.text}</p>
                 )}

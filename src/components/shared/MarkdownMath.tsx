@@ -68,15 +68,29 @@ function TableHeader(props: ComponentPropsWithoutRef<"th">) {
   return <th scope="col" {...props} />;
 }
 
+export type MarkdownMathVariant = "reading" | "ui" | "chat";
+
+const VARIANT_CLASS: Record<MarkdownMathVariant, string> = {
+  /** 17px Source Serif, the long-form voice: model docs, problem statements, solutions. */
+  reading: "doc-prose",
+  /** 14px Archivo, tight margins: history rows, answer preview, clean copy, diagnosis explanation. */
+  ui: "doc-prose ui-prose",
+  /** 14px Archivo with chat margins: tutor bubbles. */
+  chat: "doc-prose chat-prose",
+};
+
 export type MarkdownMathProps = {
   children: string;
-  /** Extra classes on the wrapper. The `doc-prose` base is always applied. */
+  /** Which prose voice renders the content. Defaults to the reading voice. */
+  variant?: MarkdownMathVariant;
+  /** Layout-only classes on the wrapper (margins, widths). Never type sizes: use `variant`. */
   className?: string;
 };
 
-export function MarkdownMath({ children, className }: MarkdownMathProps) {
+export function MarkdownMath({ children, variant = "reading", className }: MarkdownMathProps) {
+  const base = VARIANT_CLASS[variant];
   return (
-    <div className={className ? `doc-prose ${className}` : "doc-prose"}>
+    <div className={className ? `${base} ${className}` : base}>
       <Markdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[[rehypeKatex, REHYPE_KATEX_OPTIONS]]}
