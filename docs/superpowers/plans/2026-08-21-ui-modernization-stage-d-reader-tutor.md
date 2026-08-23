@@ -1752,7 +1752,7 @@ git commit -m "Show the mini-TOC from lg and mark the model being read (stage D,
 - No Test line: there is no test runner in this repo (D-054), which is exactly why this task exists. Steps 1 to 11 are the verification, and every one of them is a command or a reading with a stated expected result.
 
 **Interfaces:**
-- Consumes: everything Tasks 1 to 7 produced, by name. `truncateMiddle(value, head, tail)` from `src/lib/text.ts` (Task 1). `ModelHeading({ number, title, anchor, accent })` and `DocReader({ doc, index, accent })` (Task 6). `DocMiniTOC({ entries: ModelIndexEntry[]; accent: AccentName })` (Task 7). The `#model-n` anchor contract: one server rendered `<div id="model-n">` per index entry, in index order, carrying `scroll-mt-20` (Task 6), which both the miss-list links (Task 5) and the observer (Task 7) resolve against. From plan A: `Sheet`, `Chip`, `Button`, `Icon`, `Notice`, `Toast`, `CornerNumeral`, `MarkdownMath` and `cx`. From stage B: the drawer's positioning, `inert`, Escape and focus return, and the Tutor chip that opens it.
+- Consumes: everything Tasks 1 to 7 produced, by name. `truncateMiddle(value, head, tail)` from `src/lib/text.ts` (Task 1). `ModelHeading({ entry: ModelIndexEntry; accent: AccentName; flush?: boolean; onCopied: (ok: boolean) => void })`, `DocReader({ contentMd: string; models: ModelIndexEntry[]; accent: AccentName })` and the pure `splitModelSections(contentMd, models)` exported from `DocReader.tsx` (Task 6). `DocMiniTOC({ entries: ModelIndexEntry[]; accent: AccentName })` (Task 7). The `#model-n` anchor contract: one server rendered `<div id="model-n">` per index entry, in index order, carrying `scroll-mt-20` (Task 6), which both the miss-list links (Task 5) and the observer (Task 7) resolve against. From plan A: `Sheet`, `Chip`, `Button`, `Icon`, `Notice`, `Toast`, `CornerNumeral`, `MarkdownMath` and `cx`. From stage B: the drawer's positioning, `inert`, Escape and focus return, and the Tutor chip that opens it.
 - Produces: nothing importable, and no new component or function. What it hands forward is a written result, and Task 9 depends on one part of it. **For Task 9, the fallback ledger:** which of the three conditional `D-053` entries were actually taken during Tasks 1 to 7, namely Task 2's per-corner radius fallback, Task 2's hover-weight no-reflow reservation (which Task 7 may have extended to `DocMiniTOC.tsx` as a second site), and Task 4's `shadow-lift!` cascade fallback. Task 9 records only the ones taken, alongside its two unconditional entries. **This task opens no new `D-053` entry of its own**, whatever it finds: a defect fixed here is a defect, not a decision.
 
 **No primitive edit is needed in this task**, and none is expected. Steps 4, 8 and 11 each name one plan A file that a proven failure would send the implementer into, and each says what the proof has to be first.
@@ -2349,3 +2349,45 @@ Stage D is done when this commit lands and Task 8's pass is green. What is delib
 - The four stage plans are now all executed. The spec's sections 1 to 5 are landed, 6 is verified, 7 stayed out of scope and 8's open risks are the standing list for whatever comes next.
 
 ---
+
+## Self-review against the spec
+
+**1. Spec coverage** (the sections the header names as this stage's contract):
+
+| Spec | Requirement | Task |
+|---|---|---|
+| 3d | Reading sheet: one-line pre-header, `paper-0` sheet, title at 30, the screen's single kraft meta strip, misses as a `Notice`, numbered headings with an accent numeral and a per-heading copy-link, a live mini TOC, KaTeX untouched | Task 5 (page frame, strip, `ModelMissList`) + Task 6 (`ModelHeading`, `DocReader`, the split) + Task 7 (`DocMiniTOC`) |
+| 5a | 48px plum band square inside the drawer's top edge: dark mark, "Tutor" at `text-ui-lg .font-expanded`, the context label as a `paper-0` `Chip action` using `truncateMiddle`, then "Chats" and Close pushed right | Task 1 |
+| 5b | Empty thread `justify-start`, one intro line, the starters as a `paper-0` sheet of `divide-hairline` rows with `Icon plus`, `applyStarter` unchanged | Task 2 |
+| 5c | Assistant bubble `paper-0` radius 10 with the bottom-left corner at 4 and no border; user bubble plum stock with `paper-0` text, radius 10, bottom-right corner 4, `max-w-[85%]`; `MarkdownMath variant="chat"`; the pending indicator kept | Task 2 |
+| 5d | Composer on `paper-1` with no kraft and no top border, textarea on `paper-0` at radius 6, Send as `Button sm primary tone="plum"`, hint at `text-meta`, Enter and Shift+Enter unchanged | Task 3 |
+| 5e | Session menu panel as `Sheet paper-0 shadow-lift` keeping `role="menu"` and `menuitem`, a hairline under "New chat", items at 500, the current session on `paper-1` with a 4px plum tab, and no focus trap | Task 4, verified in Task 8 Step 5 |
+| 5f | Streaming, the header JSON line protocol, `useChatContext` and the chat API are not edited | Global Constraints (the stage's standing ban), re-checked by Task 8 Step 2's grep and Step 1's gate |
+| 6b.1 | The stage gate: `npm run typecheck`, `npm run lint`, `npm run build` green at the end | Task 8 Step 1 |
+| 6b.2 | The banned-pattern grep over every file the stage created or edited | Task 8 Step 2 |
+| 6b.3 | The 1440x900 visual pass on both surfaces, drawer closed and open | Task 8 Step 3 |
+| 6b.4 | The reduced-motion pass | Task 7 (the observer adds no motion) + Task 8 Step 11 |
+| 6b.5 | The keyboard pass, D row: heading copy-link reachable and visible on focus, TOC active state while scrolling, starter rows, session menu items, composer Enter and Shift+Enter | Task 8 Step 9 |
+| 6b.6 | One pointer line appended under the `## Modernization` heading in `docs/06-ui-spec.md` and `docs/08-design-theme.md`, no rewrite, no second heading | Task 9 Steps 9 and 10 |
+| 6c | The a11y checklist: contrast pairs, focus ring on every paper tone, the semantics list, chip metrics, `aria-label` plus `title` on icon-only controls, all math rendered | Task 3 (composer semantics) + Task 7 (`aria-current="location"`, no colour-only state) + Task 8 Step 10 |
+| 6d | `DECISIONS.md` gains D-053 and only D-053; D-045 to D-052 and D-054 belong to stages A and C and the gap is never filled here | Task 9 Steps 3 to 8 |
+| 7 | No token, color value, font or radius moves; no new dependency; no new focus management | Global Constraints, and Task 8 Steps 4 to 8 escalate rather than patch |
+| 1e | The motion budget: the sheet enter animation, the drawer's 220ms open and close, 150ms hover, 1px press, nothing else | Global Constraints + Task 2's bubble and row transitions; Task 8 Step 3 looks for anything extra |
+
+Not in this plan by design: 2a to 2e and 3a to 3c and 3e are stage B, 4a to 4e are stage C, 1a to 1d and 6a are stage A. No gap found against the sections the header claims.
+
+**2. Placeholder scan:** the writing-plans red-flag grep (the five banned phrases from its No Placeholders section) over this file prints nothing. Every code step carries its code, every check step carries its commands and its expected output, and the three conditional `D-053` paragraphs in Task 9 are written out in full rather than described, including both variants of the hover-weight paragraph.
+
+**3. Type consistency** (names used across tasks, checked against the task that defines them):
+
+- `truncateMiddle(value: string, head: number, tail: number): string` in `src/lib/text.ts` (Task 1) is called only by the drawer band in the same task, and Task 8's Consumes block names it with the same signature.
+- `ModelHeading({ entry: ModelIndexEntry; accent: AccentName; flush?: boolean; onCopied: (ok: boolean) => void })` and `DocReader({ contentMd: string; models: ModelIndexEntry[]; accent: AccentName })` (Task 6) are what Task 5's page call site renders and what Task 8 verifies. **One mismatch was found here and fixed inline:** Task 8's Consumes block had carried `ModelHeading({ number, title, anchor, accent })` and `DocReader({ doc, index, accent })`, neither of which any task defines. It now names Task 6's real signatures plus `splitModelSections`.
+- `splitModelSections(contentMd: string, models: ModelIndexEntry[]): { preamble: string; sections: { entry: ModelIndexEntry; body: string }[] }` is exported from `DocReader.tsx` (Task 6), not from `src/lib/modelIndex.ts`, in Task 6, in Task 8's Consumes block and in the D-053 paragraph Task 9 Step 8 writes.
+- `DocMiniTOC({ entries: ModelIndexEntry[]; accent: AccentName })` (Task 7) keeps the props the page already passes, so Task 5's call site and Task 7's rewrite agree and the page edit in Task 7 is the wrapper's breakpoint alone.
+- `ModelMissList({ misses: ModelMiss[] })` (Task 5) drops its `topicId` and `docId` props in the same task that updates its only call site, so no later task passes a prop that no longer exists.
+- `ModelIndexEntry` and `AccentName` are repo types (`src/lib/modelIndex.ts`, `src/lib/topicColors.ts`), spelled the same way in Tasks 5, 6, 7, 8 and 9.
+- The three components whose signatures are explicitly frozen keep them everywhere they are named: `Bubble({ role, content, pending? })` (Task 2), `ChatComposer({ value, onChange, onSend, busy, focusKey })` (Task 3) and `SessionMenu({ currentSessionId, onSelect, onNew, refreshKey })` (Task 4), so `ChatDrawer` compiles unchanged after each of them.
+- The `#model-n` anchor contract is stated identically in Task 6 (Produces), Task 7 (Consumes) and Task 8: one server rendered `<div id="model-n">` per index entry, in index order, carrying `scroll-mt-20`.
+- Stage A primitives are consumed with the signatures plan A defines (`Chip`/`chipClasses`, `Button`, `Sheet`, `Icon`, `Toast`, `Notice`, `CornerNumeral`, `MarkdownMath`, `cx`), and no task in this plan edits one. The standing uncertainty is the same one stage B recorded: plan A's final `Chip` and `Button` prop pass-through. Task 8's escalation steps send any gap back to plan A's files rather than patching a call site here.
+
+No further mismatches found.
