@@ -38,7 +38,7 @@ export function Sheet<T extends SheetTag = "div">({
         "rounded-card shadow-sheet",
         TONE_CLASS[tone],
         lift &&
-          "transition-[box-shadow,transform] duration-150 ease-paper hover:-translate-y-px hover:shadow-lift",
+          "transition-[box-shadow,translate] duration-150 ease-paper hover:-translate-y-px hover:shadow-lift",
         className,
       )}
       {...rest}

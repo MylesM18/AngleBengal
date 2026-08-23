@@ -9,7 +9,7 @@ export type ButtonSize = "sm" | "md";
 export type ButtonTone = "brand" | "plum";
 
 const BASE =
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-input text-ui font-semibold transition-[background-color,box-shadow,transform] duration-150 ease-paper active:translate-y-px active:shadow-none disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-input text-ui font-semibold transition-[background-color,box-shadow,translate] duration-150 ease-paper active:translate-y-px active:shadow-none disabled:pointer-events-none disabled:opacity-50";
 
 const SIZE_H: Record<ButtonSize, string> = {
   sm: "h-6",
