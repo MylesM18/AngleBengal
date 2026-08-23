@@ -10,14 +10,21 @@ const BASE =
   "inline-flex h-6 min-w-8 items-center justify-center gap-1 whitespace-nowrap rounded-chip px-2 text-ui transition-[background-color,color,box-shadow,transform] duration-150 ease-paper";
 
 const VARIANT: Record<ChipVariant, string> = {
-  nav: "bg-paper-0 font-medium text-ink hover:bg-desk",
+  nav: "font-medium text-ink hover:bg-desk",
   meta: "stock-textured bg-kraft text-meta font-medium text-ink",
-  action: "bg-paper-0 text-ink shadow-sheet hover:bg-desk active:translate-y-px active:shadow-none",
-  toggle: "bg-paper-0 text-ink hover:bg-desk active:translate-y-px",
+  action: "text-ink shadow-sheet hover:bg-desk active:translate-y-px active:shadow-none",
+  toggle: "text-ink hover:bg-desk active:translate-y-px",
 };
 
 /** The inverted state: current nav chip, pressed toggle. */
 const ACTIVE = "bg-ink text-paper-0 hover:bg-ink focus-visible:outline-paper-0";
+
+/**
+ * The rest fill for the paper chips (nav, action, toggle). Applied only when not
+ * active: `cx` is a plain joiner and Tailwind emits `.bg-ink` before
+ * `.bg-paper-0`, so both on one element would leave the inverted chip blank.
+ */
+const REST_FILL = "bg-paper-0";
 
 export function chipClasses({
   variant,
@@ -28,7 +35,13 @@ export function chipClasses({
   active?: boolean;
   className?: string;
 }): string {
-  return cx(BASE, VARIANT[variant], active && ACTIVE, className);
+  return cx(
+    BASE,
+    VARIANT[variant],
+    variant !== "meta" && !active && REST_FILL,
+    active && ACTIVE,
+    className,
+  );
 }
 
 export type ChipProps = {
