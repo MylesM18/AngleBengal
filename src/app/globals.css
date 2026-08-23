@@ -59,6 +59,65 @@
 
   /* motion: paper physics only */
   --ease-paper: cubic-bezier(0.2, 0, 0, 1);
+
+  /* hairline: the only separator between rows inside a sheet (spec 1a) */
+  --color-hairline: rgba(50, 41, 33, 0.1);
+
+  /* shell geometry (spec 2a): sticky offsets and scroll-margin read this */
+  --header-h: 48px;
+
+  /*
+   * Type scale (spec 1c). Each token carries size, line-height and weight, so
+   * `text-ui` is one class. Display sizes pair with `.display-cut` for the
+   * Advercase family; nothing under 22px uses Advercase (docs/08).
+   */
+  --text-meta: 12px;
+  --text-meta--line-height: 1.4;
+  --text-meta--font-weight: 500;
+  --text-ui: 14px;
+  --text-ui--line-height: 1.5;
+  --text-ui--font-weight: 400;
+  --text-ui-lg: 16px;
+  --text-ui-lg--line-height: 1.4;
+  --text-ui-lg--font-weight: 500;
+  --text-read: 17px;
+  --text-read--line-height: 1.7;
+  --text-read--font-weight: 400;
+  --text-h2: 22px;
+  --text-h2--line-height: 1.25;
+  --text-h2--font-weight: 700;
+  --text-h1: 30px;
+  --text-h1--line-height: 1.2;
+  --text-h1--font-weight: 700;
+  --text-display: 56px;
+  --text-display--line-height: 1;
+  --text-display--font-weight: 700;
+
+  /* motion budget (spec 1e): the only two keyframe animations in the app */
+  --animate-enter-sheet: enter-sheet 200ms var(--ease-paper) both;
+  --animate-cut-reveal: cut-reveal 200ms var(--ease-paper) both;
+
+  @keyframes enter-sheet {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes cut-reveal {
+    from {
+      transform: scale(0.96);
+      opacity: 0.6;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
 }
 
 /* The desk is the only surface the app body ever shows. */
