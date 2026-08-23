@@ -2045,3 +2045,307 @@ git commit -m "Give the plum and ink button tones the paper-0 focus ring (spec 6
 `git status --short` before the commit lists exactly the files the fix touched, and no others. One commit per fix, each naming what the verification pass found.
 
 ---
+### Task 9: `DECISIONS.md` D-053 and the two doc pointer lines (spec 6d, 6b.6)
+
+**Files:**
+- Modify: `DECISIONS.md` (append one entry, `### D-053. ...`, at the end of the file; the file is 604 lines and its last entry is D-044, so the append lands directly after D-044's closing paragraph unless stages A and C have already landed theirs).
+- Modify: `docs/06-ui-spec.md` (append one line at the end of the file, under the `## Modernization` heading stage C added there; the heading is not added again).
+- Modify: `docs/08-design-theme.md` (append one line at the end of the file, under the `## Modernization` heading stage C added there; the heading is not added again).
+- Creates nothing, deletes nothing, touches no file under `src/`, no route, no prop, no export and no token. This is the stage's documentation task, the last task in this plan, and the last task of the whole modernization.
+
+**Interfaces:**
+- Consumes (the names the D-053 prose cites; every one of them must already exist when this task runs, and the prose must name nothing else):
+  - Task 8, step 12 part 3, **the fallback ledger**: which of the three conditional entries below were actually taken during Tasks 1 to 7. This task cannot be written without it. If Task 8's summary is not available, re-derive the ledger from the repo rather than guessing, using the three greps in Step 2.
+  - Task 2: `src/components/chat/ChatMessageList.tsx`, its assistant bubble (`paper-0`, radius 10, bottom-left corner 4, no border) and user bubble (`plum` stock, `paper-0` text, radius 10, bottom-right corner 4, `max-w-[85%]`), and the starter rows whose label steps from 400 to 500 on hover.
+  - Task 4: `src/components/chat/SessionMenu.tsx`, whose panel is a `Sheet paper-0` carrying `shadow-lift` from the call site, and stage A's `Sheet` (`src/components/ui/Sheet.tsx`), which already carries `shadow-sheet` in its base and is never edited by this stage.
+  - Task 5: `src/app/(tabs)/learn/[topicId]/page.tsx`, whose doc branch renders the single kraft meta strip carrying the "Exemplar" chip when it applies, "n models" and "last practiced", and which runs the inline `prisma` attempt query next to the `findUnique` it already had.
+  - Task 6: `src/components/learn/DocReader.tsx` and its exported pure `splitModelSections(contentMd, models)`, `src/components/learn/ModelHeading.tsx`, and `src/lib/modelIndex.ts`, which parses the model index and is deliberately not given a splitter.
+  - Task 7: `src/components/learn/DocMiniTOC.tsx`, whose active title steps to 500 while scrolling and which may have needed the same reflow reservation as Task 2's rows.
+  - The spec itself: `docs/superpowers/specs/2026-08-21-ui-modernization-design.md`, section 3d (the reading sheet), section 5 (the tutor drawer), section 6b.6 (append a pointer, do not rewrite docs/06 and docs/08) and section 6d (the D-045 to D-054 numbering, where stage D owns D-053 alone).
+- Produces: no code, no export, no type and no name any later task consumes, because there is no later task. What it produces is the paper trail: spec 6d satisfied for stage D (D-053 written, D-045 to D-052 and D-054 left to stages A and C) and spec 6b.6 satisfied (both pointer lines exist under the heading stage C added).
+
+**No primitive edit is needed in this task.** It writes markdown and nothing else. No file under `src/` is opened, not even to read, so no primitive, prop, export or token can move here. If a change under `src/` looks necessary while writing D-053, the prose is wrong, not the code: the entry records what the build already did, and a build defect belongs to Task 8's pass, not to a decision entry.
+
+Behaviour contract (read before starting):
+
+- **Append only.** Do not edit, reflow, renumber or reorder a single existing line in any of the three files. Spec 6b.6 is explicit that docs/06 and docs/08 get a pointer rather than a rewrite, and `DECISIONS.md` accumulates entries by its own header's working agreement.
+- **The number D-053 comes from spec 6d, not from what is currently in the file.** Stage A owns D-045 to D-051 and D-054, stage C owns D-052. If those stages have landed, D-053 follows D-052 with no gap. If they have not, `DECISIONS.md` still ends at D-044 and D-053 lands directly after it, leaving D-045 to D-052 missing. **That gap is correct and expected: do not renumber this entry down, do not fill the gap, and do not write another stage's entry here.**
+- **The entry title is spec 6d's stage D row, verbatim:** `Tutor: plum user bubble, ` + backticked `Button tone="plum"` + `, starters as rows`. Spec 6d gives stage D exactly one entry, so the reader-side calls from Tasks 5 and 6 are recorded inside it rather than in a second entry. Do not open a D-055.
+- **Five sub-entries are possible, two of them unconditional.** The unconditional pair (Task 5's reading of "last practiced", Task 6's index-driven split and the colon) is always written. The three conditional ones (Task 2's per-corner radius fallback, Task 2's hover-weight reflow reservation, Task 4's `shadow-lift!` cascade fallback) are written **only if that fallback was actually taken**, per the ledger. A fallback that was not taken is not a decision and gets no paragraph, not even a sentence saying it was not needed.
+- **Task 7 opens no sub-entry of its own.** If `DocMiniTOC.tsx` needed the reflow reservation, it is named as a second site inside Task 2's reservation paragraph.
+- If `### D-053.` is already present in `DECISIONS.md`, or if either doc's `## Modernization` section already carries a second line, stop. Do not append a copy. Diff what is there against Steps 3 to 10 and report the difference instead.
+- **The `## Modernization` heading already exists in both docs**, appended by stage C's last task. This task appends one line under it and does not repeat the heading. Step 1 confirms the heading is the last heading in each file, which is what makes an append at the end of the file land inside that section.
+- No em-dashes in any of the three appends (CLAUDE.md and the Global Constraints). Step 11 greps for them.
+- Match each file's existing shape. `DECISIONS.md` prose wraps at roughly 78 columns, and its entries are `### D-0NN. Sentence case title` followed by paragraphs, bold lead-ins allowed. `docs/06-ui-spec.md` and `docs/08-design-theme.md` both use one long physical line per paragraph, so each addendum is a single long line.
+- All three files end with a single newline and no trailing blank line. Each heredoc below opens with a blank line so the append separates cleanly and ends with one newline. Do not add a second trailing blank line.
+- **No gate runs in this task.** `npm run typecheck`, `npm run lint` and `npm run build` all ran green in Task 8, and these three files are markdown: they are outside the TypeScript program and outside the lint globs, so nothing written here can change a gate result. Step 11 proves the diff touches no file under `src/`. If it does, that is this task's mistake: `git checkout -- <the src file>` and re-run the gate before committing.
+- No path in this task contains `[topicId]`, so no `GIT_LITERAL_PATHSPECS=1` prefix is needed on the commit.
+
+- [ ] **Step 1: Confirm the starting state of all three files**
+
+Run from the repo root:
+
+```bash
+wc -l DECISIONS.md docs/06-ui-spec.md docs/08-design-theme.md
+grep -nE '^### D-0(4[4-9]|5[0-9])\.' DECISIONS.md
+grep -n '^## ' docs/06-ui-spec.md | tail -n 2
+grep -n '^## ' docs/08-design-theme.md | tail -n 2
+tail -n 3 docs/06-ui-spec.md
+tail -n 3 docs/08-design-theme.md
+```
+
+Expected: three line counts. A list of `### D-0NN.` headings ending at D-044 if stages A and C have not landed, or at D-051 plus D-052 and D-054 if they have, and with **no** `### D-053.` line. `## Modernization` is the **last** `##` heading in each doc, and each `tail` shows the heading followed by exactly one pointer line (stage C's), not two. If `### D-053.` already exists, or if either doc already carries two lines under that heading, stop per the contract and report. If `## Modernization` is missing from either doc, stage C has not landed: stop, because this task appends under a heading it does not own and must not create.
+
+- [ ] **Step 2: Settle the fallback ledger before writing a word**
+
+Take Task 8's step 12 part 3 summary and read off which of the three conditional entries were taken. If that summary is not to hand, derive it from the repo instead of guessing. Run from the repo root:
+
+```bash
+grep -n 'rounded-b[lr]-\[4px\]' src/components/chat/ChatMessageList.tsx
+grep -n "before:content-\[attr(data-text)\]" src/components/chat/ChatMessageList.tsx src/components/learn/DocMiniTOC.tsx
+grep -n 'shadow-lift!' src/components/chat/SessionMenu.tsx
+```
+
+Write down three answers, because Steps 4, 5 and 6 are each skipped or run on them:
+
+1. **Per-corner radius (Task 2):** the first grep prints a line means the fallback was taken, so Step 4 runs. No output (exit status 1) means the theme's 4px radius key emitted `rounded-bl-chip` and `rounded-br-chip` as intended, so Step 4 is skipped.
+2. **Hover-weight reservation (Task 2, possibly Task 7 as a second site):** the second grep tells you which files carry the reservation. No output means Step 5 is skipped. Output for `ChatMessageList.tsx` alone means Step 5a runs. Output for both files means Step 5b runs instead.
+3. **Cascade fallback (Task 4):** the third grep printing a line means `shadow-sheet` won the cascade and `shadow-lift!` was needed, so Step 6 runs. No output means Step 6 is skipped.
+
+- [ ] **Step 3: Append the D-053 heading and its opening paragraph to `DECISIONS.md`**
+
+Run from the repo root, exactly as written:
+
+```bash
+cat >> DECISIONS.md <<'ENTRY'
+
+### D-053. Tutor: plum user bubble, `Button tone="plum"`, starters as rows
+
+`docs/superpowers/specs/2026-08-21-ui-modernization-design.md` sections 3d and
+5 restyle the model-doc reading sheet and the tutor drawer. The title above is
+the row spec 6d assigns to this stage, and 6d gives stage D exactly one entry,
+so the reader-side calls are recorded here as well. What follows is the set of
+choices the build had to make that were not derivable from docs/06 or docs/08,
+in the order the tasks land them.
+
+Nothing structural moved on either surface. The drawer keeps the overlay
+positioning, the `inert` handling, Escape and the focus return that stage B
+shipped, and streaming, the header JSON line protocol, `useChatContext` and the
+chat API are untouched (spec 5f). The reading sheet keeps its route, its data
+loading and its KaTeX pipeline (spec 3d). Every primitive used on both screens
+comes from stage A and none of them was edited.
+ENTRY
+```
+
+- [ ] **Step 4: Append the per-corner radius paragraph, only if the ledger says that fallback was taken**
+
+Skip this step entirely if Step 2's first answer was "not taken". Otherwise run from the repo root, exactly as written:
+
+```bash
+cat >> DECISIONS.md <<'ENTRY'
+
+**The chat bubbles write their odd corner as an arbitrary length.** The
+assistant bubble is radius 10 with its bottom-left corner at 4, and the user
+bubble radius 10 with its bottom-right corner at 4, so both should have taken
+the 4px radius token as `rounded-bl-chip` and `rounded-br-chip`. Tailwind did
+not emit those per-corner utilities for the key stage A named, and no other 4px
+radius token exists to point at, so the two corners are written
+`rounded-bl-[4px]` and `rounded-br-[4px]` at the call site. The arbitrary length
+is deliberate and is not a token in disguise: spec 1a bans arbitrary alpha and
+the stage grep bans `text-[`, neither of which covers a length. Adding a fourth
+radius token was the alternative and it is out of scope, because spec 7 freezes
+the three radii for the whole modernization.
+ENTRY
+```
+
+- [ ] **Step 5: Append the hover-weight reservation paragraph, only if the ledger says that reservation was taken**
+
+Skip this step entirely if Step 2's second answer was "not taken". Otherwise run **exactly one** of 5a and 5b, whichever the ledger says.
+
+**Step 5a, the reservation was needed on the starter rows only.** Run from the repo root, exactly as written:
+
+```bash
+cat >> DECISIONS.md <<'ENTRY'
+
+**Hover reserves the heavier metrics instead of only stepping the weight.** A
+starter row's label steps from 400 to 500 on hover, which is the whole hover
+signal on that row, and 500 is wider than 400 at the same size: measured, the
+row rewrapped and the sheet twitched under the pointer. The label now carries an
+invisible `::before` pseudo-element holding the same string at the heavier
+weight with zero height,
+`before:invisible before:block before:h-0 before:font-medium before:content-[attr(data-text)]`,
+fed from a `data-text` attribute, so the row is laid out at the 500 metrics from
+first paint and hover only repaints. The two cheaper options both lose
+something: setting 500 permanently removes the hover signal, and compensating
+with a transform or with letter-spacing moves the text under the pointer, which
+is the thing being avoided.
+ENTRY
+```
+
+**Step 5b, the reservation was needed on the starter rows and on the mini TOC.** Run from the repo root, exactly as written:
+
+```bash
+cat >> DECISIONS.md <<'ENTRY'
+
+**Hover and active weight reserve the heavier metrics instead of only stepping
+the weight.** A starter row's label steps from 400 to 500 on hover, which is the
+whole hover signal on that row, and 500 is wider than 400 at the same size:
+measured, the row rewrapped and the sheet twitched under the pointer. The label
+now carries an invisible `::before` pseudo-element holding the same string at
+the heavier weight with zero height,
+`before:invisible before:block before:h-0 before:font-medium before:content-[attr(data-text)]`,
+fed from a `data-text` attribute, so the row is laid out at the 500 metrics from
+first paint and hover only repaints. The two cheaper options both lose
+something: setting 500 permanently removes the hover signal, and compensating
+with a transform or with letter-spacing moves the text under the pointer, which
+is the thing being avoided.
+
+The mini TOC in `src/components/learn/DocMiniTOC.tsx` needed the same
+reservation for the same reason, and it is the worse of the two cases: its
+active title steps to 500 as you scroll rather than on a deliberate hover, so a
+two-line title rewrapping made the sticky column move on its own. The same
+pseudo-element reservation is applied to the TOC title span.
+ENTRY
+```
+
+- [ ] **Step 6: Append the cascade-fallback paragraph, only if the ledger says that fallback was taken**
+
+Skip this step entirely if Step 2's third answer was "not taken". Otherwise run from the repo root, exactly as written:
+
+```bash
+cat >> DECISIONS.md <<'ENTRY'
+
+**The session menu forces its shadow with the Tailwind v4 important suffix.**
+The menu panel is stage A's `Sheet` with `shadow-lift` passed through
+`className`, which puts two shadow utilities on one element: `shadow-sheet` from
+the primitive's base and `shadow-lift` from the call site. `cx` only joins
+strings, so the winner is decided by the order the two utilities appear in the
+compiled stylesheet rather than by their order in the attribute. Measured
+against both tokens, `shadow-sheet` won, and a menu panel that sits above a
+sheet needs the heavier shadow to read as above it. The class is therefore
+written `shadow-lift!`. Teaching `Sheet` a shadow prop would have been the
+tidier fix and it is out of scope: stage D consumes stage A's primitives and
+never edits them, and a prop added here would land untested on every other
+`Sheet` call site in the app.
+ENTRY
+```
+
+- [ ] **Step 7: Append the "last practiced" paragraph (unconditional)**
+
+Run from the repo root, exactly as written:
+
+```bash
+cat >> DECISIONS.md <<'ENTRY'
+
+**"Last practiced" on the doc meta strip means the topic's most recent
+attempt.** Attempts hang off problems and problems hang off topics, so an
+attempt is never tied to a document: the phrase the strip has to print has no
+exact source. It shows the most recent attempt on this document's topic, which
+is what practising means to the person reading the sheet, because Practice runs
+per topic rather than per document. The honest alternative was to drop the line,
+and the strip is thin enough already: it carries the "Exemplar" chip when it
+applies, "n models" and this, and nothing else. The query is written inline with
+`prisma` next to the `findUnique` the doc branch already runs, rather than added
+to `src/lib/attempts.ts`, so this stage still touches only the files its plan
+lists.
+ENTRY
+```
+
+- [ ] **Step 8: Append the index-driven split paragraph (unconditional)**
+
+Run from the repo root, exactly as written:
+
+```bash
+cat >> DECISIONS.md <<'ENTRY'
+
+**The reader splits the document against the parsed index, and a heading reads
+"Model n: title".** The reading sheet stopped rendering the document as one
+markdown blob, because a `## Model n` heading emitted by the markdown renderer
+cannot carry a numeral behind it or a copy-link beside it without editing the
+renderer, and the renderer is a stage A primitive. The split is a pure
+`splitModelSections(contentMd, models)` exported from
+`src/components/learn/DocReader.tsx`, taking the entries `src/lib/modelIndex.ts`
+already parsed. It was deliberately not added to `modelIndex.ts`: the index
+parser has other callers and returns a document's structure, while the split is
+a rendering concern that only this surface has. Any text before the first
+heading renders as its own preamble block, so no document silently loses its
+opening, and the anchor a link points at is now `ModelHeading`'s wrapper rather
+than the heading element itself, which changes nothing for a reader following a
+`#model-n` URL.
+
+The heading joins the number and the title with a colon rather than reproducing
+the separator the seeded exemplar uses, which is an em-dash. House style bans
+em-dashes in copy (CLAUDE.md), and a heading composed at render time is new
+copy. The exemplar file itself is untouched: it is the generation quality bar
+and is never edited.
+ENTRY
+```
+
+- [ ] **Step 9: Append the pointer line to `docs/06-ui-spec.md`**
+
+The `## Modernization` heading is already there. This append adds one line under it. Run from the repo root, exactly as written:
+
+```bash
+cat >> docs/06-ui-spec.md <<'ADDENDUM'
+
+That spec's section 3d supersedes the model-doc reader described in §2 (numbered headings with an accent numeral behind them, a per-heading copy-link, and a live mini TOC from `lg` up), and its section 5 supersedes the tutor drawer described in §5 (a plum header band, the starters as rows, plum user bubbles, a paper composer and a sheet session menu). This line is a pointer, not a rewrite (spec 6b.6).
+ADDENDUM
+```
+
+- [ ] **Step 10: Append the pointer line to `docs/08-design-theme.md`**
+
+The `## Modernization` heading is already there. This append adds one line under it. Run from the repo root, exactly as written:
+
+```bash
+cat >> docs/08-design-theme.md <<'ADDENDUM'
+
+That spec's section 3d (the model-doc reading sheet) and section 5 (the tutor drawer) re-apply this theme rather than editing it: no color value, font or radius on this page moves, the drawer's header band and user bubbles take the existing plum stock with `paper-0` text on it, and the reader's heading numeral is the topic accent at 16%, one of the two numeral opacities the spec allows. This line is a pointer, not a rewrite (spec 6b.6).
+ADDENDUM
+```
+
+- [ ] **Step 11: Read the three appends back and check them**
+
+Run from the repo root:
+
+```bash
+grep -c $'\xe2\x80\x94' DECISIONS.md docs/06-ui-spec.md docs/08-design-theme.md
+grep -n '^### D-053\.' DECISIONS.md
+grep -c '^## Modernization$' docs/06-ui-spec.md docs/08-design-theme.md
+tail -n 6 docs/06-ui-spec.md
+tail -n 6 docs/08-design-theme.md
+git diff --stat DECISIONS.md docs/06-ui-spec.md docs/08-design-theme.md
+git status --short
+```
+
+Expected, and every line of it matters:
+
+- The em-dash count is `0` for all three files. A non-zero count means an append introduced one: find it with `grep -n` and replace it with a comma, a colon, parentheses or a hyphen.
+- Exactly one `### D-053.` line, and its title matches spec 6d's row.
+- Exactly one `## Modernization` line in each doc. A count of 2 means Step 9 or Step 10 re-added the heading: `git checkout -- <the doc>` and redo that append.
+- Each `tail` shows the heading, stage C's pointer line, a blank line, then the new line, in that order.
+- `git diff --stat` shows **three** files changed, insertions only, **zero deletions**. A deletion means an existing line was rewritten, which the contract forbids: `git checkout -- <file>` and redo the append.
+- `git status --short` lists exactly those three entries and nothing under `src/`. If a `src/` file appears, revert it and re-run `npm run typecheck && npm run lint && npm run build` before going on.
+
+Then read the D-053 entry itself once, top to bottom, and check it against the ledger: it holds the two unconditional paragraphs plus exactly the conditional paragraphs Step 2 said were taken, no more. A paragraph describing a fallback that was not taken is worse than no paragraph, because the next reader will go looking for code that is not there.
+
+- [ ] **Step 12: Commit**
+
+```bash
+git add DECISIONS.md docs/06-ui-spec.md docs/08-design-theme.md
+git commit -m "docs: record D-053 and point docs/06 and docs/08 at the reader and tutor spec sections"
+git status --short
+```
+
+Expected: `git status --short` prints nothing.
+
+- [ ] **Step 13: Close stage D and the modernization**
+
+Stage D is done when this commit lands and Task 8's pass is green. What is deliberately still open, so the next reader does not go looking for it here:
+
+- D-045 to D-052 and D-054 belong to stages A and C. If they are missing from `DECISIONS.md`, those stages have not landed yet. Do not write them from this plan, and do not renumber D-053 to close the gap.
+- `docs/06-ui-spec.md` and `docs/08-design-theme.md` keep every pre-modernization sentence they had. They are correct as history plus a pointer, and rewriting them is out of scope (spec 7).
+- Task 8's step 5 finding (Escape from a menu item that Tab focused drops focus to `<body>`) is recorded in that task's summary and accepted. Spec 5e asks for no focus trap and spec 7 puts new focus management out of scope, so it is not a defect and it is not a decision entry.
+- Any Task 8 step that ended "unobservable" for want of seed data (a persisted chat session, a diagnosed attempt) is still unobservable. It was not written up as passed and it is not closed by this commit.
+- The four stage plans are now all executed. The spec's sections 1 to 5 are landed, 6 is verified, 7 stayed out of scope and 8's open risks are the standing list for whatever comes next.
+
+---
