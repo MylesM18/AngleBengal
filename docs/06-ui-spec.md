@@ -88,3 +88,7 @@ chat/        ChatDrawer, ChatMessageList, ChatComposer, SessionMenu
 - KaTeX render errors (bad LaTeX) render the raw string in a subtle mono style rather than crashing (`errorColor` + `throwOnError:false`).
 - Keyboard: problem Submit on Enter when answer input focused; Learn tree navigable by arrows.
 - Accessibility floor: all toolbar buttons labeled, focus states visible, drawer traps focus, canvas has a text alternative summarizing tool state.
+
+## Modernization addendum (2026-08-21)
+
+The Editorial-paper modernization re-applies this document rather than replacing it. Where the two differ, `docs/superpowers/specs/2026-08-21-ui-modernization-design.md` is the contract: the hairline token and one-kraft-strip rule (spec 1a), the six-token type scale (1c), the `.doc-prose` layer fix and `MarkdownMath` variants (1d), the motion budget (1e), the primitives in `src/components/ui/` (1f), the 48px header and overlay drawer (2), and the Learn, Practice and tutor treatments (3 to 5). Decisions D-045 to D-054 in `DECISIONS.md` record each deviation.

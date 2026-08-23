@@ -168,3 +168,7 @@ Paper physics only: slide, settle, lift, press. Durations 150-220ms, `cubic-bezi
    **The font variables must go on `<html>`, not `<body>`.** Tailwind's `@theme` emits `--font-sans/-serif/-mono/-display` onto `:root`, and a custom property is substituted at the element that declares it. If the next/font variables they reference sit one level down on `<body>`, all four resolve to invalid at `:root` and inherit down invalid, and the whole app silently falls back to system fonts.
 4. The grain data-URI lives in one CSS class (`.stock-textured`), applied to desk and kraft only.
 5. `brand/theme-showcase.html` in this bundle is the visual reference implementation of everything above; when a treatment is ambiguous in words, match the showcase.
+
+## Modernization addendum (2026-08-21)
+
+The Editorial-paper modernization re-applies this document rather than replacing it. Where the two differ, `docs/superpowers/specs/2026-08-21-ui-modernization-design.md` is the contract: the hairline token and one-kraft-strip rule (spec 1a), the six-token type scale (1c), the `.doc-prose` layer fix and `MarkdownMath` variants (1d), the motion budget (1e), the primitives in `src/components/ui/` (1f), the 48px header and overlay drawer (2), and the Learn, Practice and tutor treatments (3 to 5). Decisions D-045 to D-054 in `DECISIONS.md` record each deviation.

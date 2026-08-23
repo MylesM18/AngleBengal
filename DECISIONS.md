@@ -602,3 +602,35 @@ No new query: `getTopicTree()` already returns `docCount` and
 separate grouped query so unverified problems can never be surfaced
 (non-negotiable 2). The page flattens that tree and filters it. Accents come
 from `getRootNameByTopicId()`, matching the Learn index.
+
+### D-045. Hairline token and the one-kraft-strip rule
+
+The modernization spec (`docs/superpowers/specs/2026-08-21-ui-modernization-design.md`, 1a) adds `--color-hairline: rgba(50,41,33,.10)` as the only separator between rows inside a sheet. Regions are never outlined: every `border-ink-faint/40` box goes, and each screen carries at most one persistent kraft strip (the sketch toolbar on Practice, the meta strip on a doc page, none on the Learn index). Toasts stay kraft as slips with `shadow-lift`, per docs/08.
+
+### D-046. Six-token type scale, arbitrary `text-[px]` banned
+
+`@theme` now carries `--text-meta` (12/500), `--text-ui` (14/400), `--text-ui-lg` (16/500), `--text-read` (17/1.7 serif body), `--text-h2` (22/700), `--text-h1` (30/700) and `--text-display` (56/700), each with line-height and weight sub-properties (spec 1c). The sixteen arbitrary sizes in use migrate per the spec's table; new code never writes `text-[`. Nothing under 22px uses Advercase (docs/08 rule kept).
+
+### D-047. `.doc-prose` into `@layer components`, `MarkdownMath` variants, diagnosis explanation in the UI voice
+
+`.doc-prose` was unlayered and beat every Tailwind utility, so `className="text-[12.5px]"` on `MarkdownMath` rendered at 17px serif. The block now lives in `@layer components`, KaTeX's stylesheet imports into `layer(base)` so the prose overrides still win, and `MarkdownMath` takes `variant: "reading" | "ui" | "chat"` (spec 1d). History statements, the answer preview, the clean-copy panel and the DiagnosisCard explanation use `ui`; docs/08 called for serif on the diagnosis explanation and this deviates on purpose for one UI voice in the panel chrome. The problem statement stays `reading`.
+
+### D-048. In-repo `Icon`, no icon dependency
+
+Twelve 16px glyphs (pen, eraser, undo, clear, grid, graph, plus, chevron, check, cross, copy, close) as inline SVG paths with a 1.5px `currentColor` stroke in `src/components/ui/Icon.tsx` (spec 1f). An icon library would add a dependency for a dozen shapes.
+
+### D-049. Overlay drawer, no scrim, Tab focus trap dropped
+
+The tutor drawer will overlay the workspace (`absolute`, `translate-x`) instead of pushing `main` with a negative margin, so `SketchCanvas` never re-measures when it opens (spec 2b). It is non-modal: no scrim, no Tab-cycling trap; `inert` + `aria-hidden` when closed, Escape closes, focus returns to the Tutor chip. Recorded here in stage A because the shell stage implements it.
+
+### D-050. Settings as a nav chip beside Tutor
+
+Settings joins Learn and Practice as a `Chip variant="nav"` on the right of the top bar, before the plum Tutor chip, instead of a bare text link (spec 2a).
+
+### D-051. Learn index field is generate-only; search lives in the rail; cover grid falls back past 12 roots
+
+The field on `/learn` generates a topic and never filters; with about 12 roots the cover grid needs no search. Topic search lives in the in-topic rail. Past 12 roots the cover grid collapses to the rail list (spec 3a, 3b).
+
+### D-054. No test runner added in this work
+
+The repo has no `npm test` and this work adds none (spec 6b, 6d). Gates are `npm run typecheck`, `npm run lint`, `npm run build` and the browser passes in the spec. Pure logic that later stages add (`useSplitRatio`'s clamp math, `truncateMiddle`) lives as plain functions in `src/lib/` so a runner can cover them later without refactoring. D-052 and D-053 are written by stages C and D.
