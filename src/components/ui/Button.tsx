@@ -11,9 +11,15 @@ export type ButtonTone = "brand" | "plum";
 const BASE =
   "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-input text-ui font-semibold transition-[background-color,box-shadow,transform] duration-150 ease-paper active:translate-y-px active:shadow-none disabled:pointer-events-none disabled:opacity-50";
 
-const SIZE: Record<ButtonSize, string> = {
-  sm: "h-6 px-2.5",
-  md: "h-8 px-3.5",
+const SIZE_H: Record<ButtonSize, string> = {
+  sm: "h-6",
+  md: "h-8",
+};
+
+/** Side padding for the filled and outlined variants; tertiary keeps its own px-1. */
+const SIZE_PX: Record<ButtonSize, string> = {
+  sm: "px-2.5",
+  md: "px-3.5",
 };
 
 const VARIANT: Record<ButtonVariant, string> = {
@@ -39,7 +45,14 @@ export function buttonClasses({
   tone?: ButtonTone;
   className?: string;
 }): string {
-  return cx(BASE, SIZE[size], VARIANT[variant], variant === "primary" && PRIMARY_TONE[tone], className);
+  return cx(
+    BASE,
+    SIZE_H[size],
+    variant !== "tertiary" && SIZE_PX[size],
+    VARIANT[variant],
+    variant === "primary" && PRIMARY_TONE[tone],
+    className,
+  );
 }
 
 type SharedProps = {
