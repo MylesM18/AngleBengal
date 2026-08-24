@@ -4,15 +4,23 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
-import { ProblemSkeleton } from "@/components/ui/Skeleton";
 import { snapshotSketch } from "@/components/sketchpad/Sketchpad";
 import { SketchpadUnavailableNote } from "@/components/sketchpad/SketchpadUnavailableNote";
+import { BaseBand } from "@/components/ui/BaseBand";
+import { Button } from "@/components/ui/Button";
+import { chipClasses } from "@/components/ui/Chip";
+import { CornerNumeral } from "@/components/ui/CornerNumeral";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Notice } from "@/components/ui/Notice";
+import { Sheet } from "@/components/ui/Sheet";
+import { ProblemSkeleton } from "@/components/ui/Skeleton";
 import {
   clearActiveProblem,
   markRevealed,
   setActiveProblem,
 } from "@/lib/practiceSession";
 import { useSketchStore } from "@/lib/sketch/store";
+import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
 
 import {
   AnswerInput,
@@ -24,7 +32,6 @@ import {
 } from "./AnswerInput";
 import { DiagnosisCard } from "./DiagnosisCard";
 import { DifficultySelector } from "./DifficultySelector";
-import { PoolEmptyState } from "./PoolEmptyState";
 
 /**
  * The practice loop's left panel (docs/06 §3). The sketchpad that shares this
@@ -234,13 +241,29 @@ export function PracticePanel({
 
   const solutionShown = outcome?.correct ? outcome.solutionMd : revealedSolution;
   const locked = Boolean(outcome?.correct) || revealedSolution !== null;
+  /** The root topic's accent drives the card's numeral and base band (docs/08). */
+  const accent = ACCENT_VAR[accentForRoot(topicPath[0] ?? "")];
+
+  const terminalActions =
+    outcome && !outcome.correct && !locked ? (
+      <>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setOutcome(null);
+            setError(null);
+          }}
+        >
+          Try again
+        </Button>
+        <Button onClick={() => loadProblem()}>Next problem</Button>
+      </>
+    ) : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="stock-textured flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-ink-faint/40 bg-kraft px-4 py-2.5">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[12px] text-ink">{topicPath.join("  ›  ")}</p>
-        </div>
+      <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline bg-paper-1 px-4 py-2.5">
+        <p className="min-w-0 flex-1 truncate text-meta text-ink">{topicPath.join("  ›  ")}</p>
         <DifficultySelector
           value={difficulty}
           counts={counts}
@@ -255,38 +278,44 @@ export function PracticePanel({
             setDifficulty(level);
           }}
         />
-        <button
-          type="button"
-          onClick={() => loadProblem()}
-          disabled={loading || generating}
-          className="rounded-input border-[1.5px] border-ink bg-paper-0 px-2.5 py-1.5 text-[12.5px] font-semibold text-ink disabled:opacity-50"
-        >
-          New problem
-        </button>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
         {loading ? (
           <ProblemSkeleton />
         ) : !problem ? (
-          <PoolEmptyState
-            difficulty={difficulty}
-            generating={generating}
-            lastRun={lastRun}
-            error={error}
-            onGenerate={() => void generate()}
-          />
+          <div className="flex flex-col gap-3">
+            <EmptyState
+              title={generating ? "Writing and checking problems" : "No problems ready"}
+              line={
+                generating
+                  ? "Each problem is solved a second time, independently, before it can be shown to you. Problems the check disagrees with are discarded."
+                  : `Nothing verified and unsolved at difficulty ${difficulty} yet.`
+              }
+              accent={accent}
+              action={
+                <Button loading={generating} onClick={() => void generate()}>
+                  {generating ? "Working..." : "Generate 5 problems"}
+                </Button>
+              }
+            />
+
+            {lastRun && !generating && (
+              <Notice kind="info">
+                Last run: generated {lastRun.requested}, verifying passed{" "}
+                <strong>{lastRun.verified}</strong>
+                {lastRun.discarded > 0 && `, discarded ${lastRun.discarded}`}.
+              </Notice>
+            )}
+
+            {error && <Notice kind="error">{error}</Notice>}
+          </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <section className="relative overflow-hidden rounded-card bg-paper-1 pb-[16px] shadow-sheet">
-              <span
-                aria-hidden
-                className="display-cut absolute top-1 right-3 text-[56px] leading-none text-brand opacity-[0.16]"
-              >
-                {problem.difficulty}
-              </span>
+            <Sheet tone="paper-0" className="relative overflow-hidden pb-4">
+              <CornerNumeral n={problem.difficulty} color={accent} size={30} />
               <div className="p-4">
-                <MarkdownMath>{problem.statementMd}</MarkdownMath>
+                <MarkdownMath variant="reading">{problem.statementMd}</MarkdownMath>
 
                 {problem.modelTags.length > 0 && (
                   <ul className="mt-3 flex flex-wrap gap-1.5">
@@ -294,7 +323,7 @@ export function PracticePanel({
                       <li key={`${tag.docId}-${tag.modelNumber}`}>
                         <Link
                           href={`/learn/${tag.topicId}?doc=${tag.docId}#model-${tag.modelNumber}`}
-                          className="stock-textured inline-block rounded-chip bg-kraft px-2 py-1 text-[11px] font-semibold text-ink transition-shadow hover:shadow-sheet"
+                          className={chipClasses({ variant: "meta", className: "font-semibold" })}
                         >
                           M{tag.modelNumber} · {tag.title}
                         </Link>
@@ -303,8 +332,8 @@ export function PracticePanel({
                   </ul>
                 )}
               </div>
-              <span aria-hidden className="absolute inset-x-0 bottom-0 h-[16px] bg-brand" />
-            </section>
+              <BaseBand color={accent} />
+            </Sheet>
 
             <section className="flex flex-col gap-3">
               <AnswerInput
@@ -317,122 +346,76 @@ export function PracticePanel({
               />
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void submit()}
-                  disabled={submitting || locked}
-                  className="rounded-input bg-brand px-3.5 py-2 text-[13px] font-semibold text-paper-0 transition-transform hover:bg-brand-deep active:translate-y-px disabled:opacity-50"
-                >
+                <Button loading={submitting} disabled={locked} onClick={() => void submit()}>
                   {submitting ? "Checking..." : "Submit"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => loadProblem()}
-                  disabled={submitting}
-                  className="rounded-input border-[1.5px] border-ink bg-paper-0 px-3 py-2 text-[13px] font-semibold text-ink disabled:opacity-50"
-                >
+                </Button>
+                <Button variant="tertiary" disabled={submitting} onClick={() => loadProblem()}>
                   Skip
-                </button>
+                </Button>
                 {!locked && (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmReveal(true)}
+                  <Button
+                    variant="tertiary"
                     disabled={submitting}
-                    className="text-[13px] font-semibold text-cobalt hover:underline disabled:opacity-50"
+                    onClick={() => setConfirmReveal(true)}
                   >
                     Show solution
-                  </button>
+                  </Button>
                 )}
               </div>
 
               {confirmReveal && (
-                <div className="rounded-input border-l-[3px] border-marigold bg-marigold-tint px-3 py-2.5">
-                  <p className="text-[12.5px] text-ink">This counts as unsolved. Show it anyway?</p>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void reveal()}
-                      className="rounded-chip bg-ink px-2.5 py-1 text-[12px] font-semibold text-paper-0"
-                    >
-                      Show solution
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmReveal(false)}
-                      className="rounded-chip border border-ink px-2.5 py-1 text-[12px] font-semibold text-ink"
-                    >
-                      Keep trying
-                    </button>
-                  </div>
-                </div>
+                <Notice
+                  kind="warning"
+                  action={
+                    <>
+                      <Button variant="destructive" size="sm" onClick={() => void reveal()}>
+                        Show solution
+                      </Button>
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        onClick={() => setConfirmReveal(false)}
+                      >
+                        Keep trying
+                      </Button>
+                    </>
+                  }
+                >
+                  This counts as unsolved. Show it anyway?
+                </Notice>
               )}
 
-              {error && (
-                <p className="rounded-input border-l-[3px] border-red bg-red-tint px-2.5 py-2 text-[12.5px] text-ink">
-                  {error}
-                </p>
-              )}
+              {error && <Notice kind="error">{error}</Notice>}
             </section>
 
-            {outcome?.correct && (
-              <section className="overflow-hidden rounded-card bg-paper-1 shadow-sheet">
-                <div className="flex items-center gap-2 border-l-[4px] border-green px-4 py-2.5">
-                  <span aria-hidden className="text-[15px] text-green">
-                    ✓
-                  </span>
-                  <p className="text-[13.5px] font-semibold text-ink">Correct</p>
-                </div>
-              </section>
-            )}
+            {outcome?.correct && <Notice kind="success">Correct</Notice>}
 
             {outcome && !outcome.correct && outcome.diagnosis && (
-              <DiagnosisCard diagnosis={outcome.diagnosis} />
+              <DiagnosisCard diagnosis={outcome.diagnosis} actions={terminalActions} />
             )}
 
             {outcome && !outcome.correct && !outcome.diagnosis && (
-              <section className="rounded-card bg-paper-1 shadow-sheet">
-                <div className="border-l-[4px] border-red px-4 py-3">
-                  <p className="text-[13.5px] font-semibold text-ink">
-                    <span aria-hidden className="mr-1.5 text-red">
-                      ✗
-                    </span>
-                    Not quite
-                  </p>
-                  <p className="mt-1 max-w-[52ch] text-[12.5px] leading-relaxed text-ink-soft">
-                    Nothing here points clearly at one model, so this is not attributed to
-                    one. Try again, or show the solution.
-                  </p>
-                </div>
-              </section>
+              <Notice kind="error">
+                <p className="font-semibold">Not quite</p>
+                <p className="mt-1 max-w-[52ch] text-ink-soft">
+                  Nothing here points clearly at one model, so this is not attributed to one.
+                  Try again, or show the solution.
+                </p>
+              </Notice>
             )}
 
-            {outcome && !outcome.correct && (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOutcome(null);
-                    setError(null);
-                  }}
-                  className="rounded-input border-[1.5px] border-ink bg-paper-0 px-3 py-1.5 text-[12.5px] font-semibold text-ink"
-                >
-                  Try again
-                </button>
-              </div>
+            {outcome && !outcome.correct && !outcome.diagnosis && terminalActions && (
+              <div className="flex flex-wrap gap-2">{terminalActions}</div>
             )}
 
             {solutionShown && (
-              <section className="rounded-card bg-paper-0 p-4 shadow-sheet">
+              <Sheet tone="paper-0" className="p-4">
                 <p className="meta-caps mb-2 text-ink-soft">Solution</p>
-                <MarkdownMath>{solutionShown}</MarkdownMath>
-                <button
-                  type="button"
-                  onClick={() => loadProblem()}
-                  className="mt-3 rounded-input bg-brand px-3.5 py-2 text-[13px] font-semibold text-paper-0 hover:bg-brand-deep"
-                >
+                <MarkdownMath variant="reading">{solutionShown}</MarkdownMath>
+                <Button className="mt-3" onClick={() => loadProblem()}>
                   Next problem
-                </button>
-              </section>
+                </Button>
+              </Sheet>
             )}
           </div>
         )}
