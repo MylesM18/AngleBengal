@@ -1,5 +1,7 @@
-import { costByPrompt } from "@/lib/attempts";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Sheet } from "@/components/ui/Sheet";
 import { AI_MODELS } from "@/lib/ai/config";
+import { costByPrompt } from "@/lib/attempts";
 
 export const dynamic = "force-dynamic";
 
@@ -25,103 +27,112 @@ export default async function SettingsPage() {
   const number = (value: number) => value.toLocaleString("en-US");
 
   return (
-    <div className="mx-auto max-w-[760px] px-8 py-10">
-      <h1 className="display-cut text-[30px] leading-tight text-ink">Settings</h1>
+    <div className="h-full overflow-y-auto p-2">
+      <div className="max-w-[860px] pt-16">
+        <h1 className="display-cut text-h1 text-ink">Settings</h1>
 
-      <section className="mt-8">
-        <h2 className="meta-caps mb-3 text-ink-soft">AI usage</h2>
-
-        {rows.length === 0 ? (
-          <div className="stock-textured rounded-card bg-kraft p-5">
-            <p className="text-[13px] text-ink">No AI calls logged yet.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-card bg-paper-1 shadow-sheet">
-            <table className="w-full text-[13px]">
-              <caption className="sr-only">
-                Token usage and call counts by prompt
-              </caption>
-              <thead className="bg-marigold-tint">
-                <tr>
-                  <th scope="col" className="px-3 py-2 text-left font-bold">
-                    Prompt
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-right font-bold">
-                    Calls
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-right font-bold">
-                    Input
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-right font-bold">
-                    Output
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-right font-bold">
-                    Avg time
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.promptName} className="border-t border-ink-faint/40">
-                    <th scope="row" className="px-3 py-2 text-left font-semibold text-ink">
-                      {row.promptName}
-                      {row.failed > 0 && (
-                        <span className="ml-1.5 text-[11px] font-normal text-red">
-                          {row.failed} failed
-                        </span>
-                      )}
-                    </th>
-                    <td className="px-3 py-2 text-right tabular-nums">{number(row.calls)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {number(row.inputTokens)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {number(row.outputTokens)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-ink-soft">
-                      {row.calls ? `${Math.round(row.totalMs / row.calls / 100) / 10}s` : "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-ink-faint bg-paper-0">
-                  <th scope="row" className="px-3 py-2 text-left font-bold text-ink">
-                    Total
-                  </th>
-                  <td className="px-3 py-2 text-right font-bold tabular-nums">
-                    {number(totals.calls)}
-                  </td>
-                  <td className="px-3 py-2 text-right font-bold tabular-nums">
-                    {number(totals.input)}
-                  </td>
-                  <td className="px-3 py-2 text-right font-bold tabular-nums">
-                    {number(totals.output)}
-                  </td>
-                  <td className="px-3 py-2" />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+        {rows.length === 0 && (
+          <EmptyState
+            title="No AI calls logged yet"
+            line="Generate a topic or practice a problem and the token usage shows up here."
+            accent="var(--color-marigold)"
+            className="mt-6"
+          />
         )}
 
-        <p className="mt-2 max-w-[60ch] text-[12px] leading-relaxed text-ink-soft">
-          Tokens, not dollars: prices change independently of this app, and a stale
-          hardcoded rate would mislead more than it informs.
-        </p>
-      </section>
+        <Sheet tone="paper-1" className="animate-enter-sheet mt-6 divide-y divide-hairline overflow-hidden">
+          {rows.length > 0 && (
+            <section aria-labelledby="settings-usage">
+              <h2 id="settings-usage" className="meta-caps px-4 pt-3 pb-2 text-ink-soft">
+                AI usage
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-ui">
+                  <caption className="sr-only">Token usage and call counts by prompt</caption>
+                  <thead className="bg-marigold-tint">
+                    <tr>
+                      <th scope="col" className="px-4 py-2 text-left font-bold">
+                        Prompt
+                      </th>
+                      <th scope="col" className="px-4 py-2 text-right font-bold">
+                        Calls
+                      </th>
+                      <th scope="col" className="px-4 py-2 text-right font-bold">
+                        Input
+                      </th>
+                      <th scope="col" className="px-4 py-2 text-right font-bold">
+                        Output
+                      </th>
+                      <th scope="col" className="px-4 py-2 text-right font-bold">
+                        Avg time
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {rows.map((row) => (
+                      <tr key={row.promptName}>
+                        <th scope="row" className="px-4 py-2 text-left font-semibold text-ink">
+                          {row.promptName}
+                          {row.failed > 0 && (
+                            <span className="ml-1.5 text-meta font-normal text-red">
+                              {row.failed} failed
+                            </span>
+                          )}
+                        </th>
+                        <td className="px-4 py-2 text-right tabular-nums">{number(row.calls)}</td>
+                        <td className="px-4 py-2 text-right tabular-nums">
+                          {number(row.inputTokens)}
+                        </td>
+                        <td className="px-4 py-2 text-right tabular-nums">
+                          {number(row.outputTokens)}
+                        </td>
+                        <td className="px-4 py-2 text-right tabular-nums text-ink-soft">
+                          {row.calls ? `${Math.round(row.totalMs / row.calls / 100) / 10}s` : "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-hairline bg-paper-0">
+                      <th scope="row" className="px-4 py-2 text-left font-bold text-ink">
+                        Total
+                      </th>
+                      <td className="px-4 py-2 text-right font-bold tabular-nums">
+                        {number(totals.calls)}
+                      </td>
+                      <td className="px-4 py-2 text-right font-bold tabular-nums">
+                        {number(totals.input)}
+                      </td>
+                      <td className="px-4 py-2 text-right font-bold tabular-nums">
+                        {number(totals.output)}
+                      </td>
+                      <td className="px-4 py-2" />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <p className="max-w-[60ch] px-4 py-3 text-meta leading-relaxed text-ink-soft">
+                Tokens, not dollars: prices change independently of this app, and a stale
+                hardcoded rate would mislead more than it informs.
+              </p>
+            </section>
+          )}
 
-      <section className="mt-8">
-        <h2 className="meta-caps mb-3 text-ink-soft">Models in use</h2>
-        <dl className="rounded-card bg-paper-1 p-4 shadow-sheet">
-          {Object.entries(AI_MODELS).map(([role, id]) => (
-            <div key={role} className="flex gap-3 py-1 text-[13px]">
-              <dt className="w-[110px] shrink-0 font-semibold text-ink">{role}</dt>
-              <dd className="font-mono text-[12.5px] text-ink-soft">{id}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+          <section aria-labelledby="settings-models" className="px-4 pt-3 pb-4">
+            <h2 id="settings-models" className="meta-caps mb-2 text-ink-soft">
+              Models in use
+            </h2>
+            <dl className="divide-y divide-hairline">
+              {Object.entries(AI_MODELS).map(([role, id]) => (
+                <div key={role} className="flex gap-3 py-1.5 text-ui">
+                  <dt className="w-[110px] shrink-0 font-semibold text-ink">{role}</dt>
+                  <dd className="font-mono text-meta text-ink-soft">{id}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </Sheet>
+      </div>
     </div>
   );
 }
