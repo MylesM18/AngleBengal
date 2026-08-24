@@ -1,4 +1,4 @@
-import { TopicTree } from "@/components/learn/TopicTree";
+import { TopicRail } from "@/components/learn/TopicRail";
 import { Sheet } from "@/components/ui/Sheet";
 import { getTopicTree } from "@/lib/topics";
 
@@ -13,7 +13,6 @@ export const dynamic = "force-dynamic";
  *
  * The rail is a full-height, self-scrolling column: the page frame scrolls
  * the content column, not the window, so there is nothing for it to stick to.
- * Task 5 swaps TopicTree for TopicRail; nothing else here changes.
  */
 export default async function TopicLayout({ children }: { children: React.ReactNode }) {
   const topics = await getTopicTree();
@@ -26,7 +25,7 @@ export default async function TopicLayout({ children }: { children: React.ReactN
         aria-label="Topics"
         className="hidden h-full min-h-0 w-[320px] shrink-0 flex-col overflow-y-auto py-2 lg:flex"
       >
-        <TopicTree topics={topics} />
+        <TopicRail topics={topics} />
       </Sheet>
 
       <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>

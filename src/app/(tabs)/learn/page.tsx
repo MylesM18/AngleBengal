@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
 import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
-import { TopicTree } from "@/components/learn/TopicTree";
+import { TopicRail } from "@/components/learn/TopicRail";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { prisma } from "@/lib/db";
@@ -79,7 +79,7 @@ export default async function LearnIndexPage() {
 
           {roots.length > COVER_GRID_MAX_ROOTS ? (
             <Sheet tone="paper-1" className="animate-enter-sheet py-2">
-              <TopicTree topics={tree} />
+              <TopicRail topics={tree} />
             </Sheet>
           ) : (
             <ul aria-label="Topic covers" className="animate-enter-sheet grid grid-cols-1 gap-6 sm:grid-cols-2">
