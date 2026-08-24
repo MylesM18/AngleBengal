@@ -1,58 +1,49 @@
 import Link from "next/link";
 
+import { BaseBand } from "@/components/ui/BaseBand";
+import { CornerNumeral } from "@/components/ui/CornerNumeral";
+import { Sheet } from "@/components/ui/Sheet";
 import { ACCENT_VAR, type AccentName } from "@/lib/topicColors";
 
-/**
- * A model document as a swatch card (docs/08): paper sheet, corner numeral
- * carrying the model count, topic-accent base band.
- */
-export function DocCard({
-  topicId,
-  doc,
-  accent,
-}: {
+export type DocCardProps = {
   topicId: string;
-  doc: { id: string; title: string; isExemplar: boolean; modelCount: number; createdAt: Date };
+  doc: {
+    id: string;
+    title: string;
+    isExemplar: boolean;
+    modelCount: number;
+    createdAt: Date;
+  };
   accent: AccentName;
-}) {
-  return (
-    <Link
-      href={`/learn/${topicId}?doc=${doc.id}`}
-      className="relative flex min-h-[132px] flex-col overflow-hidden rounded-card bg-paper-1 pb-[18px] shadow-sheet transition-all hover:-translate-y-px hover:shadow-lift"
-    >
-      <span
-        aria-hidden
-        className="display-cut pointer-events-none absolute top-1 right-3 text-[56px] leading-none tabular-nums"
-        style={{ color: ACCENT_VAR[accent], opacity: 0.16 }}
-      >
-        {doc.modelCount}
-      </span>
+};
 
-      <div className="flex flex-1 flex-col p-4">
-        {doc.isExemplar && (
-          <span className="meta-caps mb-1.5 self-start rounded-chip bg-brand-tint px-1.5 py-0.5 text-[10px] text-brand-deep">
+const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };
+
+/**
+ * One model document on the topic page (spec 3c): a lifting paper-1 sheet
+ * with the model count as a corner numeral, the title, a meta line and the
+ * accent base band. The whole card is the link into the reader.
+ */
+export function DocCard({ topicId, doc, accent }: DocCardProps) {
+  const color = ACCENT_VAR[accent];
+  const models = `${doc.modelCount} ${doc.modelCount === 1 ? "model" : "models"}`;
+  return (
+    <Link href={`/learn/${topicId}?doc=${doc.id}`} className="block rounded-card">
+      <Sheet tone="paper-1" lift className="relative flex min-h-[132px] flex-col overflow-hidden p-4 pb-7">
+        {doc.modelCount > 0 ? <CornerNumeral n={doc.modelCount} size={56} color={color} /> : null}
+        {doc.isExemplar ? (
+          <span className="meta-caps mb-1.5 self-start rounded-chip bg-brand-tint px-1.5 py-0.5 text-brand-deep">
             Exemplar
           </span>
-        )}
-        <h3 className="font-expanded max-w-[26ch] text-[17px] leading-tight text-ink">
-          {doc.title}
-        </h3>
-        <p className="mt-auto pt-3 text-[12px] text-ink-soft">
-          {doc.modelCount} {doc.modelCount === 1 ? "model" : "models"}
-          {" · "}
-          {doc.createdAt.toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-          })}
+        ) : null}
+        <h3 className="max-w-[26ch] text-ui-lg font-semibold leading-tight text-ink">{doc.title}</h3>
+        <p className="mt-auto pt-3 text-meta text-ink-soft">
+          {models} · {doc.createdAt.toLocaleDateString("en-US", DATE_FORMAT)}
         </p>
-      </div>
-
-      <span
-        aria-hidden
-        className="absolute inset-x-0 bottom-0 h-[18px]"
-        style={{ backgroundColor: ACCENT_VAR[accent] }}
-      />
+        <BaseBand color={color} />
+      </Sheet>
     </Link>
   );
 }
+
+export default DocCard;

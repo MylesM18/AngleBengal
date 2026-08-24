@@ -104,6 +104,7 @@ export type TopicDetail = {
     modelCount: number;
     createdAt: Date;
   }[];
+  children: { id: string; name: string }[];
 };
 
 /** Root-to-leaf name path, used by breadcrumbs and the generation progress row. */
@@ -140,6 +141,7 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
         select: { id: true, title: true, isExemplar: true, modelIndexJson: true, createdAt: true },
         orderBy: { createdAt: "desc" },
       },
+      children: { select: { id: true, name: true }, orderBy: { name: "asc" } },
     },
   });
   if (!topic) return null;
@@ -165,6 +167,7 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
       modelCount: deserializeModelIndex(doc.modelIndexJson).length,
       createdAt: doc.createdAt,
     })),
+    children: topic.children,
   };
 }
 

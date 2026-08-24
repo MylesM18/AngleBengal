@@ -3,13 +3,17 @@ import { notFound } from "next/navigation";
 
 import { DocCard } from "@/components/learn/DocCard";
 import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
+import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
 import { ModelMissList } from "@/components/learn/ModelMissList";
+import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { ButtonLink, buttonClasses } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { modelMissCounts } from "@/lib/attempts";
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
-import { getTopicDetail } from "@/lib/topics";
-import { accentForRoot } from "@/lib/topicColors";
+import { getDescendantCounts, getTopicDetail } from "@/lib/topics";
+import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
 
 type Params = { topicId: string };
 type Search = { doc?: string };
@@ -86,43 +90,82 @@ export default async function TopicPage({
     );
   }
 
+  const counts = await getDescendantCounts();
+  const totals = counts.get(topic.id) ?? ZERO;
+  const canPractice = totals.verifiedProblems > 0;
+  const empty = topic.modelDocs.length === 0 && topic.children.length === 0;
+  const countLine = [
+    plural(totals.docs, "model document"),
+    plural(totals.verifiedProblems, "verified problem"),
+    ...(topic.children.length > 0 ? [plural(topic.children.length, "subtopic")] : []),
+  ].join(" · ");
+
   return (
-    <div className="mx-auto max-w-[860px] px-8 py-10">
+    <div className="mx-auto max-w-[860px] px-8 pt-16 pb-10">
       <Breadcrumb path={topic.path} topicId={topic.id} hasSiblings={false} />
-
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="display-cut text-[30px] leading-tight text-ink">{topic.name}</h1>
-        <Link
-          href={`/practice/${topic.id}`}
-          className="rounded-input bg-brand px-3.5 py-2 text-[13.5px] font-semibold text-paper-0 transition-transform hover:bg-brand-deep active:translate-y-px"
-        >
-          Practice this topic
-        </Link>
+        <h1 className="display-cut text-h1 text-ink">{topic.name}</h1>
+        {canPractice ? (
+          <ButtonLink href={`/practice/${topic.id}`} size="md">
+            Practice this topic
+          </ButtonLink>
+        ) : (
+          <span
+            aria-disabled="true"
+            title="No verified problems beneath this topic yet"
+            className={buttonClasses({
+              variant: "primary",
+              size: "md",
+              tone: "brand",
+              className: "pointer-events-none opacity-50",
+            })}
+          >
+            Practice this topic
+          </span>
+        )}
       </div>
+      <p className="mt-2 text-meta text-ink-soft">{countLine}</p>
 
-      <p className="mt-2 text-[13px] text-ink-soft">
-        {topic.docCount} {topic.docCount === 1 ? "document" : "documents"}
-        {" · "}
-        {topic.verifiedProblemCount} verified{" "}
-        {topic.verifiedProblemCount === 1 ? "problem" : "problems"}
-      </p>
-
-      {topic.modelDocs.length === 0 ? (
-        <div className="stock-textured mt-8 rounded-card bg-kraft p-6">
-          <p className="font-expanded mb-1 text-[16px] text-ink">No models here yet</p>
-          <p className="max-w-[48ch] text-[13.5px] leading-relaxed text-ink">
-            Generating mental models for a topic arrives in Phase 1. Until then, the seeded
-            Distance-Rate-Time document under Algebra shows the shape every generated document
-            has to match.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {topic.modelDocs.length > 0 ? (
+        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
           {topic.modelDocs.map((doc) => (
             <DocCard key={doc.id} topicId={topic.id} doc={doc} accent={accent} />
           ))}
         </div>
-      )}
+      ) : null}
+
+      {topic.children.length > 0 ? (
+        <>
+          <h2 className="meta-caps mt-10">Subtopics</h2>
+          <ul aria-label="Subtopics" className="mt-3 grid grid-cols-1 gap-6 sm:grid-cols-2">
+            {topic.children.map((child) => {
+              const c = counts.get(child.id) ?? ZERO;
+              return (
+                <li key={child.id}>
+                  <TopicCoverCard
+                    href={`/learn/${child.id}`}
+                    name={child.name}
+                    numeral={c.docs}
+                    meta={`${plural(c.docs, "model")} · ${plural(c.verifiedProblems, "problem")}`}
+                    accent={accent}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : null}
+
+      {empty ? (
+        <EmptyState
+          shape="wedge"
+          accent={ACCENT_VAR[accent]}
+          title="No models here yet"
+          line="Generate the first mental model document for this topic."
+          action={<GenerateTopicInput initialValue={topic.name} compact />}
+          className="mt-8"
+        />
+      ) : null}
     </div>
   );
 }
@@ -137,7 +180,7 @@ function Breadcrumb({
   hasSiblings: boolean;
 }) {
   return (
-    <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1.5 text-[12px]">
+    <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1.5 text-meta">
       <span className="text-ink-soft">{path.join("  ›  ")}</span>
       {hasSiblings && (
         <Link href={`/learn/${topicId}`} className="ml-2 text-cobalt hover:underline">
@@ -146,4 +189,10 @@ function Breadcrumb({
       )}
     </nav>
   );
+}
+
+const ZERO = { docs: 0, verifiedProblems: 0 };
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
