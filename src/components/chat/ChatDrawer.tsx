@@ -158,47 +158,19 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   }, [draft, send, streaming]);
 
   /**
-   * Focus management for the drawer (docs/06 §7).
+   * Focus management for the drawer (spec 2b, D-049).
    *
-   * Opening moves focus into the composer, Escape closes, and Tab cycles
-   * within the panel while it is open. The drawer overlays the page rather
-   * than replacing it, so without this a keyboard user tabs straight out of an
-   * open drawer into content they cannot see the top of.
+   * Opening moves focus into the composer; Escape closes, and AppShell's
+   * `onClose` returns focus to the Tutor chip. The drawer is a non-modal side
+   * panel over a workspace that stays usable, so there is no Tab trap.
    */
   useEffect(() => {
     if (!open) return;
 
-    const element = panel.current;
-    element?.querySelector<HTMLTextAreaElement>("#tutor-composer")?.focus();
+    panel.current?.querySelector<HTMLTextAreaElement>("#tutor-composer")?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab" || !element) return;
-
-      const focusable = [
-        ...element.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      ].filter((node) => node.offsetParent !== null);
-      if (focusable.length === 0) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const activeNode = document.activeElement;
-
-      if (!event.shiftKey && activeNode === last) {
-        event.preventDefault();
-        first.focus();
-      } else if (event.shiftKey && activeNode === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (activeNode instanceof Node && !element.contains(activeNode)) {
-        event.preventDefault();
-        first.focus();
-      }
+      if (event.key === "Escape") onClose();
     }
 
     document.addEventListener("keydown", onKeyDown);
@@ -232,8 +204,8 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
       aria-label="Tutor"
       aria-hidden={!open}
       inert={!open}
-      className={`flex w-[420px] shrink-0 flex-col border-l border-ink-faint/40 bg-paper-1 transition-[margin] duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${
-        open ? "mr-0" : "-mr-[420px]"
+      className={`absolute inset-y-0 right-0 z-10 flex w-[min(420px,100vw)] flex-col bg-paper-1 shadow-lift transition-transform duration-220 ease-paper ${
+        open ? "translate-x-0" : "translate-x-full"
       }`}
     >
       <div className="flex h-12 shrink-0 items-center gap-2 bg-plum px-3">

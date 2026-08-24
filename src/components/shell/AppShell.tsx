@@ -27,7 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen flex-col">
       <TopBar chatOpen={chatOpen} onToggleChat={toggleChat} tutorRef={tutorRef} />
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
         <ChatDrawer open={chatOpen} onClose={closeChat} />
       </div>
