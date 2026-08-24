@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { snapshotSketch } from "@/components/sketchpad/Sketchpad";
@@ -243,6 +243,7 @@ export function PracticePanel({
   const locked = Boolean(outcome?.correct) || revealedSolution !== null;
   /** The root topic's accent drives the card's numeral and base band (docs/08). */
   const accent = ACCENT_VAR[accentForRoot(topicPath[0] ?? "")];
+  const revealTriggerRef = useRef<HTMLButtonElement>(null);
 
   const terminalActions =
     outcome && !outcome.correct && !locked ? (
@@ -354,6 +355,7 @@ export function PracticePanel({
                 </Button>
                 {!locked && (
                   <Button
+                    ref={revealTriggerRef}
                     variant="tertiary"
                     disabled={submitting}
                     onClick={() => setConfirmReveal(true)}
@@ -374,7 +376,10 @@ export function PracticePanel({
                       <Button
                         variant="tertiary"
                         size="sm"
-                        onClick={() => setConfirmReveal(false)}
+                        onClick={() => {
+                          setConfirmReveal(false);
+                          revealTriggerRef.current?.focus();
+                        }}
                       >
                         Keep trying
                       </Button>
