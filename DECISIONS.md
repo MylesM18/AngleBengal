@@ -634,3 +634,7 @@ The field on `/learn` generates a topic and never filters; with about 12 roots t
 ### D-054. No test runner added in this work
 
 The repo has no `npm test` and this work adds none (spec 6b, 6d). Gates are `npm run typecheck`, `npm run lint`, `npm run build` and the browser passes in the spec. Pure logic that later stages add (`useSplitRatio`'s clamp math, `truncateMiddle`) lives as plain functions in `src/lib/` so a runner can cover them later without refactoring. D-052 and D-053 are written by stages C and D.
+
+### D-055. Stage B choices
+
+The topic rail lives in `src/app/(tabs)/learn/[topicId]/layout.tsx` (so it also frames the history page) and `learn/layout.tsx` is deleted, since the index has no rail (spec 3a); the index Recent list shows the 8 most recent docs; rail search is a case-insensitive name substring match that keeps ancestors and auto-expands matching roots; `TopicTree` is renamed `TopicRail` with `git mv` to keep its history; descendant counts come from one memoized `getDescendantCounts()` (React `cache`) and the `/learn/[topicId]` Practice button disables when no verified problem exists beneath the topic. Two build notes: the index generate button is `size="md"` (32px) to line up with the 32px input, where the spec's `sm` (24px) would sit 8px short; and Recent rows show meta and title only, since `MentalModelDoc` has no description column behind the spec's clamped description.
