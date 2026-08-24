@@ -1,8 +1,10 @@
 "use client";
 
-import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { ButtonLink } from "@/components/ui/Button";
+import { DieCutWindow } from "@/components/ui/DieCutWindow";
 
 /**
  * The system's hero moment (docs/08): a paper sheet with a triangular die-cut
@@ -13,6 +15,7 @@ import { MarkdownMath } from "@/components/shared/MarkdownMath";
  */
 export function DiagnosisCard({
   diagnosis,
+  actions,
 }: {
   diagnosis: {
     modelNumber: number;
@@ -21,6 +24,8 @@ export function DiagnosisCard({
     explanationMd: string;
     learnHref: string;
   };
+  /** The state's exits, as one row at the bottom: Try again (secondary), then Next problem (primary). */
+  actions?: ReactNode;
 }) {
   return (
     <section
@@ -30,25 +35,18 @@ export function DiagnosisCard({
       <div className="flex gap-4 p-4">
         {/* The die-cut: a triangle punched through the sheet, showing red
             stock beneath with the failed model's numeral on it. */}
-        <div
-          aria-hidden
-          className="relative h-[72px] w-[72px] shrink-0 bg-red"
-          style={{
-            clipPath: "polygon(50% 0%, 100% 100%, 0% 100%)",
-            boxShadow: "var(--shadow-cut)",
-          }}
-        >
-          <span className="display-cut absolute inset-x-0 bottom-1 text-center text-[30px] leading-none text-paper-0">
+        <DieCutWindow shape="triangle" color="var(--color-red)">
+          <span className="display-cut text-h1 absolute inset-x-0 bottom-1 text-center leading-none text-paper-0">
             {diagnosis.modelNumber}
           </span>
-        </div>
+        </DieCutWindow>
 
         <div className="min-w-0 flex-1">
           <p className="meta-caps mb-1 text-red">Diagnosis</p>
-          <p className="text-[14px] leading-snug font-semibold text-ink">
+          <p className="text-ui leading-snug font-semibold text-ink">
             {diagnosis.symptom}
           </p>
-          <p className="mt-0.5 text-[12.5px] text-ink-soft">
+          <p className="text-meta mt-0.5 text-ink-soft">
             Model {diagnosis.modelNumber}: {diagnosis.modelTitle} failed
           </p>
 
@@ -56,14 +54,22 @@ export function DiagnosisCard({
             {diagnosis.explanationMd}
           </MarkdownMath>
 
-          <Link
+          <ButtonLink
             href={diagnosis.learnHref}
-            className="mt-3 inline-block rounded-input border-[1.5px] border-ink bg-paper-0 px-3 py-1.5 text-[12.5px] font-semibold text-ink transition-transform active:translate-y-px"
+            variant="secondary"
+            size="sm"
+            className="mt-3"
           >
             Review Model {diagnosis.modelNumber}
-          </Link>
+          </ButtonLink>
         </div>
       </div>
+
+      {actions ? (
+        <div className="flex flex-wrap gap-2 border-t border-hairline px-4 py-3">
+          {actions}
+        </div>
+      ) : null}
     </section>
   );
 }
