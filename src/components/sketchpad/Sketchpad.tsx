@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from "react";
 
+import type { NoticeKind } from "@/components/ui/Notice";
+import { Toast } from "@/components/ui/Toast";
 import { compositeToPng } from "@/lib/sketch/render";
 import { useSketchStore, type OcrBlock } from "@/lib/sketch/store";
 
@@ -10,7 +12,7 @@ import { SketchCanvas } from "./SketchCanvas";
 import { SketchToolbar } from "./SketchToolbar";
 
 /**
- * The sketchpad panel: toolbar, canvas stack, and the clean-copy sheet
+ * The sketchpad panel: toolbar, canvas stack, and the clean-copy slip
  * (docs/06 §4).
  *
  * The canvas size is tracked here because compositing for OCR and for the
@@ -18,16 +20,18 @@ import { SketchToolbar } from "./SketchToolbar";
  */
 export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) => void }) {
   const [cleaning, setCleaning] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ kind: NoticeKind; message: string } | null>(null);
 
   const blocks = useSketchStore((state) => state.ocrBlocks);
   const setOcrBlocks = useSketchStore((state) => state.setOcrBlocks);
   const setCanvasSize = useSketchStore((state) => state.setCanvasSize);
 
-  const flash = useCallback((message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(null), 3200);
+  // One entry point for every sketchpad message. The Toast primitive owns the
+  // timer: it calls `dismissToast` after its default 3200ms.
+  const flash = useCallback((message: string, kind: NoticeKind = "warning") => {
+    setToast({ kind, message });
   }, []);
+  const dismissToast = useCallback(() => setToast(null), []);
 
   const cleanUp = useCallback(async () => {
     const { strokes, background } = useSketchStore.getState();
@@ -59,13 +63,13 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
         const message =
           (payload as { error?: { message?: string } }).error?.message ??
           "Could not read that.";
-        flash(message);
+        flash(message, "error");
         return;
       }
 
       setOcrBlocks((payload as { blocks: OcrBlock[] }).blocks);
     } catch {
-      flash("Could not reach the reader. Try again in a moment.");
+      flash("Could not reach the reader. Try again in a moment.", "error");
     } finally {
       setCleaning(false);
     }
@@ -86,16 +90,17 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
           blocks={blocks}
           onInsert={onInsertAnswer}
           onClose={() => setOcrBlocks(null)}
+          onCopied={() => flash("Copied", "success")}
         />
       )}
 
       {toast && (
-        <div
-          role="status"
-          className="stock-textured absolute bottom-4 left-1/2 -translate-x-1/2 rounded-input border-l-[4px] border-marigold bg-kraft px-3 py-2 text-[12.5px] text-ink shadow-lift"
-        >
-          {toast}
-        </div>
+        <Toast
+          kind={toast.kind}
+          message={toast.message}
+          onDismiss={dismissToast}
+          className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2"
+        />
       )}
     </div>
   );

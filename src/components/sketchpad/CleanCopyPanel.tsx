@@ -1,104 +1,81 @@
 "use client";
 
-import { useState } from "react";
-
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { Chip } from "@/components/ui/Chip";
 import type { OcrBlock } from "@/lib/sketch/store";
 
 /**
- * The clean copy of the student's handwriting (docs/06 §4): a fresh paper
- * sheet that slides up from the panel's bottom edge, each block rendered with
- * KaTeX or as plain text, in order.
+ * The clean copy of the student's handwriting (docs/06 §4, spec 4d): a paper-1
+ * slip lying over the bottom of the canvas, each block rendered with KaTeX or
+ * as plain text, in order.
  *
- * "Insert into answer" is the point of the whole feature, so it is the primary
- * action on every math block.
+ * "Use as answer" is the point of the whole feature, so it is the first action
+ * on every math block. Copy writes the LaTeX and tells the parent, which owns
+ * the toast; the slip keeps no state of its own.
  */
 export function CleanCopyPanel({
   blocks,
   onInsert,
   onClose,
+  onCopied,
 }: {
   blocks: OcrBlock[];
   /** Given the block's LaTeX, for the answer input to consume. */
   onInsert: (latex: string) => void;
   onClose: () => void;
+  /** Called once after a successful clipboard write, so the parent can flash "Copied". */
+  onCopied?: () => void;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const [copied, setCopied] = useState<number | null>(null);
-
-  async function copyLatex(latex: string, index: number) {
+  async function copyLatex(latex: string) {
     try {
       await navigator.clipboard.writeText(latex);
-      setCopied(index);
-      window.setTimeout(() => setCopied(null), 1500);
+      onCopied?.();
     } catch {
-      // Clipboard can be blocked by permissions; the insert action still works.
+      // Clipboard can be blocked by permissions; "Use as answer" still works.
     }
   }
 
   return (
     <section
       aria-label="Clean copy"
-      className="shrink-0 rounded-t-card bg-paper-1 shadow-lift"
-      style={{ maxHeight: collapsed ? undefined : "34%" }}
+      className="absolute inset-x-3 bottom-3 z-10 flex max-h-[40%] flex-col rounded-card bg-paper-1 shadow-lift"
     >
-      <div className="flex items-center gap-2 border-b border-ink-faint/40 px-3 py-1.5">
+      <div className="flex shrink-0 items-center gap-2 border-b border-hairline px-3 py-1.5">
         <p className="meta-caps text-ink-soft">Clean copy</p>
-        <button
-          type="button"
-          onClick={() => setCollapsed((value) => !value)}
-          aria-expanded={!collapsed}
-          className="ml-auto rounded-chip px-1.5 py-0.5 text-[11px] font-semibold text-ink-soft hover:text-ink"
-        >
-          {collapsed ? "Expand" : "Collapse"}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-chip px-1.5 py-0.5 text-[11px] font-semibold text-ink-soft hover:text-ink"
-        >
+        <Chip variant="action" icon="close" className="ml-auto" onClick={onClose}>
           Dismiss
-        </button>
+        </Chip>
       </div>
 
-      {!collapsed && (
-        <ul className="max-h-[240px] overflow-y-auto p-3">
-          {blocks.map((block, index) => (
-            <li
-              key={index}
-              className="flex items-start gap-2 border-b border-ink-faint/25 py-1.5 last:border-b-0"
-            >
-              <div className="min-w-0 flex-1">
-                {block.kind === "math" ? (
-                  <MarkdownMath variant="ui">{`$$${block.latex}$$`}</MarkdownMath>
-                ) : (
-                  <p className="text-[12.5px] leading-snug text-ink-soft">{block.text}</p>
-                )}
-              </div>
-
-              {block.kind === "math" && (
-                <div className="flex shrink-0 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => onInsert(block.latex)}
-                    className="rounded-chip bg-brand px-2 py-1 text-[11px] font-semibold text-paper-0 hover:bg-brand-deep"
-                  >
-                    Insert into answer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void copyLatex(block.latex, index)}
-                    aria-label="Copy LaTeX"
-                    className="rounded-chip bg-paper-0 px-2 py-1 text-[11px] font-semibold text-ink hover:bg-paper-1"
-                  >
-                    {copied === index ? "Copied" : "LaTeX"}
-                  </button>
-                </div>
+      <ul className="min-h-0 divide-y divide-hairline overflow-y-auto px-3">
+        {blocks.map((block, index) => (
+          <li key={index} className="flex items-start gap-2 py-1.5">
+            <div className="min-w-0 flex-1">
+              {block.kind === "math" ? (
+                <MarkdownMath variant="ui">{`$$${block.latex}$$`}</MarkdownMath>
+              ) : (
+                <p className="text-ui leading-snug text-ink-soft">{block.text}</p>
               )}
-            </li>
-          ))}
-        </ul>
-      )}
+            </div>
+
+            {block.kind === "math" && (
+              <div className="flex shrink-0 gap-1">
+                <Chip variant="action" icon="check" onClick={() => onInsert(block.latex)}>
+                  Use as answer
+                </Chip>
+                <Chip
+                  variant="action"
+                  icon="copy"
+                  aria-label="Copy LaTeX"
+                  onClick={() => void copyLatex(block.latex)}
+                >
+                  Copy
+                </Chip>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
