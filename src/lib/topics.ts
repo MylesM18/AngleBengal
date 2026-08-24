@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
 
@@ -187,3 +189,65 @@ export async function getRootNameByTopicId(): Promise<Map<string, string>> {
   }
   return rootNames;
 }
+
+export type DescendantCounts = { docs: number; verifiedProblems: number };
+
+/**
+ * Pure roll-up: a topic's own counts plus every descendant's, keyed by topic
+ * id. Every topic in `topics` gets an entry, even with nothing beneath it.
+ * Kept free of the database so the arithmetic can be read on its own (D-054).
+ */
+export function rollUpCounts(
+  topics: { id: string; parentId: string | null }[],
+  own: Map<string, DescendantCounts>,
+): Map<string, DescendantCounts> {
+  const totals = new Map<string, DescendantCounts>();
+  for (const topic of topics) totals.set(topic.id, { docs: 0, verifiedProblems: 0 });
+  const parentOf = new Map(topics.map((topic) => [topic.id, topic.parentId]));
+
+  for (const topic of topics) {
+    const mine = own.get(topic.id);
+    if (!mine) continue;
+    let currentId: string | null = topic.id;
+    // Same depth guard as getTopicPath: a cyclic parent chain fails loudly.
+    for (let depth = 0; currentId && depth < 12; depth += 1) {
+      const bucket = totals.get(currentId);
+      if (!bucket) break;
+      bucket.docs += mine.docs;
+      bucket.verifiedProblems += mine.verifiedProblems;
+      currentId = parentOf.get(currentId) ?? null;
+    }
+  }
+  return totals;
+}
+
+/**
+ * topic id -> counts for the topic AND everything beneath it (spec 3a cover
+ * numerals, 3c counts line, the Practice button's enabled state). One
+ * request-scoped value: React `cache` dedupes the three queries across the
+ * layout and the page that both read it.
+ */
+export const getDescendantCounts = cache(
+  async (): Promise<Map<string, DescendantCounts>> => {
+    const [topics, docs, problems] = await Promise.all([
+      prisma.topic.findMany({ select: { id: true, parentId: true } }),
+      prisma.mentalModelDoc.groupBy({ by: ["topicId"], _count: { _all: true } }),
+      prisma.problem.groupBy({
+        by: ["topicId"],
+        where: { verified: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const own = new Map<string, DescendantCounts>();
+    for (const row of docs) {
+      own.set(row.topicId, { docs: row._count._all, verifiedProblems: 0 });
+    }
+    for (const row of problems) {
+      const bucket = own.get(row.topicId) ?? { docs: 0, verifiedProblems: 0 };
+      bucket.verifiedProblems = row._count._all;
+      own.set(row.topicId, bucket);
+    }
+    return rollUpCounts(topics, own);
+  },
+);

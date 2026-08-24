@@ -1,10 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/Notice";
 
 /**
- * The generate action pinned above the topic tree (docs/06 §2).
+ * The generate action: on the Learn index header (spec 3a) and, prefilled
+ * and compact, as the action of an empty topic's EmptyState (spec 3c).
  *
  * The route is synchronous (docs/02: "build the simple synchronous version
  * first"), so it emits no progress events. The stage row is therefore driven
@@ -32,9 +36,18 @@ type Failure = {
 const CLASSIFY_MS = 4_000;
 const FILED_LINGER_MS = 1_200;
 
-export function GenerateTopicInput() {
+export function GenerateTopicInput({
+  initialValue = "",
+  compact = false,
+}: {
+  /** Prefill, used by the topic page empty state with the topic's name. */
+  initialValue?: string;
+  /** Drops the top margin so the form sits inside another component's layout. */
+  compact?: boolean;
+}) {
   const router = useRouter();
-  const [value, setValue] = useState("");
+  const inputId = useId();
+  const [value, setValue] = useState(initialValue);
   const [stage, setStage] = useState<Stage>("idle");
   const [filedPath, setFiledPath] = useState<string[] | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -115,34 +128,27 @@ export function GenerateTopicInput() {
   }
 
   return (
-    <div className="border-b border-ink-faint/40 px-2 pt-3 pb-3">
-      <form onSubmit={onSubmit} className="flex gap-1.5">
-        <label htmlFor="generate-topic" className="sr-only">
+    <div className={compact ? "" : "mt-6"}>
+      <form onSubmit={onSubmit} className="flex items-center gap-1.5">
+        <label htmlFor={inputId} className="sr-only">
           Generate mental models for a topic
         </label>
         <input
-          id="generate-topic"
+          id={inputId}
           type="text"
           value={value}
           disabled={busy}
           onChange={(event) => setValue(event.target.value)}
           placeholder="Generate mental models for any topic..."
-          className="min-w-0 flex-1 rounded-input border border-ink-faint bg-paper-0 px-2.5 py-2 text-[13px] text-ink placeholder:text-ink-faint disabled:opacity-60"
+          className="h-8 min-w-0 flex-1 rounded-input border border-hairline bg-paper-0 px-2.5 text-ui text-ink shadow-sheet placeholder:text-ink-faint disabled:opacity-60"
         />
-        <button
-          type="submit"
-          disabled={busy || value.trim().length === 0}
-          className="shrink-0 rounded-input bg-brand px-2.5 py-2 text-[12.5px] font-semibold text-paper-0 transition-transform hover:bg-brand-deep active:translate-y-px disabled:opacity-40 disabled:hover:bg-brand"
-        >
-          {busy ? "..." : "Generate"}
-        </button>
+        <Button type="submit" size="md" loading={busy} disabled={value.trim().length === 0}>
+          {busy ? "Working..." : "Generate"}
+        </Button>
       </form>
 
       {busy && (
-        <ol
-          aria-live="polite"
-          className="mt-2 flex flex-col gap-1 px-0.5 text-[11.5px] text-ink-soft"
-        >
+        <ol aria-live="polite" className="mt-2 flex flex-col gap-1 px-0.5 text-meta text-ink-soft">
           <StageLine done={stage !== "classifying"} active={stage === "classifying"}>
             Classifying the topic
           </StageLine>
@@ -199,29 +205,28 @@ function FailureNotice({
   canRetry: boolean;
 }) {
   const notMath = failure.code === "NOT_MATH";
-  const accent = notMath ? "border-marigold bg-marigold-tint" : "border-red bg-red-tint";
 
   return (
-    <div className={`mt-2 rounded-input border-l-[3px] ${accent} px-2.5 py-2`} role="status">
-      <p className="text-[12px] leading-snug text-ink">{failure.message}</p>
+    <Notice
+      kind={notMath ? "warning" : "error"}
+      className="mt-2"
+      action={
+        !notMath && canRetry ? (
+          <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
+            Try again
+          </Button>
+        ) : undefined
+      }
+    >
+      <p className="text-ui leading-snug text-ink">{failure.message}</p>
 
       {failure.failures && failure.failures.length > 0 && (
-        <ul className="mt-1.5 flex flex-col gap-0.5 text-[11px] leading-snug text-ink-soft">
+        <ul className="mt-1.5 flex flex-col gap-0.5 text-meta leading-snug text-ink-soft">
           {failure.failures.slice(0, 4).map((line) => (
             <li key={line}>· {line}</li>
           ))}
         </ul>
       )}
-
-      {!notMath && canRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-2 rounded-chip border-[1.5px] border-ink bg-paper-0 px-2 py-1 text-[11.5px] font-semibold text-ink"
-        >
-          Try again
-        </button>
-      )}
-    </div>
+    </Notice>
   );
 }
