@@ -190,6 +190,7 @@ export function SketchToolbar({
             variant="toggle"
             pressed={width === option}
             aria-label={`Stroke width ${option}`}
+            title={`Stroke width ${option}`}
             onClick={() => setWidth(option)}
           >
             <span
@@ -209,6 +210,7 @@ export function SketchToolbar({
             onClick={() => setColor(option)}
             aria-pressed={color === option}
             aria-label={`${option} ink`}
+            title={`${option} ink`}
             className={cx(
               "h-6 w-6 rounded-full border-2",
               color === option ? "border-ink inset-ring-2 inset-ring-paper-0" : "border-paper-0",
