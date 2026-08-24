@@ -72,7 +72,11 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
   }, [flash, setOcrBlocks]);
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0">
+    <div
+      data-sketchpad
+      tabIndex={-1}
+      className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0 outline-none"
+    >
       <SketchToolbar cleaning={cleaning} onCleanUp={() => void cleanUp()} />
 
       <SketchCanvas onSizeChange={setCanvasSize} />
