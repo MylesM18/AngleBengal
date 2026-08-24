@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentPropsWithoutRef } from "react";
+import { forwardRef, type ComponentPropsWithoutRef } from "react";
 
 import { cx } from "@/lib/cx";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -68,20 +68,24 @@ export type ButtonProps = SharedProps & {
   loading?: boolean;
 } & ComponentPropsWithoutRef<"button">;
 
-export function Button({
-  variant,
-  size,
-  tone,
-  icon,
-  loading = false,
-  className,
-  children,
-  type = "button",
-  disabled,
-  ...rest
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    variant,
+    size,
+    tone,
+    icon,
+    loading = false,
+    className,
+    children,
+    type = "button",
+    disabled,
+    ...rest
+  },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       type={type}
       className={buttonClasses({ variant, size, tone, className })}
       disabled={disabled || loading}
@@ -92,7 +96,7 @@ export function Button({
       {children}
     </button>
   );
-}
+});
 
 export type ButtonLinkProps = SharedProps & ComponentPropsWithoutRef<typeof Link>;
 
