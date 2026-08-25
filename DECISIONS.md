@@ -842,3 +842,40 @@ working the moment the rule was layered. Measured after: 9.04:1 on plum.
 
 The `globals.css` ban that stage D observed was a stage D scope rule and stage D
 closed at `91c6dbb`, so it no longer applies. See also D-057.
+
+### D-059. The reader toast is portalled to the document body
+
+Owner ruling (d) recorded the toast containing-block defect. The copy-link slip
+in `src/components/learn/DocReader.tsx` is `position: fixed` and is meant to pin
+to the bottom of the viewport, but it rendered inside the reading sheet, and the
+sheet carries `animate-enter-sheet`. That animation's fill-mode is `both` and
+its last keyframe says `transform: none`, which Chrome computes as
+`matrix(1, 0, 0, 1, 0, 0)` rather than the keyword, and the fill keeps it after
+the animation ends. A transformed element becomes the containing block for its
+`fixed` descendants, so the slip anchored to the sheet instead of the viewport.
+Measured before the fix on the seeded exemplar document: `offsetParent` was the
+sheet and the slip's top was 85758px, roughly the sheet's full height down the
+page, so nobody would ever see it.
+
+**The fix is `createPortal(..., document.body)`.** The slip keeps every class it
+had, `fixed bottom-6 left-1/2 z-50 -translate-x-1/2`, and simply renders
+somewhere the transform cannot reach. Measured after, in a 1280 by 800 viewport:
+`position` still `fixed`, `offsetParent` now `null`, parent is `body`, the slip
+sits 24px off the bottom of the viewport and is horizontally centred. The sheet
+still computes `matrix(1, 0, 0, 1, 0, 6)`, which is the point: the animation was
+not weakened to work around the symptom.
+
+Two things were deliberately not done. **The slip was not switched to
+`absolute`**, which would have moved it with the document instead of pinning it
+and would have traded a bug nobody sees for a bug everybody sees. **The
+animation was not changed**, neither by dropping fill-mode `both` nor by
+removing the final `transform: none`: the entrance is a spec 1e motion decision,
+the same fill is used by `cut-reveal`, and the transform would still capture any
+future `fixed` descendant, so the containing block is the real problem and the
+portal is the real fix.
+
+Verifying it needs care. `offsetParent === null` alone is NOT proof, because a
+`display: none` element reports `null` too and would pass a naive check while
+being invisible. The assertion pairs it with `position === 'fixed'` and with
+evidence that the slip is actually rendered (`display`, `visibility`, `opacity`
+and a non-zero box). See also D-058.

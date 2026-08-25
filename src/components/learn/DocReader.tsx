@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { ModelHeading } from "@/components/learn/ModelHeading";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
@@ -108,15 +109,26 @@ export function DocReader({ contentMd, models, accent }: DocReaderProps) {
         </section>
       ))}
 
-      {toast ? (
-        <Toast
-          key={toast.id}
-          kind={toast.kind}
-          message={toast.message}
-          onDismiss={hideToast}
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2"
-        />
-      ) : null}
+      {/*
+        Portalled to <body> on purpose. The reading sheet carries
+        `animate-enter-sheet`, whose fill-mode `both` leaves a computed
+        transform behind even though the last keyframe says `transform: none`.
+        A transformed ancestor becomes the containing block for `fixed`
+        descendants, so in place this slip anchored to the sheet's bottom
+        rather than the viewport's. See D-059.
+      */}
+      {toast
+        ? createPortal(
+            <Toast
+              key={toast.id}
+              kind={toast.kind}
+              message={toast.message}
+              onDismiss={hideToast}
+              className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2"
+            />,
+            document.body,
+          )
+        : null}
     </>
   );
 }
