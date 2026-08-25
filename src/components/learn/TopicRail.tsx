@@ -219,6 +219,7 @@ function TopicBranch({
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-label={expanded ? `Collapse ${topic.name}` : `Expand ${topic.name}`}
+            title={expanded ? `Collapse ${topic.name}` : `Expand ${topic.name}`}
             data-expander
             tabIndex={-1}
             className="flex w-6 shrink-0 items-center justify-center text-ink-faint transition-colors hover:text-ink"
