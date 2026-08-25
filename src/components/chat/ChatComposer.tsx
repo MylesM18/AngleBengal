@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
+import { Button } from "@/components/ui/Button";
+
 /**
  * Multiline composer (docs/06 §5): Enter sends, Shift+Enter inserts a newline.
  *
@@ -45,7 +47,7 @@ export function ChatComposer({
   const canSend = !busy && value.trim().length > 0;
 
   return (
-    <div className="stock-textured shrink-0 border-t border-ink-faint/40 bg-kraft p-3">
+    <div className="shrink-0 bg-paper-1 p-3">
       <div className="flex items-end gap-1.5">
         <label htmlFor="tutor-composer" className="sr-only">
           Message the tutor
@@ -64,18 +66,20 @@ export function ChatComposer({
             }
           }}
           placeholder="Ask the tutor..."
-          className="min-w-0 flex-1 resize-none rounded-input border border-ink-faint bg-paper-0 px-3 py-2 text-[13px] leading-snug text-ink placeholder:text-ink-faint disabled:opacity-60"
+          className="min-w-0 flex-1 resize-none rounded-input bg-paper-0 px-3 py-2 text-ui text-ink placeholder:text-ink-faint disabled:opacity-60"
         />
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="sm"
+          tone="plum"
           onClick={onSend}
           disabled={!canSend}
-          className="shrink-0 rounded-input bg-plum px-3 py-2 text-[12.5px] font-semibold text-paper-0 transition-transform active:translate-y-px disabled:opacity-40"
+          className="shrink-0"
         >
           Send
-        </button>
+        </Button>
       </div>
-      <p className="mt-1 px-0.5 text-[10.5px] text-ink/60">
+      <p className="mt-1 px-0.5 text-meta text-ink-soft">
         Enter sends, Shift plus Enter adds a line.
       </p>
     </div>
