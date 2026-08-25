@@ -638,3 +638,59 @@ The repo has no `npm test` and this work adds none (spec 6b, 6d). Gates are `npm
 ### D-055. Stage B choices
 
 The topic rail lives in `src/app/(tabs)/learn/[topicId]/layout.tsx` (so it also frames the history page) and `learn/layout.tsx` is deleted, since the index has no rail (spec 3a); the index Recent list shows the 8 most recent docs; rail search is a case-insensitive name substring match that keeps ancestors and auto-expands matching roots; `TopicTree` is renamed `TopicRail` with `git mv` to keep its history; descendant counts come from one memoized `getDescendantCounts()` (React `cache`) and the `/learn/[topicId]` Practice button disables when no verified problem exists beneath the topic. Two build notes: the index generate button is `size="md"` (32px) to line up with the 32px input, where the spec's `sm` (24px) would sit 8px short; and Recent rows show meta and title only, since `MentalModelDoc` has no description column behind the spec's clamped description.
+
+### D-052. Practice: the five calls the modernization spec left to the build
+
+`docs/superpowers/specs/2026-08-21-ui-modernization-design.md` section 4
+reshapes the Practice screen. Five of its choices were not derivable from
+docs/06 or docs/08, so they are recorded here in the order the build lands
+them. Nothing else about the screen moved: the sketch store, the OCR route,
+the answer comparison and the diagnosis path are untouched (spec 4e).
+
+**The split ratio persists in `localStorage`, under `ab:practice-split`.** The
+old split was a fixed 45/55 with no way to move it. It is now a drag handle
+plus arrow keys, and a ratio that does not survive a reload makes that handle
+a toy. `useSplitRatio` writes on `pointerup` and on each keyboard commit,
+never during a drag, so the pointer path stays one `requestAnimationFrame`
+setting one CSS custom property. A cookie or a database column would buy
+cross-device persistence, which a single-user local-first Phase 1 app
+(CLAUDE.md) does not need, and a database write would put the network on the
+drag path. A missing, unparseable or out-of-range stored value is clamped or
+falls back to `SPLIT_DEFAULT` (0.45) rather than throwing, and that clamp is a
+pure function in `src/lib/practice/splitRatio.ts` so a runner can cover it
+later (D-054).
+
+**The header "New problem" button is dropped.** The panel header carried a
+"New problem" button while the actions row already offered "Skip" and every
+terminal state already ended in "Next problem". Three controls competing for
+the same intent is the opposite of spec 4c, which asks each state to show one
+primary action. The header keeps only its truncating topic line, and nothing
+becomes unreachable: "Skip" moves on while a problem is open, "Next problem"
+moves on once it has been answered or revealed.
+
+**Clear asks in a popover, not `window.confirm`.** `window.confirm` blocks the
+main thread, cannot be styled or themed, reads as browser chrome inside a
+paper-textured toolbar, and is invisible to the keyboard, reduced-motion and
+visual passes the spec requires (6b.3 to 6b.5). Clear now opens a small
+`role="dialog"` popover anchored under its chip, reading "Clear the whole
+canvas? This cannot be undone." with "Clear" then "Keep"; Escape closes it and
+returns focus to the Clear chip. After this stage the string `window.confirm`
+appears nowhere under `src/`, and it is a banned pattern in the stage grep
+(spec 6b.2).
+
+**The problem statement stays serif.** The modernization moves labels, meta
+and controls onto the sans cuts, and the statement would have been swept along
+with them. It is deliberately left in the serif cut: the statement is the one
+block on this screen that is read closely rather than scanned, it carries
+inline KaTeX that is set against serif everywhere in the model docs, and
+holding that voice is what ties a problem to the document it tests. Only the
+chrome around the statement changes.
+
+**The clean copy slip loses its Expand/Collapse toggle and its `copied`
+state.** The slip used to be a collapsible panel with a local `copied` boolean
+driving an inline confirmation label. It is now an absolutely positioned sheet
+sized to its own content, carrying "Dismiss" and "Use as answer" plus one
+"Copy" per math block, so there is no collapsed height left to toggle to and
+"Dismiss" is the collapse. The copy confirmation moved onto the shared `Toast`
+primitive from stage A, which announces through `role="status"` and clears
+itself after 3.2 seconds, so the local state and its timer went with it.
