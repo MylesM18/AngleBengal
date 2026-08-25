@@ -85,7 +85,7 @@ export default async function TopicPage({
 
             <div className="stock-textured flex flex-wrap items-center gap-3 border-y border-hairline bg-kraft px-8 py-2.5 text-meta text-ink">
               {doc.isExemplar && (
-                <span className="inline-flex h-6 items-center rounded-chip bg-paper-0 px-2 font-medium text-ink">
+                <span className="inline-flex h-6 items-center rounded-chip bg-paper-0 px-2 text-ui font-medium text-ink">
                   Exemplar
                 </span>
               )}

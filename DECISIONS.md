@@ -952,3 +952,41 @@ from "a live mini TOC from `lg` up" to "from `xl` up". That line was appended
 verbatim from this stage's plan (D-053), but a pointer that describes the code
 is worth more than a pointer that matches a superseded plan, and the plan file
 itself is not edited. See also D-060.
+
+### D-062. Meta chips take the chip size, and a practice model tag truncates
+
+Owner rulings (a) and (b), the last two on the list.
+
+**(a) The meta chip no longer overrides its own font size.** `Chip`'s `BASE`
+sets `text-ui`, 14px, and every variant took it except `meta`, which added
+`text-meta` and pulled itself back to 12px. That override is removed, so the
+meta chip now matches the rest of the component at 14px. The weight is
+unchanged: the variant's `font-medium` still wins over the 400 that `text-ui`
+carries, measured at 500 on a plain meta chip. The "Exemplar" chip on the doc
+meta strip is hand-rolled rather than a `Chip`, and was inheriting the strip's
+12px, so it takes `text-ui` too and is now 14px like its component siblings.
+
+The strip's plain text is deliberately left at `text-meta`. The ruling is about
+chips, so "n models" and "last practiced" are still meta text at 12px: they are
+not chips and resizing them would have changed a surface the ruling did not name.
+This is the narrow reading of a ruling whose original wording, "meta chips 14px
+not 12px", could also have meant the whole strip. Widening it later is one class.
+
+**(b) A practice model tag truncates instead of being clipped.** The tags in
+`PracticePanel` are meta chips carrying `M<n> · <title>`, and `BASE` makes a
+chip `whitespace-nowrap`, so a long title grew the chip past the panel rather
+than wrapping. The workspace panel is resizable down to `lg:min-w-[360px]`, and
+the panel's own `overflow-hidden` then cut the tag off with no ellipsis and no
+way to read the rest. Measured at the 360px minimum before the fix: two of the
+three tags on the first seeded problem ran to 417px and 473px against a panel
+edge at 360.
+
+The fix is at the call site, not in the primitive. The `li` and the chip get
+`min-w-0 max-w-full` so the flex item may actually shrink, the label moves into
+a `truncate` span so the overflow ends in an ellipsis, and the chip gains a
+`title` holding the full `M<n> · <title>` so a truncated tag is still readable
+on hover. Editing `Chip`'s `whitespace-nowrap` was the alternative and was
+rejected: a chip is a single-line control by design, and every other chip in the
+app would have inherited the change. Measured after, at the same 360px minimum
+and with the wider 14px type from (a): all three tags end at or inside 324px,
+two of them ellipsised. See also D-057 and D-058.

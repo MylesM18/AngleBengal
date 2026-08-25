@@ -321,12 +321,16 @@ export function PracticePanel({
                 {problem.modelTags.length > 0 && (
                   <ul className="mt-3 flex flex-wrap gap-1.5">
                     {problem.modelTags.map((tag) => (
-                      <li key={`${tag.docId}-${tag.modelNumber}`}>
+                      <li key={`${tag.docId}-${tag.modelNumber}`} className="min-w-0 max-w-full">
                         <Link
                           href={`/learn/${tag.topicId}?doc=${tag.docId}#model-${tag.modelNumber}`}
-                          className={chipClasses({ variant: "meta", className: "font-semibold" })}
+                          className={chipClasses({
+                            variant: "meta",
+                            className: "min-w-0 max-w-full font-semibold",
+                          })}
+                          title={`M${tag.modelNumber} · ${tag.title}`}
                         >
-                          M{tag.modelNumber} · {tag.title}
+                          <span className="truncate">M{tag.modelNumber} · {tag.title}</span>
                         </Link>
                       </li>
                     ))}

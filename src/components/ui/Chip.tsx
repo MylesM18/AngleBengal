@@ -11,7 +11,9 @@ const BASE =
 
 const VARIANT: Record<ChipVariant, string> = {
   nav: "font-medium text-ink hover:bg-desk",
-  meta: "stock-textured bg-kraft text-meta font-medium text-ink",
+  // No font-size of its own: the meta chip takes BASE's `text-ui` (14px) like
+  // every other variant. It used to override down to `text-meta` (12px).
+  meta: "stock-textured bg-kraft font-medium text-ink",
   action: "text-ink shadow-sheet hover:bg-desk active:translate-y-px active:shadow-none",
   toggle: "text-ink hover:bg-desk active:translate-y-px",
 };
