@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { Chip } from "@/components/ui/Chip";
+import { Icon } from "@/components/ui/Icon";
+
 /** Recent chats plus New chat (docs/06 §5). */
 
 export type SessionSummary = {
@@ -62,15 +65,16 @@ export function SessionMenu({
 
   return (
     <div ref={wrapper} className="relative">
-      <button
-        type="button"
+      <Chip
+        variant="action"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="rounded-chip px-2 py-1 text-[12px] font-semibold text-paper-0/85 transition-colors hover:text-paper-0"
+        className="bg-paper-0 text-ink focus-visible:outline-paper-0"
       >
         Chats
-      </button>
+        <Icon name="chevron" size={12} className="ml-1" />
+      </Chip>
 
       {open && (
         <div

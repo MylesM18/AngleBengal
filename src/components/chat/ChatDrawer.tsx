@@ -3,6 +3,9 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Chip, chipClasses } from "@/components/ui/Chip";
+import { truncateMiddle } from "@/lib/text";
+
 import { ChatComposer } from "./ChatComposer";
 import { ChatMessageList, type ChatTurn } from "./ChatMessageList";
 import { SessionMenu } from "./SessionMenu";
@@ -210,26 +213,38 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
     >
       <div className="flex h-12 shrink-0 items-center gap-2 bg-plum px-3">
         <Image src="/anglebengal-mark-dark.svg" alt="" width={20} height={20} className="shrink-0" />
-        <span className="font-expanded text-[15px] text-paper-0">Tutor</span>
+        <span className="font-expanded text-ui-lg text-paper-0">Tutor</span>
+        {/*
+          Not a Chip button: there is nothing to click. role="note" is what
+          makes the aria-label carry the untruncated path to a screen reader.
+        */}
         <span
-          className="ml-1 min-w-0 flex-1 truncate text-[11px] text-paper-0/70"
+          role="note"
           title={contextChip}
+          aria-label={contextChip}
+          className={chipClasses({
+            variant: "action",
+            className: "ml-1 min-w-0 shrink bg-paper-0 text-ink",
+          })}
         >
-          {contextChip}
+          {truncateMiddle(contextChip, 14, 14)}
         </span>
-        <SessionMenu
-          currentSessionId={sessionId}
-          onSelect={(id) => void loadSession(id)}
-          onNew={startNew}
-          refreshKey={sessionsKey}
-        />
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-chip px-2 py-1 text-[12px] font-semibold text-paper-0/85 transition-colors hover:text-paper-0"
-        >
-          Close
-        </button>
+
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <SessionMenu
+            currentSessionId={sessionId}
+            onSelect={(id) => void loadSession(id)}
+            onNew={startNew}
+            refreshKey={sessionsKey}
+          />
+          <Chip
+            variant="action"
+            onClick={onClose}
+            aria-label="Close tutor"
+            icon="close"
+            className="bg-paper-0 text-ink focus-visible:outline-paper-0"
+          />
+        </div>
       </div>
 
       <ChatMessageList
