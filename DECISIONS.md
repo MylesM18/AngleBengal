@@ -879,3 +879,48 @@ Verifying it needs care. `offsetParent === null` alone is NOT proof, because a
 being invisible. The assertion pairs it with `position === 'fixed'` and with
 evidence that the slip is actually rendered (`display`, `visibility`, `opacity`
 and a non-zero box). See also D-058.
+
+### D-060. The mini TOC measures from the scrollport, and a jump updates the row
+
+Owner ruling (e) recorded three defects on the doc reading route. Two of them
+live in `src/components/learn/DocMiniTOC.tsx` and are fixed here. The third,
+(e3), is a layout question and is deliberately left open below.
+
+**(e1) The reading line now measures from the scrollport, not the viewport.**
+The doc route does not scroll the window: `AppShell` gives the main column
+`overflow-y-auto`, and that column's top edge sits at viewport 56, below the
+48px header. `ModelHeading` carries `scroll-mt-20`, and a `scroll-mt` resolves
+against the element that scrolls, so a jumped-to heading parked at viewport
+56 + 80 = 136. The old constant was a viewport number, 96, and its comment
+derived it from a header of 64px that the theme has not had since
+`--header-h` became 48px. The two numbers were therefore measured from
+different origins, 136 sat below 96, the loop's `break` fired before reaching
+the target, and **every deep link marked the model above the one it linked to.**
+The constant is now `SCROLL_MARGIN + 8`, measured down from the scrollport's
+own top, so it is tied to the same 80 the heading declares. Measured after: a
+jumped-to heading parks at exactly 80 from the scrollport top, inside the line,
+and the row that lights is the row that was clicked.
+
+**(e2) A fragment jump now updates the row, and the observer was not touched to
+do it.** The jump moves the scrollport in a single frame, which can cross no
+observer threshold at all, so the callback never ran and the column kept its
+previous row. The fix does not add thresholds and does not give the observer a
+`root`: neither addresses the mechanism, because an observer only samples what
+a rendered frame shows it, and both would make the scheduler harder to reason
+about. Instead the same `recompute` is also driven by a passive `scroll`
+listener on the scrollport, by `hashchange` for a repeat click on the row
+already in the URL, and by one seeding call on mount. The seeding call fixed a
+second symptom nobody had written down: before it, no row was marked at all
+until something happened to schedule the observer.
+
+**Verifying this needs a rendered frame.** Scroll events and observer callbacks
+are both delivered during the rendering step, and a hidden tab does not run one.
+Measured in a hidden pane, a scroll listener records zero events while
+`scrollTop` demonstrably moves, which reads exactly like a broken listener and
+is not one. Force a frame between the scroll and the assertion.
+
+**(e3) is not fixed here.** At the `lg` edge the reading column measures 374px,
+because the 320px topic rail and the 210px mini TOC both appear at `lg` and
+leave 1024 - 320 - 24 - 64 - 32 - 210 between them. The plan's expected 718 is
+what the same sum gives with no rail, so closing it means choosing which of the
+two side columns yields, and that is a layout decision rather than a defect fix.

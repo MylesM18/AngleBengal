@@ -7,16 +7,31 @@ import type { ModelIndexEntry } from "@/lib/modelIndex";
 import { ACCENT_VAR, type AccentName } from "@/lib/topicColors";
 
 /**
- * The reading line, in px from the top of the viewport: the sticky top bar
- * (`--header-h`, 64) plus a 32px lead-in. A heading counts as reached once its
- * top edge has passed this line, so the active row is the last heading above
- * it.
- *
- * `ModelHeading` carries `scroll-mt-20`, which parks a jumped-to heading at
- * 80px. That is above this line, so a deep link always makes its own target
- * active rather than the model before it.
+ * Matches `scroll-mt-20` on `ModelHeading`: a jumped-to heading parks exactly
+ * this far below the top edge of whatever scrolled it. Keep the two in step.
  */
-const ACTIVE_LINE = 96;
+const SCROLL_MARGIN = 80;
+
+/**
+ * The reading line, in px measured down from the SCROLLPORT's top edge rather
+ * than from the top of the viewport. A heading counts as reached once its top
+ * edge passes this line, so the active row is the last heading above it.
+ *
+ * The doc route does not scroll the window. It scrolls an inner column, and
+ * that column's own top sits below the 48px header, so a viewport-based line
+ * and a `scroll-mt` resolving against the scrollport were measured from two
+ * different origins: a heading jumped to parked 40px below a viewport line of
+ * 96, and every deep link marked the model above its target. Measuring from the
+ * scrollport takes the header out of the sum. The slack keeps a parked heading
+ * on the reached side of the line after sub-pixel rounding.
+ */
+const READING_LINE = SCROLL_MARGIN + 8;
+
+/**
+ * The observer's scheduling margin. It only decides WHEN the callback runs; the
+ * callback reads live rects, so this never decides which row wins.
+ */
+const OBSERVER_MARGIN = 96;
 
 /**
  * Sticky mini-TOC on doc pages (docs/06 §2, spec 3d): the models by number and
@@ -45,22 +60,52 @@ export function DocMiniTOC({
       .filter((el): el is HTMLElement => el !== null);
     if (heads.length === 0) return;
 
+    let node = heads[0]?.parentElement ?? null;
+    let scrollport: HTMLElement | null = null;
+    while (node) {
+      const overflowY = window.getComputedStyle(node).overflowY;
+      if (overflowY === "auto" || overflowY === "scroll") {
+        scrollport = node;
+        break;
+      }
+      node = node.parentElement;
+    }
+
     const recompute = () => {
+      const origin = scrollport ? scrollport.getBoundingClientRect().top : 0;
       let currentId = heads[0]?.id ?? null;
       for (const head of heads) {
-        if (head.getBoundingClientRect().top > ACTIVE_LINE) break;
+        if (head.getBoundingClientRect().top - origin > READING_LINE) break;
         currentId = head.id;
       }
-      setActiveAnchor(currentId);
+      setActiveAnchor((prev) => (prev === currentId ? prev : currentId));
     };
 
     const observer = new IntersectionObserver(recompute, {
-      rootMargin: `-${ACTIVE_LINE}px 0px 0px 0px`,
+      rootMargin: `-${OBSERVER_MARGIN}px 0px 0px 0px`,
       threshold: 0,
     });
     for (const head of heads) observer.observe(head);
 
-    return () => observer.disconnect();
+    /*
+      A fragment jump moves the scrollport in a single frame, which can cross no
+      observer threshold at all, in which case the callback above never runs and
+      the column keeps pointing at the model it was already on. These three
+      carry that case without touching the observer: the scrollport always emits
+      `scroll` when it moves, `hashchange` covers a repeat click on the row
+      already in the URL, and the seeding call marks a row before any event
+      arrives.
+    */
+    const scrollTarget: HTMLElement | Window = scrollport ?? window;
+    scrollTarget.addEventListener("scroll", recompute, { passive: true });
+    window.addEventListener("hashchange", recompute);
+    recompute();
+
+    return () => {
+      observer.disconnect();
+      scrollTarget.removeEventListener("scroll", recompute);
+      window.removeEventListener("hashchange", recompute);
+    };
   }, [anchorKey]);
 
   if (entries.length === 0) return null;
