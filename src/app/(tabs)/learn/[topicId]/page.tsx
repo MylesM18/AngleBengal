@@ -9,6 +9,7 @@ import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { ButtonLink, buttonClasses } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Sheet } from "@/components/ui/Sheet";
 import { modelMissCounts } from "@/lib/attempts";
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
@@ -56,31 +57,49 @@ export default async function TopicPage({
 
     const index = deserializeModelIndex(doc.modelIndexJson);
     const misses = await modelMissCounts(doc.id);
+    const lastAttempt = await prisma.attempt.findFirst({
+      where: { problem: { topicId: topic.id } },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
+    const lastPracticed = lastAttempt
+      ? `Last practiced ${lastAttempt.createdAt.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })}`
+      : "Not practiced yet";
 
     return (
       <article className="flex justify-center gap-8 px-8 py-10">
         <div className="min-w-0 max-w-[68ch] flex-1">
-          <Breadcrumb path={topic.path} topicId={topic.id} hasSiblings={topic.docCount > 1} />
+          <div className="mb-4 flex items-center justify-between gap-4 [&>nav]:mb-0">
+            <Breadcrumb path={topic.path} topicId={topic.id} hasSiblings={topic.docCount > 1} />
+            <ButtonLink href={`/learn/${topic.id}/history`} variant="tertiary" size="sm">
+              History
+            </ButtonLink>
+          </div>
 
-          <div className="mb-3 flex items-center gap-2">
-            {doc.isExemplar && (
-              <span className="meta-caps inline-block rounded-chip bg-brand-tint px-2 py-0.5 text-[10px] text-brand-deep">
-                Exemplar
+          <Sheet tone="paper-0" className="animate-enter-sheet overflow-hidden">
+            <h1 className="display-cut px-8 pb-5 pt-8 text-h1 text-ink">{doc.title}</h1>
+
+            <div className="stock-textured flex flex-wrap items-center gap-3 border-y border-hairline bg-kraft px-8 py-2.5 text-meta text-ink-soft">
+              {doc.isExemplar && (
+                <span className="inline-flex h-6 items-center rounded-chip bg-paper-0 px-2 font-medium text-ink">
+                  Exemplar
+                </span>
+              )}
+              <span>
+                {index.length} {index.length === 1 ? "model" : "models"}
               </span>
-            )}
-            <Link
-              href={`/learn/${topic.id}/history`}
-              className="text-[12px] text-cobalt hover:underline"
-            >
-              Attempt history
-            </Link>
-          </div>
+              <span>{lastPracticed}</span>
+            </div>
 
-          <ModelMissList misses={misses} topicId={topic.id} docId={doc.id} />
-
-          <div className="rounded-card bg-paper-0 px-8 py-8 shadow-sheet">
-            <MarkdownMath>{doc.contentMd}</MarkdownMath>
-          </div>
+            <div className="px-8 py-8">
+              <ModelMissList misses={misses} />
+              <MarkdownMath>{doc.contentMd}</MarkdownMath>
+            </div>
+          </Sheet>
         </div>
 
         <div className="hidden xl:block">
