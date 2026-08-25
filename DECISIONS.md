@@ -990,3 +990,39 @@ rejected: a chip is a single-line control by design, and every other chip in the
 app would have inherited the change. Measured after, at the same 360px minimum
 and with the wider 14px type from (a): all three tags end at or inside 324px,
 two of them ellipsised. See also D-057 and D-058.
+
+### D-063. The practice index moves onto the type scale
+
+`D-046` fixed a six-token type scale and banned arbitrary `text-[px]`, but
+`src/app/(tabs)/practice/page.tsx` carried seven of them: 30, 15, 16, 13.5, 13,
+14.5 and 12. Three were exact scale values written the long way, and four were
+sizes the scale does not contain. All seven now name a token.
+
+Three snapped exactly: 30 to `text-h1`, 16 to `text-ui-lg`, 12 to `text-meta`.
+The four off-scale sizes rounded to the nearest token, and the two genuinely
+ambiguous ones were settled by precedent rather than by taste. 15 and 13 both
+sit halfway between two tokens, and the sibling pages already answer the
+question: `learn/page.tsx` sets its lede and its body copy in plain `text-ui`,
+and `settings/page.tsx` titles itself `display-cut text-h1`, which is exactly
+what the practice title was spelling out as `text-[30px]`. So the lede, the two
+explanatory paragraphs and the topic-row name all take `text-ui`, and the page
+title takes `text-h1` like Settings.
+
+One weight moves on purpose. The topic-row detail line was `text-[12px]`, a bare
+size that left the weight at the inherited 400. `text-meta` carries 500, which
+is the weight every other piece of meta text in the app already renders at, so
+the row detail now matches them. Nothing else moved: `font-expanded` on the
+empty-state title and `font-semibold` on the topic-row name both still outrank
+the weight their new size token carries, measured at 700 and 600.
+
+The `leading-*` utilities were left alone. The ban is on arbitrary sizes, the
+`leading` classes are ordinary utilities rather than arbitrary values, and
+dropping them would have changed the page's vertical rhythm beyond the point of
+the change. The sibling pages do set the same copy without a `leading` override,
+so aligning them is a reasonable follow-up and is not done here.
+
+**This is the practice index only.** Nine arbitrary text sizes remain in
+`src/components/practice/AnswerInput.tsx` (seven) and
+`src/components/sketchpad/SketchpadUnavailableNote.tsx` (two), and
+`rounded-[2px]` on the practice index is an arbitrary radius rather than a text
+size, so spec 7 rather than `D-046` governs it. None of those are touched here.

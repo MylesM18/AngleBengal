@@ -34,16 +34,16 @@ export default async function PracticeIndexPage() {
 
   return (
     <div className="mx-auto max-w-[760px] px-8 py-10">
-      <h1 className="display-cut text-[30px] leading-tight text-ink">Practice</h1>
-      <p className="mt-2 max-w-[54ch] text-[15px] leading-relaxed text-ink-soft">
+      <h1 className="display-cut text-h1 leading-tight text-ink">Practice</h1>
+      <p className="mt-2 max-w-[54ch] text-ui leading-relaxed text-ink-soft">
         Verified problems tagged to the models they exercise. A wrong answer is diagnosed
         back to the model that failed, so pick the topic you want to be tested on.
       </p>
 
       {ready.length === 0 && needsProblems.length === 0 ? (
         <div className="stock-textured mt-8 rounded-card bg-kraft p-5">
-          <p className="font-expanded mb-1 text-[16px] text-ink">No topics are ready yet</p>
-          <p className="max-w-[50ch] text-[13.5px] leading-relaxed text-ink">
+          <p className="font-expanded mb-1 text-ui-lg text-ink">No topics are ready yet</p>
+          <p className="max-w-[50ch] text-ui leading-relaxed text-ink">
             Problems are generated against a topic&apos;s mental models, so a topic needs a
             document first. Generate one from the{" "}
             <Link href="/learn" className="text-cobalt hover:underline">
@@ -75,7 +75,7 @@ export default async function PracticeIndexPage() {
       {needsProblems.length > 0 && (
         <section className="mt-8">
           <h2 className="meta-caps mb-3 text-ink-soft">Models ready, no problems yet</h2>
-          <p className="mb-3 max-w-[54ch] text-[13px] leading-relaxed text-ink-soft">
+          <p className="mb-3 max-w-[54ch] text-ui leading-relaxed text-ink-soft">
             These topics have mental models but an empty problem pool. Opening one offers to
             generate and verify a first set.
           </p>
@@ -122,8 +122,8 @@ function TopicRow({
           style={{ backgroundColor: ACCENT_VAR[accent] }}
         />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14.5px] font-semibold text-ink">{topic.name}</span>
-          <span className="block text-[12px] text-ink-soft">
+          <span className="block truncate text-ui font-semibold text-ink">{topic.name}</span>
+          <span className="block text-meta text-ink-soft">
             {rootName === topic.name ? detail : `${rootName} · ${detail}`}
           </span>
         </span>
