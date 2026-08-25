@@ -118,7 +118,7 @@ function TopicRow({
       >
         <span
           aria-hidden
-          className="h-9 w-1.5 shrink-0 rounded-[2px]"
+          className="h-9 w-1.5 shrink-0 rounded-chip"
           style={{ backgroundColor: ACCENT_VAR[accent] }}
         />
         <span className="min-w-0 flex-1">

@@ -206,7 +206,7 @@ function TopicBranch({
       >
         <span
           aria-hidden
-          className="shrink-0 rounded-l-[2px] transition-[width]"
+          className="shrink-0 rounded-l-chip transition-[width]"
           style={{
             width: active ? 8 : 4,
             backgroundColor: ACCENT_VAR[accent],

@@ -1061,3 +1061,39 @@ Tailwind class, and there is no `text-[px]` behind it. `D-046` binds the classes
 this codebase writes, not a vendored renderer's internal scale. Likewise
 `rounded-[2px]` on the practice index remains an arbitrary radius under spec 7
 rather than anything `D-046` covers. See also D-063.
+
+### D-065. The two accent bars take the chip radius
+
+`D-064` left `rounded-[2px]` standing on the practice index as the last
+arbitrary value in `src/`. It was not the last one. A grep for `rounded-\[`
+misses `rounded-l-[2px]`, because the side modifier sits between the prefix and
+the bracket, and `src/components/learn/TopicRail.tsx` was carrying exactly that
+on its topic accent tab. The two are a matched pair, the same 2px treatment on
+the same kind of thin accent bar, so both are fixed here. Fixing one would have
+left the rule half applied and the two bars disagreeing.
+
+Both now take `rounded-chip`, the smallest of the three radii spec 7 freezes,
+as `rounded-chip` on the practice bar and `rounded-l-chip` on the topic tab,
+which is left-rounded only. **No fourth radius token was added**: spec 7 freezes
+the set at card 10, input 6 and chip 4 for the whole modernization, and 2px was
+never one of them.
+
+The visible change is smaller than swapping 2px for 4px sounds, because a
+border-radius is clamped to half the box. The practice bar is 6px wide, so its
+4px specification paints at 3px, one pixel rounder than before. The topic tab is
+4px wide at rest and 8px when current, so at rest it paints at 2px, exactly what
+it painted before, and only the current tab changes, from 2px to 4px. Measured
+across all 31 tabs on the reader route: left corners 4px specified, right corners
+0px, painted 2px at width 4 and 4px at width 8.
+
+One thing was worth checking rather than assuming. A Tailwind class that does not
+exist produces no declaration at all, so a side-modified theme radius that failed
+to generate would have silently rounded nothing, and the bars would have gone
+square without any error anywhere. `rounded-l-chip` does generate: the computed
+top-left radius is 4px and matches `--radius-chip`, and the right corners stay
+at 0px.
+
+`src/` now holds no arbitrary radius and no arbitrary text size. Still standing
+and governed by neither rule: `border-[1.5px]` on `Button.tsx`'s secondary
+variant is an arbitrary border width, which spec 7 does not freeze and `D-046`
+does not cover. See also D-063 and D-064.
