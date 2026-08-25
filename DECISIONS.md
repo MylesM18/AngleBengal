@@ -1097,3 +1097,40 @@ at 0px.
 and governed by neither rule: `border-[1.5px]` on `Button.tsx`'s secondary
 variant is an arbitrary border width, which spec 7 does not freeze and `D-046`
 does not cover. See also D-063 and D-064.
+
+### D-066. The two arbitrary border widths are reviewed and deliberately kept
+
+`D-065` closed the arbitrary radii and noted `border-[1.5px]` on `Button.tsx`'s
+secondary variant as governed by nothing. Auditing that properly turns up two
+sites, not one, because a grep for `border-\[` misses a side modifier the same
+way it missed `rounded-l-[2px]`: `src/components/sketchpad/SketchpadUnavailableNote.tsx`
+carries `border-l-[3px]` on its marigold accent rule. Both were reviewed. **Both
+stay.**
+
+**No locked decision governs border width.** `D-046` fixes a six-token type
+scale and bans arbitrary `text-[px]`. Spec 7 freezes the three radii. Neither
+mentions borders, and there is no border-width token in `@theme` to snap to, so
+removing these would not be enforcing a rule. It would be choosing a new look
+and calling it compliance.
+
+**The 1.5px is a real weight, not a rounding artifact.** Measured at a device
+pixel ratio of 2, `border-[1.5px]` computes to 1.5px and paints as three device
+pixels. `border` paints two and `border-2` paints four, so neither reproduces it:
+snapping down loses the crisper edge that separates a secondary button from the
+1px hairline used for dividers, and snapping up makes an outline button heavier
+than any other rule on the page. The 3px marigold rule sits between `border-l-2`
+and `border-l-4` in the same way.
+
+The de facto scale is worth writing down even though it is not enforced: 27
+elements use plain `border`, one uses `border-2`, and these two are the only
+widths off that set. Tailwind's arbitrary-value syntax is the intended way to
+express a deliberate one-off, and two one-offs across a codebase this size is a
+considered exception rather than drift.
+
+This closes the arbitrary-value sweep that ran from `D-063`. Text sizes are on
+the scale, radii are on the token set, and border widths are reviewed and kept.
+What remains in brackets is layout dimension, `w-[150px]`, `max-w-[68ch]`,
+`w-[320px]`, `lg:min-w-[360px]` and their kind, which no rule has ever covered
+and which a scale would not improve. **A future audit should read this entry
+before "fixing" either border**, and should use `border(-[a-z]{1,2})*-\[` rather
+than `border-\[` if it wants to find them at all.
