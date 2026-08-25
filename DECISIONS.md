@@ -694,3 +694,24 @@ sized to its own content, carrying "Dismiss" and "Use as answer" plus one
 "Dismiss" is the collapse. The copy confirmation moved onto the shared `Toast`
 primitive from stage A, which announces through `role="status"` and clears
 itself after 3.2 seconds, so the local state and its timer went with it.
+
+### D-056. Stage D: chat bubble prose inherits its bubble color
+
+**Stage D's "add nothing to `globals.css`" rule is lifted for two lines, by owner
+ruling.** Spec 5c inverted the user chat bubble to `bg-plum text-paper-0`, but the
+markdown wrapper inside it carries `doc-prose chat-prose`, and `.doc-prose` sets
+`color: var(--color-ink)`. The wrapper therefore beat the bubble's own `text-paper-0`,
+so every word of every user message rendered ink on plum at 1.45:1, not just the KaTeX
+the plan anticipated.
+
+**The fix is two edits in `globals.css` and nothing else.** `.doc-prose .katex` loses
+its `color` declaration entirely (the rule had no other declarations, so the rule is
+gone), because that selector applies to the math element directly and would have held
+it at ink whatever the wrapper inherited. `.doc-prose.chat-prose` gains
+`color: inherit`, which outranks bare `.doc-prose` on the wrapper and lets the whole
+subtree take the bubble's `paper-0`. Measured after the change: chat math and chat
+prose both sit at 9.04:1 on plum, and reading sheet math still computes to ink, because
+`.doc-prose` alone still colors that surface.
+
+**The two alternatives were rejected.** Hard-coding a color on the bubble is barred by
+the plan, and reverting the inversion would have undone approved spec 5c.
