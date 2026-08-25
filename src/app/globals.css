@@ -173,11 +173,16 @@ body {
   text-transform: uppercase;
 }
 
-/* Focus ring: 2px cobalt offset 2px, visible on every paper tone (docs/08). */
-:where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--color-cobalt);
-  outline-offset: 2px;
-  border-radius: 2px;
+@layer base {
+  /* Focus ring: 2px cobalt offset 2px, visible on every paper tone (docs/08). */
+  /* Layered on purpose: unlayered, this outranked every @layer utilities rule, */
+  /* so a call site's focus-visible:outline-* was inert and any focused element */
+  /* lost its own radius to the 2px below. See D-058. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-cobalt);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
 }
 
 @layer components {

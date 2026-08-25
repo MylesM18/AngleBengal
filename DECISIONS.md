@@ -806,3 +806,39 @@ at 10.25:1.
 
 This edits `src/app/globals.css`, which the stage D plan banned. That ban was a
 stage D scope rule and stage D closed at `91c6dbb`, so it no longer applies.
+
+### D-058. The focus ring moves into `@layer base`, and the Tutor chip asks for a paper ring
+
+Owner ruling (c) recorded the focus-ring cascade defect. The global focus rule
+in `src/app/globals.css` sat outside every cascade layer. Unlayered CSS outranks
+all layered CSS whatever the specificity, and Tailwind v4 compiles
+`focus-visible:outline-*` into `@layer utilities`, so the rule beat every call
+site that tried to override it. Two things followed, both measured on the live
+page before the fix: a focused element took the cobalt ring even where the call
+site asked for `focus-visible:outline-paper-0`, at 2.48:1 on the `ink` nav chip
+and 1.72:1 on `plum`, under the 3:1 floor for a UI component; and the rule's
+`border-radius: 2px` clobbered the element's own radius, so every focused chip,
+input and card snapped from 4, 6 or 10px to 2px.
+
+**The rule is now wrapped in `@layer base`.** That is the whole cascade fix. It
+was not written with `!important`, which would have made the ring impossible to
+override rather than merely hard to, and it did not touch `Button.tsx`, whose
+`plum` tone was already correct and only ever looked wrong because the utility
+it declared could not win. Layering leaves the default intact: an element with
+no `focus-visible:outline-*` of its own still takes the cobalt ring at 2px with
+a 2px offset, measured at 5.27:1 on `paper-0`. Elements keep their own radius,
+because a radius utility sits in `@layer utilities` and now outranks the base
+rule, while an element with no radius rule at all still gets the 2px the ring
+was written to give it.
+
+**The Tutor chip in `src/components/shell/TopBar.tsx` gains
+`focus-visible:outline-paper-0`.** Layering alone would not have closed ruling
+(c)'s headline number. That chip is a plain `button` on `bg-plum` that never
+declared the utility, so it kept the cobalt ring at 1.72:1 even after the
+cascade was fixed. It is the only focusable element on a dark stock that was
+missing the declaration: the other three sites, `Chip`'s active state,
+`ChatDrawer`'s close and `SessionMenu`'s trigger, already had it and started
+working the moment the rule was layered. Measured after: 9.04:1 on plum.
+
+The `globals.css` ban that stage D observed was a stage D scope rule and stage D
+closed at `91c6dbb`, so it no longer applies. See also D-057.

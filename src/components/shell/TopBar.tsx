@@ -64,7 +64,7 @@ export function TopBar({ chatOpen, onToggleChat, tutorRef }: TopBarProps) {
         aria-expanded={chatOpen}
         aria-controls="tutor-drawer"
         className={cx(
-          "flex h-7 shrink-0 items-center gap-1.5 rounded-chip bg-plum px-2.5 text-ui font-semibold text-paper-0 transition-[transform,box-shadow] duration-200 ease-paper",
+          "flex h-7 shrink-0 items-center gap-1.5 rounded-chip bg-plum px-2.5 text-ui font-semibold text-paper-0 transition-[transform,box-shadow] duration-200 ease-paper focus-visible:outline-paper-0",
           chatOpen ? "translate-y-px shadow-none" : "shadow-sheet active:translate-y-px active:shadow-none",
         )}
       >
