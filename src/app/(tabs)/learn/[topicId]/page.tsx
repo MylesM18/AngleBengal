@@ -83,7 +83,7 @@ export default async function TopicPage({
           <Sheet tone="paper-0" className="animate-enter-sheet overflow-hidden">
             <h1 className="display-cut px-8 pb-5 pt-8 text-h1 text-ink">{doc.title}</h1>
 
-            <div className="stock-textured flex flex-wrap items-center gap-3 border-y border-hairline bg-kraft px-8 py-2.5 text-meta text-ink-soft">
+            <div className="stock-textured flex flex-wrap items-center gap-3 border-y border-hairline bg-kraft px-8 py-2.5 text-meta text-ink">
               {doc.isExemplar && (
                 <span className="inline-flex h-6 items-center rounded-chip bg-paper-0 px-2 font-medium text-ink">
                   Exemplar

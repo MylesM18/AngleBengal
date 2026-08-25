@@ -777,3 +777,32 @@ the separator the seeded exemplar uses, which is an em-dash. House style bans
 em-dashes in copy (CLAUDE.md), and a heading composed at render time is new
 copy. The exemplar file itself is untouched: it is the generation quality bar
 and is never edited.
+
+### D-057. The 4.5 contrast floor on the doc meta strip and the mini TOC
+
+Owner rulings (f1) and (f2) recorded two measured shortfalls against the 4.5
+contrast floor. Both are now fixed, and the two sites needed different kinds of
+fix because only one of them had an in-palette colour to move to.
+
+**The doc meta strip takes `ink` rather than `ink-soft`.** The strip carries the
+"Exemplar" chip, "n models" and "last practiced" at 12px on `kraft`, where
+`ink-soft` measured 3.02:1. No other existing token clears the floor on that
+stock: `ink-faint` is 1.33:1 and even a darkened `ink-soft` reaches only about
+3.07:1, so `ink` at 6.93:1 is the only in-palette answer. The strip keeps its
+own de-emphasis from the kraft stock it sits on rather than from lighter text.
+
+**The `ink-soft` token itself darkens from `#6b5f52` to `#685c4f`.** The
+inactive mini TOC row is `ink-soft` on the app-shell `desk` colour, which
+measured 4.47:1, short of the floor by 0.03. The row could not simply take
+`ink`: `DocMiniTOC` distinguishes the active row as `font-medium text-ink` and
+gives the inactive row `hover:text-ink`, so moving the resting colour to `ink`
+would erase both the resting distinction and the hover affordance. Darkening the
+token by three steps per channel takes the pairing to 4.68:1, a margin of 0.175
+rather than the 0.034 a single step would leave, while staying visually
+indistinguishable from the locked Swatch Book value. The change is safe in every
+direction: no `text-ink-soft` call site in `src/` pairs the token with a dark
+stock, so darkening only ever raises contrast, and the active row is untouched
+at 10.25:1.
+
+This edits `src/app/globals.css`, which the stage D plan banned. That ban was a
+stage D scope rule and stage D closed at `91c6dbb`, so it no longer applies.
