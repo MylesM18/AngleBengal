@@ -1026,3 +1026,38 @@ so aligning them is a reasonable follow-up and is not done here.
 `src/components/sketchpad/SketchpadUnavailableNote.tsx` (two), and
 `rounded-[2px]` on the practice index is an arbitrary radius rather than a text
 size, so spec 7 rather than `D-046` governs it. None of those are touched here.
+
+### D-064. The last nine arbitrary text sizes, and what the scale does not govern
+
+`D-063` put the practice index on the scale and recorded nine arbitrary
+`text-[px]` still standing, seven in `src/components/practice/AnswerInput.tsx`
+and two in `src/components/sketchpad/SketchpadUnavailableNote.tsx`. All nine now
+name a token, and **`src/` no longer contains a single `text-[`**, which is what
+`D-046` asked for.
+
+Two inputs at 14 and one status label at 12 were exact scale values written the
+long way. The rest rounded: 13.5 to `text-ui`, and 12.5 and 13 to `text-meta`.
+
+**The two unit labels were the interesting pair.** `AnswerInput` renders a unit
+beside an answer field in two different branches, one at 12.5px and the other at
+13px, for the same job. Nothing chose those numbers apart from hand-tuning them
+in isolation, and no reader could have told them apart. Both are now `text-meta`
+and render identically, which is the point of having a scale at all.
+
+**Weights were held still except where the token is the right answer.** Three of
+these carry `font-semibold` or `font-expanded`, which outrank the weight a size
+token brings, so they did not move: measured at 600, 600 and 700. The labels,
+units and status text take `text-meta`'s 500, matching every other piece of meta
+text, as the topic row did in `D-063`. The one exception is the second paragraph
+of the sketchpad note, which is three lines of prose rather than a label: it
+keeps 400 through an explicit `font-normal`, because `text-meta`'s 500 is a
+treatment for labels and chips and a boldened body paragraph would have been a
+restyle rather than a size fix.
+
+**What the scale does not govern.** Auditing the practice session afterwards
+still reports text at 20.57px, on `mn` and `annotation` elements. That is KaTeX
+sizing math at its own 1.21em against the surrounding 17px `text-read`, not a
+Tailwind class, and there is no `text-[px]` behind it. `D-046` binds the classes
+this codebase writes, not a vendored renderer's internal scale. Likewise
+`rounded-[2px]` on the practice index remains an arbitrary radius under spec 7
+rather than anything `D-046` covers. See also D-063.

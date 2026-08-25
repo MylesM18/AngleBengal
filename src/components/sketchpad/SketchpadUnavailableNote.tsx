@@ -15,10 +15,10 @@ export function SketchpadUnavailableNote() {
       className="stock-textured mt-5 rounded-card bg-kraft px-4 py-3 lg:hidden"
     >
       <div className="border-l-[3px] border-marigold pl-3">
-        <p className="text-[12.5px] font-semibold text-ink">
+        <p className="text-meta font-semibold text-ink">
           The sketchpad needs a wider window
         </p>
-        <p className="mt-0.5 max-w-[58ch] text-[12px] leading-relaxed text-ink">
+        <p className="mt-0.5 max-w-[58ch] text-meta font-normal leading-relaxed text-ink">
           Handwriting and cleanup are desktop only for now, and this window is under
           1024px. Widen it to bring the canvas back, or work on paper and type your
           answer above.

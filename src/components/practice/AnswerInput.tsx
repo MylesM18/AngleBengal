@@ -74,7 +74,7 @@ export function AnswerInput({
             <div key={part.name} className="flex items-center gap-2">
               <label
                 htmlFor={`answer-${part.name}`}
-                className="w-[150px] shrink-0 text-right text-[12.5px] text-ink-soft"
+                className="w-[150px] shrink-0 text-right text-meta text-ink-soft"
               >
                 {part.label}
               </label>
@@ -91,7 +91,7 @@ export function AnswerInput({
                   })
                 }
                 onKeyDown={onKeyDown}
-                className={`w-[130px] rounded-input border bg-paper-0 px-2.5 py-1.5 text-[14px] text-ink disabled:opacity-60 ${
+                className={`w-[130px] rounded-input border bg-paper-0 px-2.5 py-1.5 text-ui text-ink disabled:opacity-60 ${
                   match === undefined
                     ? "border-ink-faint"
                     : match
@@ -100,11 +100,11 @@ export function AnswerInput({
                 }`}
               />
               {part.unit && (
-                <span className="text-[12.5px] text-ink-soft">{part.unit}</span>
+                <span className="text-meta text-ink-soft">{part.unit}</span>
               )}
               {match !== undefined && (
                 <span
-                  className={`text-[12px] font-semibold ${match ? "text-green" : "text-red"}`}
+                  className={`text-meta font-semibold ${match ? "text-green" : "text-red"}`}
                 >
                   {match ? "✓ correct" : "✗ not yet"}
                 </span>
@@ -131,7 +131,7 @@ export function AnswerInput({
             onChange={(event) => onChange({ ...value, single: event.target.value })}
             onKeyDown={onKeyDown}
             placeholder="e.g. 30t = 12(t + 1.5)"
-            className="min-w-0 flex-1 rounded-input border border-ink-faint bg-paper-0 px-3 py-2 font-mono text-[13.5px] text-ink placeholder:text-ink-faint disabled:opacity-60"
+            className="min-w-0 flex-1 rounded-input border border-ink-faint bg-paper-0 px-3 py-2 font-mono text-ui text-ink placeholder:text-ink-faint disabled:opacity-60"
           />
         </div>
         {value.single.trim() && (
@@ -157,9 +157,9 @@ export function AnswerInput({
         onChange={(event) => onChange({ ...value, single: event.target.value })}
         onKeyDown={onKeyDown}
         placeholder="Your answer"
-        className="w-[180px] rounded-input border border-ink-faint bg-paper-0 px-3 py-2 text-[14px] text-ink placeholder:text-ink-faint disabled:opacity-60"
+        className="w-[180px] rounded-input border border-ink-faint bg-paper-0 px-3 py-2 text-ui text-ink placeholder:text-ink-faint disabled:opacity-60"
       />
-      {shape.unit && <span className="text-[13px] text-ink-soft">{shape.unit}</span>}
+      {shape.unit && <span className="text-meta text-ink-soft">{shape.unit}</span>}
     </div>
   );
 }
