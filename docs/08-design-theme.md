@@ -172,3 +172,5 @@ Paper physics only: slide, settle, lift, press. Durations 150-220ms, `cubic-bezi
 ## Modernization addendum (2026-08-21)
 
 The Editorial-paper modernization re-applies this document rather than replacing it. Where the two differ, `docs/superpowers/specs/2026-08-21-ui-modernization-design.md` is the contract: the hairline token and one-kraft-strip rule (spec 1a), the six-token type scale (1c), the `.doc-prose` layer fix and `MarkdownMath` variants (1d), the motion budget (1e), the primitives in `src/components/ui/` (1f), the 48px header and overlay drawer (2), and the Learn, Practice and tutor treatments (3 to 5). Decisions D-045 to D-054 in `DECISIONS.md` record each deviation.
+
+That spec's section 3d (the model-doc reading sheet) and section 5 (the tutor drawer) re-apply this theme rather than editing it: no color value, font or radius on this page moves, the drawer's header band and user bubbles take the existing plum stock with `paper-0` text on it, and the reader's heading numeral is the topic accent at 16%, one of the two numeral opacities the spec allows. This line is a pointer, not a rewrite (spec 6b.6).

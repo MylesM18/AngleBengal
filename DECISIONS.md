@@ -715,3 +715,65 @@ prose both sit at 9.04:1 on plum, and reading sheet math still computes to ink, 
 
 **The two alternatives were rejected.** Hard-coding a color on the bubble is barred by
 the plan, and reverting the inversion would have undone approved spec 5c.
+
+### D-053. Tutor: plum user bubble, `Button tone="plum"`, starters as rows
+
+`docs/superpowers/specs/2026-08-21-ui-modernization-design.md` sections 3d and
+5 restyle the model-doc reading sheet and the tutor drawer. The title above is
+the row spec 6d assigns to this stage, and 6d gives stage D exactly one entry,
+so the reader-side calls are recorded here as well. What follows is the set of
+choices the build had to make that were not derivable from docs/06 or docs/08,
+in the order the tasks land them.
+
+Nothing structural moved on either surface. The drawer keeps the overlay
+positioning, the `inert` handling, Escape and the focus return that stage B
+shipped, and streaming, the header JSON line protocol, `useChatContext` and the
+chat API are untouched (spec 5f). The reading sheet keeps its route, its data
+loading and its KaTeX pipeline (spec 3d). Every primitive used on both screens
+comes from stage A and none of them was edited.
+
+**The session menu forces its shadow with the Tailwind v4 important suffix.**
+The menu panel is stage A's `Sheet` with `shadow-lift` passed through
+`className`, which puts two shadow utilities on one element: `shadow-sheet` from
+the primitive's base and `shadow-lift` from the call site. `cx` only joins
+strings, so the winner is decided by the order the two utilities appear in the
+compiled stylesheet rather than by their order in the attribute. Measured
+against both tokens, `shadow-sheet` won, and a menu panel that sits above a
+sheet needs the heavier shadow to read as above it. The class is therefore
+written `shadow-lift!`. Teaching `Sheet` a shadow prop would have been the
+tidier fix and it is out of scope: stage D consumes stage A's primitives and
+never edits them, and a prop added here would land untested on every other
+`Sheet` call site in the app.
+
+**"Last practiced" on the doc meta strip means the topic's most recent
+attempt.** Attempts hang off problems and problems hang off topics, so an
+attempt is never tied to a document: the phrase the strip has to print has no
+exact source. It shows the most recent attempt on this document's topic, which
+is what practising means to the person reading the sheet, because Practice runs
+per topic rather than per document. The honest alternative was to drop the line,
+and the strip is thin enough already: it carries the "Exemplar" chip when it
+applies, "n models" and this, and nothing else. The query is written inline with
+`prisma` next to the `findUnique` the doc branch already runs, rather than added
+to `src/lib/attempts.ts`, so this stage still touches only the files its plan
+lists.
+
+**The reader splits the document against the parsed index, and a heading reads
+"Model n: title".** The reading sheet stopped rendering the document as one
+markdown blob, because a `## Model n` heading emitted by the markdown renderer
+cannot carry a numeral behind it or a copy-link beside it without editing the
+renderer, and the renderer is a stage A primitive. The split is a pure
+`splitModelSections(contentMd, models)` exported from
+`src/components/learn/DocReader.tsx`, taking the entries `src/lib/modelIndex.ts`
+already parsed. It was deliberately not added to `modelIndex.ts`: the index
+parser has other callers and returns a document's structure, while the split is
+a rendering concern that only this surface has. Any text before the first
+heading renders as its own preamble block, so no document silently loses its
+opening, and the anchor a link points at is now `ModelHeading`'s wrapper rather
+than the heading element itself, which changes nothing for a reader following a
+`#model-n` URL.
+
+The heading joins the number and the title with a colon rather than reproducing
+the separator the seeded exemplar uses, which is an em-dash. House style bans
+em-dashes in copy (CLAUDE.md), and a heading composed at render time is new
+copy. The exemplar file itself is untouched: it is the generation quality bar
+and is never edited.
