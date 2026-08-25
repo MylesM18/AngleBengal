@@ -3,10 +3,10 @@ import { notFound } from "next/navigation";
 
 import { DocCard } from "@/components/learn/DocCard";
 import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
+import { DocReader } from "@/components/learn/DocReader";
 import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
 import { ModelMissList } from "@/components/learn/ModelMissList";
 import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
-import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { ButtonLink, buttonClasses } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Sheet } from "@/components/ui/Sheet";
@@ -97,7 +97,7 @@ export default async function TopicPage({
 
             <div className="px-8 py-8">
               <ModelMissList misses={misses} />
-              <MarkdownMath>{doc.contentMd}</MarkdownMath>
+              <DocReader contentMd={doc.contentMd} models={index} accent={accent} />
             </div>
           </Sheet>
         </div>
