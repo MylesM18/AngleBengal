@@ -924,3 +924,31 @@ because the 320px topic rail and the 210px mini TOC both appear at `lg` and
 leave 1024 - 320 - 24 - 64 - 32 - 210 between them. The plan's expected 718 is
 what the same sum gives with no rail, so closing it means choosing which of the
 two side columns yields, and that is a layout decision rather than a defect fix.
+
+### D-061. The mini TOC appears from `xl`, not `lg`
+
+Owner ruling (e3), the third of ruling (e)'s defects and the one D-060 left
+open. At the `lg` edge the reading column measured 374px, because the 320px
+topic rail and the 210px mini TOC both switch on at `lg`:
+1024 - 320 - 24 - 64 - 32 - 210 leaves 374. The plan's expected 718 is the same
+sum with no rail, which is how we know the plan did not expect the rail to be
+there. Closing the gap therefore meant choosing which of the two side columns
+yields, a layout decision rather than a defect fix, so it went to the owner.
+
+**The owner chose to move the mini TOC to `xl`.** The alternative was hiding the
+topic rail on this route between 1024 and 1279, which reaches the plan's 718
+exactly but removes topic navigation at that width and edits the app shell for
+one page. Moving the TOC is one class on one wrapper and touches no other route.
+
+The result is better than the arithmetic suggested, because the reading column
+is capped by `max-w-[68ch]` and that measure is 545px. At `lg` the column now
+renders at 545, its full designed measure rather than the 616 the space allows,
+so the reader loses nothing at all. At `xl` the TOC returns at 210px and the
+column still renders at 545, so the TOC now costs the reading measure nothing at
+either width. What is given up is the TOC itself between 1024 and 1279.
+
+`docs/06-ui-spec.md`'s modernization pointer was updated in the same commit,
+from "a live mini TOC from `lg` up" to "from `xl` up". That line was appended
+verbatim from this stage's plan (D-053), but a pointer that describes the code
+is worth more than a pointer that matches a superseded plan, and the plan file
+itself is not edited. See also D-060.

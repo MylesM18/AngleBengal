@@ -102,7 +102,9 @@ export default async function TopicPage({
           </Sheet>
         </div>
 
-        <div className="hidden lg:block">
+        {/* `xl`, not `lg`: at the lg edge the 320px topic rail and this 210px
+            column both appeared and left the reading measure at 374px. See D-061. */}
+        <div className="hidden xl:block">
           <DocMiniTOC entries={index} accent={accent} />
         </div>
       </article>
