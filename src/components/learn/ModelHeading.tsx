@@ -51,6 +51,7 @@ export function ModelHeading({ entry, accent, flush = false, onCopied }: ModelHe
           type="button"
           onClick={copyLink}
           aria-label={`Copy link to model ${entry.number}`}
+          title={`Copy link to model ${entry.number}`}
           className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-chip align-middle text-ink-soft opacity-0 hover:text-plum focus:opacity-100 group-hover:opacity-100"
         >
           <Icon name="copy" size={14} />

@@ -241,6 +241,7 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             variant="action"
             onClick={onClose}
             aria-label="Close tutor"
+            title="Close tutor"
             icon="close"
             className="bg-paper-0 text-ink focus-visible:outline-paper-0"
           />
