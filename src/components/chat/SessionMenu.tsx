@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
+import { Sheet } from "@/components/ui/Sheet";
 
 /** Recent chats plus New chat (docs/06 §5). */
 
@@ -77,9 +78,10 @@ export function SessionMenu({
       </Chip>
 
       {open && (
-        <div
+        <Sheet
+          tone="paper-0"
           role="menu"
-          className="absolute right-0 z-30 mt-1 w-[260px] overflow-hidden rounded-card bg-paper-0 py-1 shadow-lift"
+          className="absolute right-0 z-30 mt-1 w-[260px] overflow-hidden py-1 shadow-lift!"
         >
           <button
             type="button"
@@ -88,15 +90,15 @@ export function SessionMenu({
               onNew();
               setOpen(false);
             }}
-            className="w-full px-3 py-2 text-left text-[12.5px] font-semibold text-ink hover:bg-paper-1"
+            className="w-full px-3 py-2 text-left text-ui font-medium text-ink hover:bg-paper-1"
           >
             New chat
           </button>
 
-          <div className="my-1 border-t border-ink-faint/40" />
+          <div className="my-1 border-t border-hairline" />
 
           {sessions.length === 0 ? (
-            <p className="px-3 py-2 text-[12px] text-ink-soft">No earlier chats.</p>
+            <p className="px-3 py-2 text-meta text-ink-soft">No earlier chats.</p>
           ) : (
             <ul className="max-h-[280px] overflow-y-auto">
               {sessions.map((session) => (
@@ -109,14 +111,17 @@ export function SessionMenu({
                       setOpen(false);
                     }}
                     aria-current={session.id === currentSessionId ? "true" : undefined}
-                    className={`w-full px-3 py-2 text-left text-[12.5px] leading-snug hover:bg-paper-1 ${
-                      session.id === currentSessionId ? "bg-paper-1 font-semibold" : ""
+                    className={`relative w-full px-3 py-2 text-left text-ui font-medium hover:bg-paper-1 ${
+                      session.id === currentSessionId ? "bg-paper-1" : ""
                     }`}
                   >
+                    {session.id === currentSessionId && (
+                      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-plum" />
+                    )}
                     <span className="block truncate text-ink">
                       {session.title ?? "Untitled chat"}
                     </span>
-                    <span className="block text-[10.5px] text-ink-soft">
+                    <span className="block text-meta text-ink-soft">
                       {session.messageCount} message{session.messageCount === 1 ? "" : "s"}
                     </span>
                   </button>
@@ -124,7 +129,7 @@ export function SessionMenu({
               ))}
             </ul>
           )}
-        </div>
+        </Sheet>
       )}
     </div>
   );
