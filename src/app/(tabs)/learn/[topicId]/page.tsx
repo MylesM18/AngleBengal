@@ -102,7 +102,7 @@ export default async function TopicPage({
           </Sheet>
         </div>
 
-        <div className="hidden xl:block">
+        <div className="hidden lg:block">
           <DocMiniTOC entries={index} accent={accent} />
         </div>
       </article>
