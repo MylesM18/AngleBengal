@@ -66,6 +66,7 @@ export function PracticePanel({
   initialCounts,
   answer,
   onAnswerChange,
+  onProblemChange,
 }: {
   topicId: string;
   topicPath: string[];
@@ -73,6 +74,12 @@ export function PracticePanel({
   /** Controlled by the workspace: the sketchpad can insert into it. */
   answer: AnswerValue;
   onAnswerChange: (value: AnswerValue) => void;
+  /**
+   * Reports the statement of whatever problem is on screen, and null when
+   * there is none. The compact sketch overlay lives outside this panel and
+   * needs the statement for its ribbon (mobile spec §4).
+   */
+  onProblemChange?: (statementMd: string | null) => void;
 }) {
   const [difficulty, setDifficulty] = useState(2);
   const [counts, setCounts] = useState(initialCounts);
@@ -152,6 +159,16 @@ export function PracticePanel({
 
   // The tutor must not keep seeing a problem after the panel is gone.
   useEffect(() => clearActiveProblem, []);
+
+  /**
+   * `problem` is derived, not state, so this fires on both edges: a loaded
+   * problem publishes its statement, and a load or a difficulty switch
+   * publishes null. Without the null the compact ribbon would keep showing
+   * the previous question over a canvas that has already been reset.
+   */
+  useEffect(() => {
+    onProblemChange?.(problem ? problem.statementMd : null);
+  }, [problem, onProblemChange]);
 
   async function submit() {
     if (!problem || submitting || outcome?.correct) return;
