@@ -109,7 +109,7 @@ task must land **before any credential is written to disk**.
 - Produces: `.env` untracked and ignored; `DATABASE_URL` and `DIRECT_URL` are
   the two names every later task reads.
 
-- [ ] **Step 1: Untrack `.env` without deleting it**
+- [x] **Step 1: Untrack `.env` without deleting it**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal
@@ -119,7 +119,7 @@ git rm --cached .env
 Expected: `rm '.env'`. The file must still exist on disk afterwards; confirm
 with `ls -la .env`.
 
-- [ ] **Step 2: Rewrite the `.gitignore` env block**
+- [x] **Step 2: Rewrite the `.gitignore` env block**
 
 Replace this block:
 
@@ -150,7 +150,7 @@ with:
 /prisma/backup/
 ```
 
-- [ ] **Step 3: Rewrite `.env.example`**
+- [x] **Step 3: Rewrite `.env.example`**
 
 ```
 # Copy to .env and fill in. Everything here is server-side only: no value in
@@ -175,7 +175,7 @@ DATABASE_URL="postgresql://USER:PASSWORD@HOST:6543/postgres?pgbouncer=true&conne
 DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/postgres"
 ```
 
-- [ ] **Step 4: Verify `.env` is no longer tracked and is ignored**
+- [x] **Step 4: Verify `.env` is no longer tracked and is ignored**
 
 ```bash
 git ls-files .env; git check-ignore -v .env
@@ -184,7 +184,7 @@ git ls-files .env; git check-ignore -v .env
 Expected: the first command prints nothing, the second prints a `.gitignore`
 line number and `.env`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .gitignore .env.example
