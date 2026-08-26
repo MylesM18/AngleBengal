@@ -14,7 +14,7 @@ import { modelMissCounts } from "@/lib/attempts";
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
 import { getDescendantCounts, getTopicDetail } from "@/lib/topics";
-import { ACCENT_VAR, accentForRoot, glyphForRoot } from "@/lib/topicColors";
+import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
 
 type Params = { topicId: string };
 type Search = { doc?: string };
@@ -40,7 +40,6 @@ export default async function TopicPage({
   if (!topic) notFound();
 
   const accent = accentForRoot(topic.path[0] ?? topic.name);
-  const glyph = glyphForRoot(topic.path[0] ?? topic.name);
 
   const selectedDocId =
     requestedDocId && topic.modelDocs.some((d) => d.id === requestedDocId)
@@ -167,7 +166,7 @@ export default async function TopicPage({
                   <TopicCoverCard
                     href={`/learn/${child.id}`}
                     name={child.name}
-                    glyph={glyph}
+                    glyph={topic.glyph}
                     meta={`${plural(c.docs, "model")} · ${plural(c.verifiedProblems, "problem")}`}
                     accent={accent}
                   />

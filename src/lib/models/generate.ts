@@ -15,6 +15,7 @@ import { validateModelDoc } from "@/lib/ai/validateModelDoc";
 import { prisma } from "@/lib/db";
 import { parseDocTitle, parseModelIndex, serializeModelIndex } from "@/lib/modelIndex";
 import { uniqueSlug } from "@/lib/slug";
+import { glyphForRootName } from "@/lib/symbols";
 import { getTopicPath, getTopicTree } from "@/lib/topics";
 
 /**
@@ -160,8 +161,21 @@ async function resolveTopic(
 
     const slug = uniqueSlug(name, takenSlugs);
     takenSlugs.add(slug);
+    // A new ROOT gets the same glyph D-078 would have hashed for it, resolved
+    // to a MathSymbol row so the cover reads from the database like every
+    // other root. Subtopics inherit their root's at read time.
+    const symbolId =
+      parentId === null
+        ? ((
+            await prisma.mathSymbol.findUnique({
+              where: { glyph: glyphForRootName(name) },
+              select: { id: true },
+            })
+          )?.id ?? null)
+        : null;
+
     const created: { id: string } = await prisma.topic.create({
-      data: { name, slug, parentId },
+      data: { name, slug, parentId, symbolId },
       select: { id: true },
     });
     parentId = created.id;

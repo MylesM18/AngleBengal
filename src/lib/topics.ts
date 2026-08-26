@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
+import { DEFAULT_GLYPH } from "@/lib/symbols";
 
 /**
  * Topic tree assembly, shared by the API routes and the Learn server
@@ -14,6 +15,7 @@ export type TopicNode = {
   id: string;
   name: string;
   slug: string;
+  glyph: string;
   parentId: string | null;
   docCount: number;
   verifiedProblemCount: number;
@@ -25,6 +27,7 @@ type TopicRow = {
   name: string;
   slug: string;
   parentId: string | null;
+  symbol: { glyph: string } | null;
   _count: { modelDocs: number };
 };
 
@@ -49,6 +52,7 @@ function buildTree(rows: TopicRow[], verified: Map<string, number>): TopicNode[]
       id: row.id,
       name: row.name,
       slug: row.slug,
+      glyph: row.symbol?.glyph ?? DEFAULT_GLYPH,
       parentId: row.parentId,
       docCount: row._count.modelDocs,
       verifiedProblemCount: verified.get(row.id) ?? 0,
@@ -67,6 +71,16 @@ function buildTree(rows: TopicRow[], verified: Map<string, number>): TopicNode[]
     list.sort((a, b) => a.name.localeCompare(b.name));
     for (const node of list) sortByName(node.children);
   };
+  // Only roots carry a symbolId; the whole subtree wears the root's emblem
+  // (spec §4), which is what `glyphForRoot(topic.path[0])` used to do.
+  const inheritGlyph = (list: TopicNode[], glyph: string): void => {
+    for (const node of list) {
+      node.glyph = glyph;
+      inheritGlyph(node.children, glyph);
+    }
+  };
+  for (const root of roots) inheritGlyph(root.children, root.glyph);
+
   sortByName(roots);
 
   return roots;
@@ -80,6 +94,7 @@ export async function getTopicTree(): Promise<TopicNode[]> {
         name: true,
         slug: true,
         parentId: true,
+        symbol: { select: { glyph: true } },
         _count: { select: { modelDocs: true } },
       },
     }),
@@ -92,6 +107,7 @@ export type TopicDetail = {
   id: string;
   name: string;
   slug: string;
+  glyph: string;
   parentId: string | null;
   description: string | null;
   path: string[];
@@ -103,6 +119,7 @@ export type TopicDetail = {
     title: string;
     isExemplar: boolean;
     modelCount: number;
+    depth: number;
     createdAt: Date;
   }[];
   children: { id: string; name: string }[];
@@ -153,8 +170,15 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
       parentId: true,
       description: true,
       modelDocs: {
-        select: { id: true, title: true, isExemplar: true, modelIndexJson: true, createdAt: true },
-        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          title: true,
+          isExemplar: true,
+          modelIndexJson: true,
+          depth: true,
+          createdAt: true,
+        },
+        orderBy: { depth: "asc" },
       },
       children: { select: { id: true, name: true }, orderBy: { name: "asc" } },
     },
@@ -167,10 +191,18 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
   ]);
   const path = pathNodes.map((node) => node.name);
 
+  // The root owns the glyph; a leaf inherits it. pathNodes[0] IS the root.
+  const rootId = pathNodes[0]?.id ?? topic.id;
+  const root = await prisma.topic.findUnique({
+    where: { id: rootId },
+    select: { symbol: { select: { glyph: true } } },
+  });
+
   return {
     id: topic.id,
     name: topic.name,
     slug: topic.slug,
+    glyph: root?.symbol?.glyph ?? DEFAULT_GLYPH,
     parentId: topic.parentId,
     description: topic.description,
     path,
@@ -182,6 +214,7 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
       title: doc.title,
       isExemplar: doc.isExemplar,
       modelCount: deserializeModelIndex(doc.modelIndexJson).length,
+      depth: doc.depth,
       createdAt: doc.createdAt,
     })),
     children: topic.children,

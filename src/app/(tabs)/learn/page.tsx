@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
-import { accentForRoot, glyphForRoot } from "@/lib/topicColors";
+import { accentForRoot } from "@/lib/topicColors";
 import { getDescendantCounts, getTopicTree, type DescendantCounts } from "@/lib/topics";
 
 /** Reads the database on every request: the topic tree and doc list change
@@ -90,7 +90,7 @@ export default async function LearnIndexPage() {
                     <TopicCoverCard
                       href={`/learn/${root.id}`}
                       name={root.name}
-                      glyph={glyphForRoot(root.name)}
+                      glyph={root.glyph}
                       meta={`${plural(c.docs, "model")} · ${plural(c.verifiedProblems, "problem")}`}
                       accent={accentForRoot(root.name)}
                     />
