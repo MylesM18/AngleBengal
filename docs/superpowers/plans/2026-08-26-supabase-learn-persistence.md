@@ -962,10 +962,15 @@ Expected: `roots: Algebra=x Calculus=∫ Geometry=▲ Precalculus=ƒ Statistics 
 Probability=Σ Trigonometry=θ`, `topics: 31 docs: 7 symbols: 10`, a nonzero
 sketch byte count, and `depth-1 docs: 7`.
 
-- [ ] **Step 4: Drive the app**
+- [x] **Step 4: Drive the app**
 
-> NOT YET RUN. Everything else in Task 4 is verified and committed (`85b522c`).
-> This is the one outstanding Phase 1 gate.
+> RUN AND PASSED. A stale `next dev` from before the datasource switch was still
+> holding port 3000, so it was killed and a fresh server started on port 3010 to
+> guarantee the reads came from Supabase. `/learn` showed six covers carrying
+> `x`, `▲`, `θ`, `ƒ`, `∫`, `Σ`, Recent listed all 7 documents, the
+> Distance-Rate-Time topic page with no `?doc=` rendered the exemplar directly
+> (D-008 intact), and `/practice` listed Distance-Rate-Time plus the six
+> models-ready topics. No console errors, no server errors.
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npm run dev
