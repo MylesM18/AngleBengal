@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Archivo, IBM_Plex_Mono, Source_Serif_4 } from "next/font/google";
 import localFont from "next/font/local";
 
@@ -43,6 +43,16 @@ export const metadata: Metadata = {
   description:
     "A mathematics tutor built on mental models: learn the models, practice against them, and find out which one failed when an answer goes wrong.",
   icons: { icon: "/anglebengal-mark.svg" },
+};
+
+/** Mobile spec §7: edge-to-edge rendering with safe-area insets, and the iOS
+ *  keyboard resizing the layout viewport so pinned composers stay visible. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
+  themeColor: "#f1eadc",
 };
 
 export default function RootLayout({

@@ -47,6 +47,7 @@
   --shadow-sheet: 0 1px 2px rgba(50, 41, 33, 0.1), 0 3px 10px rgba(50, 41, 33, 0.08);
   --shadow-lift: 0 2px 4px rgba(50, 41, 33, 0.12), 0 8px 22px rgba(50, 41, 33, 0.1);
   --shadow-cut: inset 0 2px 3px rgba(50, 41, 33, 0.18);
+  --shadow-sheet-up: 0 -1px 2px rgba(50, 41, 33, 0.1), 0 -3px 10px rgba(50, 41, 33, 0.08);
 
   --radius-card: 10px;
   --radius-input: 6px;
@@ -133,6 +134,9 @@ body {
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* Chips and cards have their own pressed states (spec §7); the gray iOS
+   * tap flash fights them, so it is suppressed at the body level. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 /*
@@ -141,6 +145,39 @@ body {
  */
 .stock-textured {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.2 0 0 0 0 0.16 0 0 0 0 0.13 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+/*
+ * Mobile utilities (mobile spec §7). Safe-area padding for edge chrome, and
+ * a visually inert 44px hit-area extension: the ::after overlay grows the
+ * touch target without changing a single rendered pixel.
+ */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@utility pl-safe {
+  padding-left: env(safe-area-inset-left);
+}
+@utility pr-safe {
+  padding-right: env(safe-area-inset-right);
+}
+@utility tap-highlight-none {
+  -webkit-tap-highlight-color: transparent;
+}
+@utility tap-target {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
 }
 
 /*
