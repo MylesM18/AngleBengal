@@ -4,6 +4,8 @@ import { Breadcrumb } from "@/components/learn/Breadcrumb";
 import { DocCard } from "@/components/learn/DocCard";
 import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
 import { DocReader } from "@/components/learn/DocReader";
+import { DocTabStrip } from "@/components/learn/DocTabStrip";
+import { GenerateMoreStudy } from "@/components/learn/GenerateMoreStudy";
 import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
 import { ModelMissList } from "@/components/learn/ModelMissList";
 import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
@@ -12,12 +14,13 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Sheet } from "@/components/ui/Sheet";
 import { modelMissCounts } from "@/lib/attempts";
 import { prisma } from "@/lib/db";
+import { parseDocTabs } from "@/lib/learn/docTabs";
 import { deserializeModelIndex } from "@/lib/modelIndex";
 import { getDescendantCounts, getTopicDetail } from "@/lib/topics";
 import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
 
 type Params = { topicId: string };
-type Search = { doc?: string };
+type Search = { doc?: string; docs?: string; active?: string };
 
 /**
  * A topic, and optionally one of its documents.
@@ -34,24 +37,36 @@ export default async function TopicPage({
   searchParams: Promise<Search>;
 }) {
   const { topicId } = await params;
-  const { doc: requestedDocId } = await searchParams;
+  const search = await searchParams;
 
   const topic = await getTopicDetail(topicId);
   if (!topic) notFound();
 
   const accent = accentForRoot(topic.path[0] ?? topic.name);
 
-  const selectedDocId =
-    requestedDocId && topic.modelDocs.some((d) => d.id === requestedDocId)
-      ? requestedDocId
+  const tabs = parseDocTabs(search, topic.modelDocs.map((doc) => doc.id));
+  // D-008 is untouched: a topic holding exactly one document still opens it
+  // directly rather than showing a one-card grid. A topic with a chain has
+  // more than one document, so it keeps its index page.
+  const openIds =
+    tabs.open.length > 0
+      ? tabs.open
       : topic.modelDocs.length === 1
-        ? topic.modelDocs[0].id
-        : null;
+        ? [topic.modelDocs[0].id]
+        : [];
+  const selectedDocId = tabs.active ?? openIds[0] ?? null;
 
   if (selectedDocId) {
     const doc = await prisma.mentalModelDoc.findUnique({
       where: { id: selectedDocId },
-      select: { id: true, title: true, contentMd: true, modelIndexJson: true, isExemplar: true },
+      select: {
+        id: true,
+        title: true,
+        contentMd: true,
+        modelIndexJson: true,
+        isExemplar: true,
+        depth: true,
+      },
     });
     if (!doc) notFound();
 
@@ -70,6 +85,11 @@ export default async function TopicPage({
         })}`
       : "Not practiced yet";
 
+    const tabLabels = topic.modelDocs
+      .filter((entry) => openIds.includes(entry.id))
+      .map((entry) => ({ id: entry.id, depth: entry.depth, isExemplar: entry.isExemplar }))
+      .sort((a, b) => openIds.indexOf(a.id) - openIds.indexOf(b.id));
+
     return (
       <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10">
         <div className="min-w-0 max-w-[68ch] flex-1">
@@ -81,6 +101,8 @@ export default async function TopicPage({
           </div>
 
           <Sheet tone="paper-0" className="animate-enter-sheet overflow-hidden">
+            <DocTabStrip topicId={topic.id} tabs={tabLabels} activeId={doc.id} />
+
             <h1 className="display-cut px-4 pb-5 pt-6 text-h1 text-ink sm:px-8 sm:pt-8">{doc.title}</h1>
 
             <div className="stock-textured flex flex-wrap items-center gap-3 border-y border-hairline bg-kraft px-4 py-2.5 text-meta text-ink sm:px-8">
@@ -93,6 +115,9 @@ export default async function TopicPage({
                 {index.length} {index.length === 1 ? "model" : "models"}
               </span>
               <span>{lastPracticed}</span>
+              <span className="ml-auto">
+                <GenerateMoreStudy topicId={topic.id} sourceDocId={doc.id} openIds={openIds} />
+              </span>
             </div>
 
             <div className="px-4 py-6 sm:px-8 sm:py-8">

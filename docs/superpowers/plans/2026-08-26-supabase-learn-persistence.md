@@ -2084,7 +2084,7 @@ real signatures rather than changing these components' behavior.
   (Task 10), `TopicDetail.modelDocs[].depth` (Task 5).
 - Produces: nothing new.
 
-- [ ] **Step 1: Badge the card**
+- [x] **Step 1: Badge the card**
 
 In `src/components/learn/DocCard.tsx`, add `depth: number;` to the `doc` shape
 in `DocCardProps`, and render the level chip beside the exemplar chip. Replace
@@ -2107,7 +2107,7 @@ The level shows on every card, not only on levels above 1: the tab strip labels
 every tab `Level N`, and a grid where only some cards carry a level reads as if
 the unbadged ones sit outside the chain.
 
-- [ ] **Step 2: Read the new search params**
+- [x] **Step 2: Read the new search params**
 
 In `src/app/(tabs)/learn/[topicId]/page.tsx`, change the `Search` type and the
 destructure:
@@ -2129,7 +2129,7 @@ import { GenerateMoreStudy } from "@/components/learn/GenerateMoreStudy";
 import { parseDocTabs } from "@/lib/learn/docTabs";
 ```
 
-- [ ] **Step 3: Resolve the tab set, keeping D-008 intact**
+- [x] **Step 3: Resolve the tab set, keeping D-008 intact**
 
 Replace the whole `const selectedDocId = ...` expression with:
 
@@ -2147,7 +2147,7 @@ Replace the whole `const selectedDocId = ...` expression with:
   const selectedDocId = tabs.active ?? openIds[0] ?? null;
 ```
 
-- [ ] **Step 4: Render the strip and the button**
+- [x] **Step 4: Render the strip and the button**
 
 Inside the `if (selectedDocId)` branch, the doc query gains `depth`:
 
@@ -2193,7 +2193,7 @@ and add the deepen control to the meta strip, after the `lastPracticed` span:
               </span>
 ```
 
-- [ ] **Step 5: Drive every branch in the browser**
+- [x] **Step 5: Drive every branch in the browser**
 
 With `npm run dev` running and the Task 7 chain in place, walk this list and
 confirm each one:
@@ -2217,13 +2217,53 @@ confirm each one:
 10. Open a topic with exactly one document, for example any other generated
     topic. It still opens that document directly (D-008).
 
-- [ ] **Step 6: Gates and commit**
+> **Plan correction (2026-08-26): item 8 is unreachable through the UI.**
+> `DocTabStrip` returns null at `tabs.length <= 1`, so a single remaining tab
+> has no close control, and closing one of two tabs always leaves one. The
+> branch is real and correct, it is just not clickable. It stays covered by
+> Task 9 Step 2's "close last" line, re-run against the live ids here:
+> `closeTabHref(drtTopic, [l3], l3, l3)` returned `/learn/cmt3314wm0007k2n0arzw20l3`,
+> and item 1 already proves that URL renders the grid.
+
+> **Result (2026-08-26).** Nine of ten items pass as printed, item 8 by the
+> correction above. Evidence, driven on port 3010 against the live chain
+> (topic `cmt3314wm0007k2n0arzw20l3`, L1 `cmt3314xb001rk2n0tow4y3aj`,
+> L2 `cmtajcwe10002k2oiedt5pmgl`, L3 `cmtajrr6k0002k2oocgn35ot9`):
+>
+> 1. The topic showed the grid, "2 model documents", both cards chipped,
+>    ordered `LEVEL 1 EXEMPLAR` then `LEVEL 2`.
+> 2. Clicking the Level 1 card gave `?doc=cmt3314xb001rk2n0tow4y3aj`, the level 1
+>    title, no strip, and the "Generate more study" button present.
+> 3. From `?doc=<l2>`, pressing the button switched it to "Writing the next
+>    level..." with `aria-busy="true"` and the polite line visible, then wrote
+>    level 3 `cmtajrr6k0002k2oocgn35ot9` ("Five Mental Models for Motion on
+>    Loops, Cycles, and Moving Frames") in about 170s. The browser tab drifted
+>    back to `/learn` while that ran, so item 3's URL assertion was re-driven by
+>    pressing the button a second time: the repeat returned the same level 3 in
+>    under a second (the Task 8 return-existing path) and pushed
+>    `?docs=<l2>%2C<l3>&active=<l3>`, with a two-tab strip and `Level 3` carrying
+>    `aria-current="page"`.
+> 4. Reload held both tabs with level 3 active.
+> 5. Back returned to `?doc=<l2>`, level 2 title, strip gone.
+> 6. Clicking the Level 2 tab gave `active=<l2>` with both tabs still open.
+> 7. Closing the active leftmost tab gave `?docs=<l3>&active=<l3>`, level 3 title.
+> 9. `?docs=<l2>,cmt36b4vb000lk2h30rtrn14y` (a Mixture document) dropped the
+>    foreign id and rendered level 2 alone.
+> 10. Mixture `cmt3314wo0009k2n04ylrprd3`, one document, still opened that
+>     document directly. D-008 intact.
+
+- [x] **Step 6: Gates and commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit && npm run build
 git add "src/app/(tabs)/learn/[topicId]/page.tsx" src/components/learn/DocCard.tsx
 git commit -m "Render the study tab strip, the deepen control and doc level badges"
 ```
+
+> **Result (2026-08-26).** `npx tsc --noEmit && npm run build` exited 0 with the
+> dev server stopped first, as the handoff prescribes. `/learn/[topicId]` still
+> compiles dynamic (`ƒ`), so the build proves nothing about the reads; item 5
+> above is what proves them.
 
 ---
 

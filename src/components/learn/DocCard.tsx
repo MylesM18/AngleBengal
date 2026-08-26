@@ -12,6 +12,7 @@ export type DocCardProps = {
     title: string;
     isExemplar: boolean;
     modelCount: number;
+    depth: number;
     createdAt: Date;
   };
   accent: AccentName;
@@ -31,11 +32,16 @@ export function DocCard({ topicId, doc, accent }: DocCardProps) {
     <Link href={`/learn/${topicId}?doc=${doc.id}`} className="block rounded-card">
       <Sheet tone="paper-1" lift className="relative flex min-h-[132px] flex-col overflow-hidden p-4 pb-7">
         {doc.modelCount > 0 ? <CornerNumeral n={doc.modelCount} size={56} color={color} /> : null}
-        {doc.isExemplar ? (
-          <span className="meta-caps mb-1.5 self-start rounded-chip bg-brand-tint px-1.5 py-0.5 text-brand-deep">
-            Exemplar
+        <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="meta-caps rounded-chip bg-paper-0 px-1.5 py-0.5 text-ink-soft">
+            Level {doc.depth}
           </span>
-        ) : null}
+          {doc.isExemplar ? (
+            <span className="meta-caps rounded-chip bg-brand-tint px-1.5 py-0.5 text-brand-deep">
+              Exemplar
+            </span>
+          ) : null}
+        </div>
         <h3 className="max-w-[26ch] text-ui-lg font-semibold leading-tight text-ink">{doc.title}</h3>
         <p className="mt-auto pt-3 text-meta text-ink-soft">
           {models} · {doc.createdAt.toLocaleDateString("en-US", DATE_FORMAT)}
