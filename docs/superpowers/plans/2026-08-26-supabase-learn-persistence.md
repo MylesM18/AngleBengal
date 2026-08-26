@@ -1864,7 +1864,7 @@ git commit -m "Add the URL contract for reader document tabs"
   - `GenerateMoreStudy({ topicId, sourceDocId, openIds })` where
     `openIds: string[]` is the current open set, so the new level appends.
 
-- [ ] **Step 1: Write the strip**
+- [x] **Step 1: Write the strip**
 
 Create `src/components/learn/DocTabStrip.tsx`:
 
@@ -1942,7 +1942,7 @@ export function DocTabStrip({ topicId, tabs, activeId }: DocTabStripProps) {
 export default DocTabStrip;
 ```
 
-- [ ] **Step 2: Write the deepen button**
+- [x] **Step 2: Write the deepen button**
 
 Create `src/components/learn/GenerateMoreStudy.tsx`:
 
@@ -2051,7 +2051,7 @@ export function GenerateMoreStudy({
 export default GenerateMoreStudy;
 ```
 
-- [ ] **Step 3: Typecheck and commit**
+- [x] **Step 3: Typecheck and commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit
@@ -2062,6 +2062,14 @@ git commit -m "Add the reader tab strip and the Generate more study control"
 If `tsc` objects to a `Button` or `Notice` prop, read
 `src/components/ui/Button.tsx` and `src/components/ui/Notice.tsx` and match the
 real signatures rather than changing these components' behavior.
+
+> **Result (2026-08-26).** Both components were written exactly as printed and
+> `npx tsc --noEmit` exited 0 on the first run. `Button` really does take
+> `variant`, `size`, `loading` and `onClick`, and `Notice` really does take
+> `kind`, `action`, `className` and children, so no signature had to be matched
+> by hand. The tokens the strip uses (`--radius-chip`, `--color-kraft`,
+> `--color-ink-faint`, `--color-brand-tint`) are all present in
+> `src/app/globals.css`.
 
 ---
 
