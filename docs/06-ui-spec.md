@@ -88,7 +88,7 @@ chat/        ChatDrawer, ChatMessageList, ChatComposer, SessionMenu
 - KaTeX render errors (bad LaTeX) render the raw string in a subtle mono style rather than crashing (`errorColor` + `throwOnError:false`).
 - Keyboard: problem Submit on Enter when answer input focused; Learn tree navigable by arrows.
 - Accessibility floor: all toolbar buttons labeled, focus states visible, canvas has a text alternative summarizing tool state.
-- Overlay behavior, as actually built: neither the tutor drawer nor the compact sketch overlay traps Tab. Each is `role="dialog"`, Escape closes it, and focus returns to the control that opened it (the Tutor chip, the Sketch button). Tab can still reach the chrome behind the overlay, and the covered chrome is not marked `inert`. This modality gap is known and deferred, not an oversight: it is recorded here so a later reader does not take "drawer traps focus" as a shipped guarantee (see D-049 and D-076).
+- Overlay behavior, as actually built: neither the tutor drawer nor the compact sketch overlay traps Tab. Only the compact sketch overlay is `role="dialog"`; the tutor drawer is a plain `<aside aria-label="Tutor">`, `aria-hidden` and `inert` when closed, and carries no `role` at all. Escape closes both, and focus returns to the control that opened it (the Tutor chip, the Sketch button). Tab can still reach the chrome behind either overlay, and the covered chrome is not marked `inert`. This modality gap is known and deferred, not an oversight: it is recorded here so a later reader does not take "drawer traps focus" as a shipped guarantee (see D-049 and D-076).
 
 ## Modernization addendum (2026-08-21)
 

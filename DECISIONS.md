@@ -1389,10 +1389,85 @@ without anyone auditing its gaps. Hit areas go on at the call site, with that
 row's clearance checked, or they do not go on.
 
 **Neither overlay traps focus.** docs/06 §7 listed "drawer traps focus" in its
-accessibility floor. The tutor drawer and the compact sketch overlay are both
-`role="dialog"`, both close on Escape, and both return focus to the control
-that opened them, but neither traps Tab and neither marks the chrome behind it
-`inert`, so a keyboard user can tab out of an overlay into the page underneath.
-That is a genuine modality gap. It is deferred rather than fixed here (it is an
-architectural change to how the shell renders behind an overlay, not a class
-tweak), and docs/06 now describes what is real instead of what was intended.
+accessibility floor. The tutor drawer and the compact sketch overlay both close
+on Escape and both return focus to the control that opened them, but only the
+compact sketch overlay (`PracticeWorkspace.tsx`) is `role="dialog"`; the tutor
+drawer (`ChatDrawer.tsx`) is a plain `<aside>` with `aria-label`, `aria-hidden`
+and `inert`, and carries no `role` at all. Neither traps Tab and neither marks
+the chrome behind it `inert`, so a keyboard user can tab out of an overlay into
+the page underneath. That is a genuine modality gap. It is deferred rather than
+fixed here (it is an architectural change to how the shell renders behind an
+overlay, not a class tweak), and docs/06 now describes what is real instead of
+what was intended.
+
+### D-077. Closing the final review's three parked items
+
+Three residual defects from the mobile-responsive project's final review, fixed
+in one pass.
+
+**The "both `role="dialog"`" claim was false, and is corrected.** docs/06 §7
+and D-076 both said the tutor drawer and the compact sketch overlay were both
+`role="dialog"`. Only the sketch overlay (`PracticeWorkspace.tsx`, the `div`
+with `role="dialog" aria-modal="true"`) actually is. The tutor drawer
+(`ChatDrawer.tsx`) is a plain `<aside aria-label="Tutor">`, `aria-hidden` and
+`inert` when closed, and carries no `role` at all. Both locations now say so.
+Nothing else in either passage changed: Escape still closes both, focus still
+returns on close, neither traps Tab, and the chrome behind neither is marked
+`inert`.
+
+**The Tutor chip kept a bare `tap-target`, the one control D-074's sweep
+missed.** `TopBar.tsx` line 74's className was written before D-074 gated the
+utility, and D-074's own fix, landed in the same file two commits later, gated
+the wordmark link (line 39) but not the chip nine lines below it. Measured
+before the fix, at 1280px: `getComputedStyle(tutorButton, '::after').content`
+was `'""'` (the overlay was live) instead of `'none'`. Changed to
+`max-lg:tap-target`, matching `Chip.tsx`'s convention. Measured after: at
+1280px, `content` is `'none'` and the button's own box is unchanged
+(`left:1196.3, right:1272, top:10, bottom:38`, same as before the class
+change, since gating touches only the pseudo-element). At 360 and 390px the
+overlay is live again (`content: '""'`) and `document.elementFromPoint` at the
+left, right, center, top-spillover and bottom-spillover points of its hit area
+all resolve to the Tutor button itself, no neighbor. A repeat grep for bare
+`tap-target` (excluding `max-lg:tap-target` and the `@utility` definition
+itself) found zero remaining call sites; the three surviving hits are all
+comments. The three doc locations naming this invariant (this entry, the
+mobile spec's §6, docs/06's "Mobile layouts" section) already described the
+intended end state accurately; the code just had not caught up. No further
+doc edits were needed there beyond this entry's own correction above.
+
+**Three practice-loop controls were still under the criterion 2 floor.**
+Acceptance criterion 2 names "Show solution" among the controls reaching 44px
+on compact, but three call sites in `PracticePanel.tsx` had never been
+touched: the reveal confirmation's destructive "Show solution" (24px tall) and
+tertiary "Keep trying" (24px tall), and "Generate 5 problems" (32px tall, the
+empty-pool path). All three now carry `max-lg:tap-target` at the call site,
+per the `Button.tsx` BASE ban this project already holds (D-076).
+
+The gap audit that follows from adding a hit area (D-071) needed no widening
+in either case, because both rows clear it a different way than the packed
+icon rows D-071 was written for: every control involved is wide enough on its
+own text to already exceed 44px, so `tap-target`'s `max(100%, 44px)` never
+grows past the control's own box on the horizontal axis, leaving nothing to
+spill sideways into a neighbor.
+
+- `Generate 5 problems` (`EmptyState`'s single-item action slot, `gap-2`
+  wrapper) measured 162.5 by 32px at both 360 and 390px. Only the vertical
+  axis has spillover (`(44-32)/2 = 6px` a side), and it lands inside the
+  `Sheet`'s own `p-5` (20px) padding on every side, nowhere near the "Last
+  run" notice 12px further down.
+- The reveal confirmation's two buttons sit in `Notice.tsx`'s `action` slot
+  (`flex shrink-0 items-center gap-2`, 8px, line 44), which also serves
+  `GenerateTopicInput.tsx`'s single-button `FailureNotice`, so it was left
+  unedited rather than widened generically. Measured at 390px: "Show
+  solution" (destructive, `size="sm"`) is 111.4 by 24px, "Keep trying"
+  (tertiary, `size="sm"`) is 80.8 by 24px, both comfortably past the 44px
+  floor on width alone. The existing 8px gap between them is therefore not
+  the constraint D-071 governs (that rule only bites when a control's own
+  width is under 44px); both buttons already clear the floor on their own
+  boxes and the row does not wrap at 360px (328px of two buttons plus an 8px
+  gap, against a 360px viewport).
+
+`document.elementFromPoint` was probed at the left edge, right edge, center,
+and (for the height-constrained controls) the top and bottom spillover points
+of each control's hit area, at both 360 and 390px, for all three controls.
+Every probe resolved to the control itself.

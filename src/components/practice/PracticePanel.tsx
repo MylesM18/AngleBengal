@@ -325,7 +325,11 @@ export function PracticePanel({
               }
               accent={accent}
               action={
-                <Button loading={generating} onClick={() => void generate()}>
+                <Button
+                  loading={generating}
+                  className="max-lg:tap-target"
+                  onClick={() => void generate()}
+                >
                   {generating ? "Working..." : "Generate 5 problems"}
                 </Button>
               }
@@ -439,12 +443,18 @@ export function PracticePanel({
                   kind="warning"
                   action={
                     <>
-                      <Button variant="destructive" size="sm" onClick={() => void reveal()}>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="max-lg:tap-target"
+                        onClick={() => void reveal()}
+                      >
                         Show solution
                       </Button>
                       <Button
                         variant="tertiary"
                         size="sm"
+                        className="max-lg:tap-target"
                         onClick={() => {
                           setConfirmReveal(false);
                           revealTriggerRef.current?.focus();
