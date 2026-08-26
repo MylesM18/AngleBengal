@@ -4,7 +4,7 @@ Date: 2026-08-26
 Status: approved (owner, 2026-08-26)
 
 Moves all Learn-tab persistence from local SQLite to the Supabase Postgres
-project `szqlwskqijurwkcrrvnk`, turns the hardcoded symbol map into data, and
+project `<project-ref>`, turns the hardcoded symbol map into data, and
 adds a depth-chained companion document feature with a tab strip in the reader.
 
 ## 1. Decisions taken

@@ -4,7 +4,7 @@
 
 **Goal:** Move every Learn-tab persistence concern (mental model docs, the symbol
 library, the taxonomy) from local SQLite to the Supabase Postgres project
-`szqlwskqijurwkcrrvnk`, and add a depth-chained companion document feature with a
+`<project-ref>`, and add a depth-chained companion document feature with a
 tab strip in the reader.
 
 **Architecture:** Prisma stays; only the datasource provider changes, gaining a
@@ -159,7 +159,7 @@ with:
 # OpenAI. Used by the generator, verifier, classifier and OCR calls.
 OPENAI_API_KEY=
 
-# Supabase Postgres, project szqlwskqijurwkcrrvnk.
+# Supabase Postgres, project <project-ref>.
 # Both strings come from the Supabase dashboard:
 #   Project Settings > Database > Connection string > ORM
 #
@@ -196,7 +196,7 @@ git commit -m "Untrack .env and document the Supabase connection strings"
 Stop and hand this to the owner. Do not invent, guess, or construct a
 connection string, and do not ask the owner to paste one into the chat.
 
-> Open Supabase, project `szqlwskqijurwkcrrvnk`, then Project Settings >
+> Open Supabase, project `<project-ref>`, then Project Settings >
 > Database > Connection string > ORM. Copy the two strings into
 > `/Users/newmac/Desktop/AngleBengal/.env` yourself as `DATABASE_URL` (the
 > `:6543` pooler one, keeping `?pgbouncer=true&connection_limit=1`) and
@@ -476,7 +476,7 @@ block:
 
 ```prisma
 // AngleBengal data model. Mirrors docs/03-data-model.md.
-// Postgres (Supabase project szqlwskqijurwkcrrvnk). Still no native arrays and
+// Postgres (Supabase project <project-ref>). Still no native arrays and
 // no Postgres-only column types: join tables and JSON strings stay as they are,
 // because they cost nothing and the schema reads the same either way.
 

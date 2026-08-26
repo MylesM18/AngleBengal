@@ -1,5 +1,5 @@
 // AngleBengal data model. Mirrors docs/03-data-model.md.
-// Postgres (Supabase project szqlwskqijurwkcrrvnk). Still no native arrays and
+// Postgres (Supabase project <project-ref>). Still no native arrays and
 // no Postgres-only column types: join tables and JSON strings stay as they are,
 // because they cost nothing and the schema reads the same either way.
 
