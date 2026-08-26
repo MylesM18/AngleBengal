@@ -13,6 +13,8 @@ import { PrismaClient } from "@prisma/client";
 
 import { parseDocTitle, parseModelIndex, serializeModelIndex } from "../src/lib/modelIndex";
 import { uniqueSlug } from "../src/lib/slug";
+import { glyphForRootName } from "../src/lib/symbols";
+import { seedSymbols } from "./symbols";
 
 const prisma = new PrismaClient();
 
@@ -53,7 +55,7 @@ const TAXONOMY: TaxonomyNode[] = [
 const EXEMPLAR_RELATIVE_PATH = "content/exemplars/drt-mental-models.md";
 const EXEMPLAR_TOPIC_NAME = "Distance-Rate-Time";
 
-async function seedTaxonomy(): Promise<Map<string, string>> {
+async function seedTaxonomy(glyphToSymbolId: Map<string, string>): Promise<Map<string, string>> {
   const takenSlugs = new Set(
     (await prisma.topic.findMany({ select: { slug: true } })).map((t) => t.slug),
   );
@@ -74,7 +76,13 @@ async function seedTaxonomy(): Promise<Map<string, string>> {
         const slug = uniqueSlug(name, takenSlugs);
         takenSlugs.add(slug);
         const created = await prisma.topic.create({
-          data: { name, slug, parentId },
+          data: {
+            name,
+            slug,
+            parentId,
+            // Only roots carry a glyph; subtopics inherit their root's.
+            symbolId: parentId ? null : (glyphToSymbolId.get(glyphForRootName(name)) ?? null),
+          },
           select: { id: true },
         });
         id = created.id;
@@ -129,8 +137,12 @@ async function seedExemplar(topicId: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  console.log("Seeding symbols...");
+  const glyphToSymbolId = await seedSymbols(prisma);
+  console.log(`  ${glyphToSymbolId.size} symbols present`);
+
   console.log("Seeding taxonomy...");
-  const idsByName = await seedTaxonomy();
+  const idsByName = await seedTaxonomy(glyphToSymbolId);
   console.log(`  ${idsByName.size} topics present`);
 
   const drtId = idsByName.get(EXEMPLAR_TOPIC_NAME);

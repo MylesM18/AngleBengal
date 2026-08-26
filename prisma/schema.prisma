@@ -1,14 +1,33 @@
 // AngleBengal data model. Mirrors docs/03-data-model.md.
-// SQLite in dev, Postgres-compatible later: no native arrays (join tables and
-// JSON strings instead), no Postgres-only column types.
+// Postgres (Supabase project szqlwskqijurwkcrrvnk). Still no native arrays and
+// no Postgres-only column types: join tables and JSON strings stay as they are,
+// because they cost nothing and the schema reads the same either way.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite" // switch to "postgresql" at deploy time
+  provider = "postgresql"
+  // Pooler, port 6543, transaction mode. Every application query.
   url      = env("DATABASE_URL")
+  // Direct, port 5432. Migrate and introspect only: the transaction-mode
+  // pooler cannot hold the advisory locks a migration takes.
+  directUrl = env("DIRECT_URL")
+}
+
+/// The symbol library (spec §4). Root topics wear one as their cover emblem;
+/// subtopics inherit their root's at read time. Data rather than a hardcoded
+/// map so a glyph can be added or reassigned without a deploy.
+model MathSymbol {
+  id        String  @id @default(cuid())
+  glyph     String  @unique
+  name      String
+  /// True for the six category emblems, false for the overflow pool.
+  isDefault Boolean @default(false)
+  sortOrder Int
+
+  topics Topic[]
 }
 
 model Topic {
@@ -19,6 +38,9 @@ model Topic {
   parent      Topic?   @relation("TopicTree", fields: [parentId], references: [id])
   children    Topic[]  @relation("TopicTree")
   description String?
+  /// Nullable because only ROOT topics carry a glyph (spec §4).
+  symbolId    String?
+  symbol      MathSymbol? @relation(fields: [symbolId], references: [id])
   createdAt   DateTime @default(now())
 
   modelDocs MentalModelDoc[]
@@ -37,10 +59,17 @@ model MentalModelDoc {
   // "## Model N" headings; used for diagnosis linking and tag display.
   modelIndexJson String
   isExemplar     Boolean  @default(false)
+  /// Study level. 1 is the canonical document; each "Generate more study"
+  /// adds the next. No cap.
+  depth          Int      @default(1)
   createdAt      DateTime @default(now())
 
   problemTags       ProblemModelTag[]
   diagnosedAttempts Attempt[]
+
+  /// THE rule "never regenerate a topic+depth that already exists", enforced in
+  /// the database so two concurrent generations cannot both win (spec §3).
+  @@unique([topicId, depth])
 }
 
 model Problem {
