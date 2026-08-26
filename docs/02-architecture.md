@@ -12,7 +12,7 @@ Next.js route handlers (/api/*)
   │        │
   │        ├── OpenAI API (generation, classification, verification, tutoring, OCR)
   ▼        ▼
-Prisma ──► SQLite (dev) / Postgres (later, same schema)
+Prisma ──► Supabase Postgres (pooled url, direct url for migrations)
 ```
 
 No background job queue in v1. Generation calls are request-scoped; the two long-running ones (model doc generation, problem batch generation) stream progress or poll a simple status field. If any single request risks serverless timeout at deploy time, the fallback is: write a `GenerationJob` row, return its id, and have the client poll `/api/jobs/[id]`. Build the simple synchronous version first.
@@ -110,4 +110,4 @@ User opens chat drawer, sends a message
 
 ## Deployment
 
-Dev: local, SQLite. Deploy target (later): Vercel + a hosted Postgres (Supabase or Neon); the Prisma schema is written to make that a connection-string swap plus `migrate deploy`. Do not introduce Postgres-only features before that milestone.
+Dev and deploy share one database: Supabase Postgres, reached over the pooler with `directUrl` set for migrate and introspect. The connection-string swap this section once anticipated happened on 2026-08-26; see D-079 and D-080. The schema still avoids native arrays, so join tables and JSON strings remain the rule.

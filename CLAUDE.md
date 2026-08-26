@@ -26,7 +26,7 @@ These are decided. Do not relitigate them mid-build; surface concerns instead.
 |---|---|---|
 | Framework | Next.js (App Router) + TypeScript strict | One deployable unit, API routes give a server for the OpenAI key |
 | Styling | Tailwind CSS | Fast, consistent |
-| Database | Prisma ORM, SQLite in dev (`file:./dev.db`) | Zero-setup local. Schema stays Postgres-compatible: no native arrays, join tables instead |
+| Database | Prisma ORM, Supabase Postgres (`postgresql` provider with `directUrl`) | Schema stays free of native arrays: join tables and JSON strings instead |
 | Math rendering | KaTeX | Fast, deterministic, renders all generated LaTeX |
 | Markdown rendering | react-markdown + remark-gfm + remark-math + rehype-katex | Model docs are stored as markdown with `$...$` / `$$...$$` math |
 | Sketchpad ink | HTML canvas + `perfect-freehand` | Pressure-styled strokes, small dependency |
@@ -72,11 +72,16 @@ npm run lint
 npx tsc --noEmit     # types must pass before any phase is called done
 ```
 
+`npx tsx prisma/export-sqlite.ts` and `npx tsx prisma/import-postgres.ts` are
+one-shot migration scripts. They have already been run and are kept for the
+record; do not run them again.
+
 ## Environment
 
 ```
 OPENAI_API_KEY=      # required, server-side only
-DATABASE_URL="file:./dev.db"
+DATABASE_URL=        # Supabase pooler, :6543, ?pgbouncer=true&connection_limit=1
+DIRECT_URL=          # Supabase direct, :5432, migrate and introspect only
 ```
 
 ## Target directory layout

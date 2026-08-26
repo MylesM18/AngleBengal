@@ -2284,10 +2284,12 @@ still describes SQLite as the database or the glyph map as code.
 - Modify: `docs/07-build-plan.md`
 - Modify: `CLAUDE.md`
 - Modify: `DECISIONS.md`
+- Modify: `docs/02-architecture.md` (added during execution, see the Result
+  block below)
 
 **Interfaces:** none. This task ships no behavior.
 
-- [ ] **Step 1: `docs/03-data-model.md`**
+- [x] **Step 1: `docs/03-data-model.md`**
 
 Add the `MathSymbol` model exactly as it appears in `prisma/schema.prisma`, add
 `Topic.symbolId` with the "roots only, subtopics inherit at read time" note, and
@@ -2298,7 +2300,7 @@ the parent of level N is level N-1 of the same topic and is fully derivable.
 Update the Seed section: ten symbol rows, then the taxonomy with roots stamped,
 then the exemplar at depth 1.
 
-- [ ] **Step 2: `docs/04-api-spec.md`**
+- [x] **Step 2: `docs/04-api-spec.md`**
 
 Add `POST /api/models/[id]/deepen`: no request body; 201 with
 `{ docId, topicId, depth, reused: false }` on a fresh generation; 200 with
@@ -2310,7 +2312,7 @@ Under the Learn routes, document `?docs=<id>,<id>&active=<id>`, that `?doc=`
 still works and normalizes, and that ids not belonging to the topic are dropped
 server-side.
 
-- [ ] **Step 3: `docs/05-ai-integration.md`**
+- [x] **Step 3: `docs/05-ai-integration.md`**
 
 Add the deepen prompt VERBATIM, per repo convention, copied from
 `src/lib/ai/prompts.ts`. State that it reuses `generatorSystem()` unchanged and
@@ -2319,14 +2321,14 @@ every level. Record the input-cost property: only the immediate parent
 contributes full text, earlier levels contribute model titles only, so input
 stays flat at roughly 12k tokens per level.
 
-- [ ] **Step 4: `docs/06-ui-spec.md`**
+- [x] **Step 4: `docs/06-ui-spec.md`**
 
 Document the reader tab strip (levels not titles, exemplar chip retained, close
 is a link, no cap, horizontal scroll, hidden at a single tab), the
 "Generate more study" control in the meta strip, and the `Level N` chip on
 `DocCard`. State that D-008 is unchanged.
 
-- [ ] **Step 5: `docs/07-build-plan.md` and `CLAUDE.md`**
+- [x] **Step 5: `docs/07-build-plan.md` and `CLAUDE.md`**
 
 In `docs/07-build-plan.md`, mark Phase 0 AC1 ("a fresh clone runs with just
 `OPENAI_API_KEY` set") as retired, with the reason: a remote database ends it
@@ -2347,7 +2349,7 @@ Add a line under Commands noting `npx tsx prisma/export-sqlite.ts` and
 `npx tsx prisma/import-postgres.ts` are one-shot migration scripts, already run,
 kept for the record.
 
-- [ ] **Step 6: `DECISIONS.md`, appended at the very end**
+- [x] **Step 6: `DECISIONS.md`, appended at the very end**
 
 Do not renumber anything. D-078 is currently the last entry; append after it.
 Write one entry each, in this order, in the file's existing voice and with no
@@ -2394,7 +2396,7 @@ em-dashes:
   `createdAt` descending, because with the unique constraint in place the only
   way a topic holds more than one document is a chain.
 
-- [ ] **Step 7: Final gates**
+- [x] **Step 7: Final gates**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit && npm run build && npm run lint
@@ -2405,12 +2407,70 @@ grep -rln "sqlite\|SQLite" docs/ CLAUDE.md | grep -v superpowers
 Expected: all three gates clean, `em-dash exit=1`, and the only remaining
 SQLite mentions are historical notes that explicitly describe the migration.
 
-- [ ] **Step 8: Commit**
+> **Plan correction (2026-08-26): the em-dash grep cannot reach exit=1 as
+> printed.** It lists `DECISIONS.md`, which legitimately holds four em-dash
+> characters, on lines 66, 74, 102 and 525. Every one of them is the character
+> being QUOTED inside backticks by an entry about the heading parser or about
+> the house-style rule itself, never prose. Deleting them would destroy the
+> meaning of those entries. Same class as the Task 6 Step 2 correction, where
+> the em-dash lives inside the `stripEmDashes` regex. The adapted gate splits
+> the two claims apart:
+>
+> ```bash
+> cd /Users/newmac/Desktop/AngleBengal
+> grep -rn "—" docs/03-data-model.md docs/04-api-spec.md docs/05-ai-integration.md docs/06-ui-spec.md docs/07-build-plan.md CLAUDE.md ; echo "five-docs em-dash exit=$?"
+> grep -c "—" DECISIONS.md
+> ```
+>
+> Expected: `five-docs em-dash exit=1` (grep's exit, so 1 is NO match, which is
+> the pass) and `DECISIONS.md` still exactly 4, meaning the eight new entries
+> added none. Verified baseline before any Step 5 or Step 6 edit: docs/03 0,
+> docs/04 0, docs/05 0, docs/06 0, docs/07 0, CLAUDE.md 0, DECISIONS.md 4.
+> A count of 5 or more would mean the new prose introduced one, and the fix
+> would be the new prose, never the four historical mentions.
+
+- [x] **Step 8: Commit**
 
 ```bash
 git add docs/03-data-model.md docs/04-api-spec.md docs/05-ai-integration.md docs/06-ui-spec.md docs/07-build-plan.md CLAUDE.md DECISIONS.md
 git commit -m "Document the Supabase migration, symbol table, doc depth and the study tab strip"
 ```
+
+> **Result (2026-08-26).** All eight steps done. Steps 1 through 4 landed in an
+> earlier session (`docs/03`, `docs/04`, `docs/05`, `docs/06`; 4 files, 134
+> insertions, 25 deletions). Step 5 retired Phase 0 AC1 in place in
+> `docs/07-build-plan.md` and rewrote `CLAUDE.md`'s Database row, Environment
+> block and Commands note. Step 6 appended D-079 through D-086 to the end of
+> `DECISIONS.md`, after D-078, renumbering nothing.
+>
+> **An eighth file joined the commit: `docs/02-architecture.md`.** The Phase 5
+> gate says no doc may still describe SQLite as the database, and the SQLite
+> sweep found that it did, in two places the spec's §10 list never enumerated:
+> the ASCII stack diagram (`Prisma ──► SQLite (dev) / Postgres (later, same
+> schema)`) and the Deployment section ("Dev: local, SQLite... Do not introduce
+> Postgres-only features before that milestone", advice the migration has
+> already overtaken). Both now describe Supabase Postgres and point at D-079
+> and D-080. This is an addition to Task 12's file list, not a change to Step
+> 6's list of entries, which stays exactly the eight the plan specifies.
+>
+> **Step 7 gates, measured.** `npx tsc --noEmit` exit 0, `npm run build` exit 0,
+> `npm run lint` exit 0, run with no dev server up (`pgrep -fl "next dev"` empty,
+> port 3010 free). The em-dash gate ran in its adapted form per the correction
+> above: `five-docs em-dash exit=1` across `docs/03`, `docs/04`, `docs/05`,
+> `docs/06`, `docs/07` and `CLAUDE.md`, `grep -c "—" DECISIONS.md` still exactly
+> **4** (lines 66, 74, 102, 525, all four the historical quoted-character
+> mentions, none introduced by the eight new entries), and `docs/02` 0.
+>
+> The SQLite sweep, `grep -rn "sqlite\|SQLite" docs/ CLAUDE.md | grep -v
+> superpowers`, now returns exactly one line: `CLAUDE.md:75`, the filename
+> `prisma/export-sqlite.ts` inside the new note recording that the two one-shot
+> migration scripts have already been run. That is the historical-note class the
+> gate allows. The glyph half of the gate is met too: the only `glyph` hits left
+> in `docs/` outside superpowers are `docs/03`'s description of the symbol
+> library as a table ("not a map in code") and `docs/08`'s font-glyph coverage
+> notes, which are unrelated.
+>
+> Phase 5 gate met. No behavior shipped, so no browser driving was required.
 
 ---
 

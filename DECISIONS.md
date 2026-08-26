@@ -1499,3 +1499,118 @@ that out:
   `CornerNumeral` itself is untouched (it still renders real counts on
   `DocCard`, `ModelHeading`, and the practice panel, and already accepted
   strings).
+
+### D-079. `.env` is untracked, and Phase 0 AC1 is retired with it
+
+The Prisma CLI reads `.env` and does not read `.env.local`, so both
+`DATABASE_URL` and `DIRECT_URL` have to live in `.env`, the one file git was
+already tracking. A Supabase connection URL embeds the database password, so
+`.env` could not stay tracked. It is now gitignored, `.env.example` carries all
+three names with their values stripped, and `OPENAI_API_KEY` stays where it
+already was, in `.env.local`.
+
+The consequence is that build plan Phase 0 AC1, "a fresh clone runs with just
+`OPENAI_API_KEY` set", is retired rather than reworded. A remote database ends
+that criterion regardless of how the secrets are filed: a clone now needs two
+connection strings before Prisma will run at all. `docs/07-build-plan.md` marks
+the criterion RETIRED in place, so the history stays readable.
+
+### D-080. `directUrl` alongside `url`, in the datasource block
+
+The pooler on 6543 runs in transaction mode and cannot hold the advisory locks
+a migration takes, so `prisma migrate` and `prisma db pull` need a session
+connection. The datasource carries both: `url` is the pooled connection every
+request uses, `directUrl` is the session connection on 5432 that only migrate
+and introspect ever touch.
+
+Prisma 7 moves this pair into `prisma.config.ts`. This repo is on 6.19, where
+the datasource block is the correct and only form, so no config file was added.
+When the major version moves, this is the line that moves with it.
+
+### D-081. The SQLite migration was deleted, not edited
+
+`prisma/migrations/20260821150512_init` was SQLite DDL and is invalid on
+Postgres: keeping it would fail a fresh `migrate deploy` on the first
+statement. It was deleted and replaced by a single Postgres init migration
+rather than hand-edited, because a migration whose checksum no longer matches
+its recorded hash is worse than an honest new one.
+
+`prisma/dev.db` was never written to during the migration and stays in the tree
+as the rollback. `prisma/backup/` is gitignored: `dump.json` carries every row,
+including the base64 sketch payloads, which is both large and not something to
+commit.
+
+### D-082. `@@unique([topicId, depth])`, and no `parentDocId`
+
+The constraint is the never-regenerate rule, not a description of it. Enforcing
+depth uniqueness in the database is the only place two concurrent generations
+of the same level cannot both win; the same check in application code loses
+that race.
+
+It also makes the chain derivable. With one document per depth per topic, the
+parent of level N is level N-1 of the same topic, so a `parentDocId` column
+would be a second source of truth for a fact the unique constraint already
+fixes. Two sources can disagree; one cannot. The column was not added.
+
+### D-083. A level is generated from its parent's full text plus earlier titles
+
+Level N's prompt carries the full text of level N-1 and, for every level before
+that, model titles only. The full parent is what keeps the new document from
+re-teaching the ground it should be building on; the titles are enough to keep
+it off anything covered earlier.
+
+The property this buys is a flat input cost. Feeding the whole chain would grow
+the prompt with every level; feeding titles holds input at roughly 12k tokens
+per level however deep the chain runs.
+
+### D-084. The symbol library became a table, and the old glyph map was deleted
+
+D-078's glyph map moved out of code and into `MathSymbol` rows. `glyphForRoot`,
+`TOPIC_GLYPHS` and `GLYPH_OVERFLOW` were deleted from
+`src/lib/topicColors.ts`. The name-to-glyph rule itself survives verbatim as
+`glyphForRootName` in `src/lib/symbols.ts`, because `resolveTopic` still needs
+it the moment the classifier files a brand new root that has no row yet.
+
+The two implementations were compared side by side before the old one was
+deleted, overflow hash included, so the glyph a brand new root falls back to is
+the same glyph it would have been given before.
+
+`TOPIC_ACCENTS` stays in code. The owner scoped this change to symbols, and the
+accent map was not part of it.
+
+### D-085. Problem generation pins to depth 1; `budgetDocs` stays newest-first
+
+`src/lib/problems/generate.ts` reads the topic's `depth: 1` document rather
+than its newest one. Existing `ProblemModelTag` rows and
+`Attempt.diagnosedDocId` values point at level 1 models. If generation followed
+the chain upward, new problems would be tagged against models no stored attempt
+was ever diagnosed against, and the two would quietly stop meaning the same
+thing.
+
+`budgetDocs` in `src/lib/ai/contextBudget.ts` is deliberately left
+newest-first, which for a chain means deepest-first. The tutor speaking in the
+most advanced vocabulary the reader has actually generated is defensible on its
+own terms, and Chat sits outside this change's scope. Recorded here as a
+deliberate asymmetry, not an oversight.
+
+### D-086. Tab state lives in the URL, and the two labeling choices that follow
+
+Which documents are open, and which one is active, are encoded as
+`?docs=<id>,<id>&active=<id>`. That survives reload and back/forward both, is
+shareable, needs no table and no client store, and the reader page is already a
+server component reading `searchParams`. Storing it would have added
+persistence for something the address bar already persists.
+
+Two sub-choices the spec left open:
+
+- Tabs are labeled by level, not by title. Every document in a chain is filed
+  under the same topic and carries close to the same name, so a strip of titles
+  reads as a row of near-duplicates. The exemplar keeps its chip.
+- `DocCard` shows `Level N` on every card, not only above level 1. Badging only
+  the deeper cards would make a grid read as if the unbadged ones sat outside
+  the chain.
+
+`getTopicDetail` in `src/lib/topics.ts` now orders `modelDocs` by depth
+ascending rather than `createdAt` descending. With `@@unique([topicId, depth])`
+in place, the only way a topic holds more than one document is a chain, and
+level order is the only order that reads correctly for one.

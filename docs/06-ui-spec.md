@@ -19,6 +19,19 @@ Two layout worlds, desktop and compact, split at `lg` (1024px): the sections bel
 - Doc selected: the rendered document via `<MarkdownMath>`. Each `## Model N` heading gets an `id="model-n"` anchor and a copy-link affordance. A sticky mini-TOC (right edge, doc pages only) lists the models by number and name.
 - Exemplar doc shows a small "Exemplar" badge; its delete action is absent.
 
+**Reader tab strip (study levels):** when a topic's chain holds more than one open document, a strip sits above the rendered document.
+- Tabs are labeled `Level N`, not by title. Every document in a chain is titled after the same topic, so titles would read as near duplicates.
+- The exemplar keeps its "Exemplar" chip, inside its tab.
+- Switching tabs and closing a tab are both plain links to a different URL (docs/04, Learn routes), so the strip is a server component holding no state. The close control is a sibling link inside the tab shell, never nested inside the tab link.
+- No cap on open tabs. The strip scrolls horizontally rather than wrapping or truncating.
+- Hidden entirely at one tab: with a single document there is nothing to switch to and nothing to close, so the strip renders nothing.
+
+**"Generate more study":** a secondary button in the document's meta strip. It posts to `POST /api/models/[id]/deepen` for the document being read, then opens the returned level as a NEW tab beside the current one rather than replacing it. While it runs, the button shows "Writing the next level..." with a polite live region ("Building on this document. This takes a minute or two."). A structural-validation failure renders inline with its `failures` list; nothing navigates.
+
+**`DocCard`:** every card in a topic's document grid carries a `Level N` chip, including level 1. Showing it only above level 1 would make a level 1 card read as if it sat outside the chain. The exemplar chip is additional, not a replacement.
+
+**D-008 is unchanged:** a topic holding exactly one document still opens that document directly rather than showing a one-card grid.
+
 ## §3 Practice tab
 
 Split view, resizable divider, default 45/55.

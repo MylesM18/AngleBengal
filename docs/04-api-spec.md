@@ -22,7 +22,17 @@ One topic with its `modelDocs` (id, title, createdAt) and counts.
 ```
 Runs classify → create-topic-path-if-needed → generate → validate → save (docs/02 flow A).
 Success `201`: `{ "docId": "...", "topicId": "...", "topicPath": ["Calculus","Applications","Related Rates"] }`
+If the classified topic already holds a level 1 document, that document is returned rather than a duplicate being generated. The response shape is unchanged and no generation call is made; the caller cannot tell the difference apart from the latency.
 Failures: `422 GENERATION_INVALID` (failed structural validation twice), `502 AI_UNAVAILABLE`.
+
+### POST /api/models/[id]/deepen
+No request body. `[id]` is the source document, and the new level is written to that document's own topic, so there is no classification and no topic creation step.
+Success `201`:
+```json
+{ "docId": "...", "topicId": "...", "depth": 3, "reused": false }
+```
+`200` with `"reused": true` when the target level (`source.depth + 1`) already exists. That is the never-regenerate rule from docs/03 (`@@unique([topicId, depth])`) surfacing as an ordinary response: no generation call, no cost, no duplicate. A double-clicked button lands here too, because the request that loses the unique constraint hands back the winner instead of failing.
+Failures: `404 NOT_FOUND` (no document with that source id), `422 GENERATION_INVALID` with `failures` in the error payload when the single retry also fails structural validation (nothing is saved), `502 AI_UNAVAILABLE`.
 
 ### GET /api/models/[id]
 `{ id, topicId, title, contentMd, modelIndexJson, isExemplar, createdAt }`
@@ -96,6 +106,18 @@ Streams the assistant reply (text stream). First chunk is preceded by a JSON hea
 
 ### GET /api/chat/sessions  /  GET /api/chat/sessions/[id]
 List sessions (id, title, updatedAt) / full message history.
+
+## Learn routes
+
+These are pages, not API handlers, but the reader's tab state is a URL contract and belongs with the route contracts.
+
+### GET /learn/[topicId]?docs=<id>,<id>&active=<id>
+`docs` is the ordered list of open document tabs, `active` is the one whose `contentMd` renders. Tab state lives entirely in the URL: it survives a reload and back/forward, it is shareable, and it needs no table and no client store.
+
+- `?doc=<id>` (the single-document shape every existing `DocCard` link and the Learn index Recent list still emit) keeps working and normalizes into the same state, as one open tab that is also active.
+- Ids that do not belong to `[topicId]` are dropped server-side, so a hand-edited URL cannot render another topic's document under this breadcrumb. Duplicates and blanks are dropped the same way.
+- An `active` that is not among the surviving open ids falls back to the first one. When nothing survives, the page renders the topic index rather than an empty reader.
+- Closing a tab is a plain link to the same URL minus that id, which is what lets the strip stay a server component. Closing the last tab returns to `/learn/[topicId]`.
 
 ## Conventions
 

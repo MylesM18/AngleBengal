@@ -12,7 +12,7 @@ Tasks:
 - `GET /api/topics`, `GET /api/topics/[id]`, `GET /api/models/[id]`.
 
 Acceptance:
-1. Fresh clone → `npm i && npx prisma migrate dev && npx prisma db seed && npm run dev` works with only `OPENAI_API_KEY` set.
+1. **RETIRED 2026-08-26.** Fresh clone → `npm i && npx prisma migrate dev && npx prisma db seed && npm run dev` works with only `OPENAI_API_KEY` set. The database is now Supabase Postgres, so a clone also needs `DATABASE_URL` and `DIRECT_URL` before Prisma will run at all. A remote database ends this criterion regardless of how the secrets are filed, so it is retired rather than reworded. See D-079.
 2. `/learn` shows the seeded tree; opening Distance-Rate-Time shows the exemplar doc fully rendered: every table, every formula, `#model-3` anchor scrolls correctly.
 3. AiCallLog table exists; the call wrapper compiles with a stub call.
 

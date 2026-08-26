@@ -99,6 +99,46 @@ Reject and retry once (appending the specific failures) if any of:
 
 On save, parse `modelIndexJson` from the Model headings.
 
+### 2.4 Deepen user message (the next study level)
+
+`POST /api/models/[id]/deepen` reuses `generatorSystem()` **unchanged**, so the exemplar, the structure rules and the no-em-dash rule all apply exactly as they do at level 1. Only the user message differs. Verbatim from `deepenUser()` in `src/lib/ai/prompts.ts`:
+
+```
+Topic: ${topicName}
+Taxonomy path: ${topicPath.join(" > ")}
+
+This is study level ${targetDepth} for this topic. The reader has already worked
+through ${priorLevels} document${priorLevels === 1 ? "" : "s"} on it. Write the next one: same topic,
+deeper water.
+
+Mental models already taught at earlier levels. Treat every one as known, and
+do not re-teach any of them:
+${covered}
+
+Requirements specific to this level, on top of everything in the system prompt:
+- Give this document a title distinct from the parent's, which is the "# "
+  heading of the document reproduced below. Do not reuse that title with a
+  number or a word like "Advanced" bolted on.
+- Every model here must be a genuinely new lens. You may name an earlier model
+  when a new one builds on it, but a restatement does not earn a section.
+- Go further: the harder cases, the places where the level ${priorLevels} models strain
+  or mislead, the structure sitting underneath them, and the connections to
+  neighboring topics that only become visible at this level.
+- The structure, depth, length and voice rules still apply in full. This
+  document is validated by exactly the same gate as level 1.
+
+THE LEVEL ${priorLevels} DOCUMENT, the immediate parent. Read it as the reader's current
+ceiling, not as material to summarize:
+
+${parentContentMd}
+```
+
+`${covered}` is one line per model already taught, `- Level {depth}, Model {number}: {title}`, in depth order, or `- (none recorded)` when no earlier index parses.
+
+Plain text completion (markdown), not JSON. `validateModelDoc` (§2.3) runs on the result unchanged, with the same single retry through `generatorRetryUser`, so **the §2 gate governs every level**: a level 4 document that is missing its diagnostic table is rejected exactly as a level 1 document would be, and nothing is saved.
+
+**Input cost is flat in depth.** Only the immediate parent contributes full text. Every earlier level contributes model titles only, drawn from its already-stored `modelIndexJson` rather than from its markdown. So the user message is roughly one document plus a short list however long the chain grows, about 12k input tokens per level, instead of growing linearly with the chain.
+
 ## §3 Topic classification (CLASSIFIER)
 
 System prompt:
