@@ -44,6 +44,8 @@ yarn-error.log*
 .vscode/*
 !.vscode/launch.json
 .idea
+# Claude Code workspace config (launch.json names the local dev server)
+/.claude/
 
 # typescript
 *.tsbuildinfo
