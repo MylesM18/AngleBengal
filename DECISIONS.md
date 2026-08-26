@@ -1218,3 +1218,60 @@ which is the one thing the ribbon exists to provide. The name is left to
 compute from the contents instead (the statement text, rendered through
 `MarkdownMath`), and the expand/collapse verb is carried separately by a
 visually hidden `.sr-only` span inside the button.
+
+### D-073. Task 9 sweep: landmark name, Clear/Keep positioning, and scope
+
+Task 9's four loose ends plus the five-viewport sweep turned up a few
+judgment calls not spelled out in the brief.
+
+**"Main tabs" over "Main."** `TopBar.tsx`'s desktop nav and
+`BottomTabBar.tsx`'s compact nav needed one shared `aria-label`. Picked
+`BottomTabBar`'s existing name: both navs render as tab-style chips with
+`aria-current="page"` on the active one, which "Main tabs" describes more
+precisely than the bare "Main."
+
+**The Clear/Keep popover's real bug was positioning, not just packing.**
+The brief framed this as the same hit-area-overlap problem Task 7 fixed on
+the sketch toolbar's chips. Testing found something worse underneath: the
+popover is anchored `absolute` to the ~70px Clear-chip wrapper, and that
+wrapper's position in the toolbar depends on how many rows the toolbar
+wraps to, which depends on viewport width. At 390px (one row, Clear sits
+near the end) the popover's `w-64` box landed with its right edge 169px
+past the viewport edge, taking the Keep button with it: not overlapped,
+not mis-tappable, entirely off-screen and unreachable. At 360px (two rows,
+Clear sits near the start) the same code happened to fit, which is
+presumably why nobody caught it. Widening the gap between Clear and Keep,
+the fix the brief pointed at, would not have touched this: the buttons
+were never the problem, the anchor was.
+
+Fixed by moving the popover's containing block on compact from the small
+Clear-chip wrapper to the toolbar strip itself (`stripRef` gets
+`max-lg:relative`, `clearWrapRef` changes from `relative` to `lg:relative`
+so it stops being positioned below `lg`), then centering the popover
+within that strip with `max-lg:inset-x-3 max-lg:mx-auto`. The strip spans
+the toolbar's full width regardless of row count, so the popover now fits
+at every compact width tested (360, 390, 834), and `lg` and up is
+untouched: `clearWrapRef` stays the nearer positioned ancestor there, so
+the original `left-0 top-full` anchor to the Clear chip is unchanged. The
+Clear-confirm and Keep buttons then got `max-lg:tap-target`, since neither
+had ever carried a hit area at all (`Button` never does, by this file's
+existing convention); the existing `gap-2` already satisfies D-071's
+clearance rule once that hit area exists, both buttons being wide enough
+from their own text labels that spillover is under 2px a side.
+
+**Scope boundary: only chrome-level and newly-broken controls were fixed.**
+The sweep surfaced several other compact controls under the 44px floor:
+the Learn shelf's generate input and button, Submit/Skip/Show solution,
+the difficulty selector, the tutor composer's Send button, and the reader's
+breadcrumb links. None of these were touched. They are the same generic
+`Button`/text-link pattern used everywhere in the app, they predate the
+mobile-responsive project, and the eight prior tasks deliberately scoped
+their touch-target work to specific chrome (nav, tutor drawer, sketch
+toolbar, the FAB) rather than every control. Retrofitting all of them
+would mean deciding whether `Button` should carry `tap-target` on compact
+by default, a design-scope call, not a class-level fix, so they are left
+for a follow-up rather than silently swept in. The one exception is the
+TopBar wordmark link (160x24, present on every screen, sitting right next
+to the Tutor chip which already carries `tap-target`): fixed with the same
+`max-lg:tap-target`, since it is persistent chrome rather than a per-screen
+action control, and the fix is a single line with no gap-widening risk.

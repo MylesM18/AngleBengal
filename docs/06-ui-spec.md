@@ -1,6 +1,6 @@
 # 06 - UI Spec
 
-Desktop-first. The visual language (colors, type, paper system, component styling) is defined in `docs/08-design-theme.md` and demonstrated in `brand/theme-showcase.html`; this document defines structure and behavior.
+Two layout worlds, desktop and compact, split at `lg` (1024px): the sections below describe the desktop layout, and the "Mobile layouts" section at the end covers what changes below the seam. The visual language (colors, type, paper system, component styling) is defined in `docs/08-design-theme.md` and demonstrated in `brand/theme-showcase.html`; this document defines structure and behavior.
 
 ## §1 App shell
 

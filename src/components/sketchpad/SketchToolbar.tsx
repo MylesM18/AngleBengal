@@ -177,7 +177,15 @@ export function SketchToolbar({
       // control here is 24px tall (h-6): a tight row-gap lets one row's hit
       // area bleed into the row below. `lg` and up is untouched: gap-2, same
       // as before.
-      className="stock-textured flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft px-3 py-2 max-lg:gap-5"
+      //
+      // `max-lg:relative` makes this strip the Clear popover's positioning
+      // ancestor on compact (see the Clear/Keep popover below): the strip
+      // spans the full toolbar width regardless of how many rows it wraps
+      // to, which is what keeps the popover on screen at every compact
+      // width. Gated to `max-lg` like every other touch fix in this file,
+      // even though an unconditional `relative` would be inert at `lg` and
+      // up too: `clearWrapRef` stays the nearer positioned ancestor there.
+      className="stock-textured flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft px-3 py-2 max-lg:relative max-lg:gap-5"
     >
       {/* 32px icon-only chips: each one's hit area spills (44 - 32) / 2 = 6px
           past its own visible edge, so two neighbors need at least 12px
@@ -287,7 +295,17 @@ export function SketchToolbar({
           Undo
         </Chip>
 
-        <div ref={clearWrapRef} className="relative">
+        {/* `lg:relative` (never positioned below `lg`) hands the popover's
+            containing block up to the strip's `max-lg:relative`, added
+            above. Anchoring the popover to this ~70px wrapper on compact
+            put its `w-64` box wherever the Clear chip happened to land, and
+            the chip's position is not fixed: it sits at the end of a single
+            row on a wide compact viewport (390px) or partway through a
+            wrapped second row on a narrow one (360px). At 390px that put
+            the popover's right edge 169px past the viewport edge, taking
+            Keep with it: not overlapped, not mis-tapped, entirely
+            unreachable. Measured before the fix. */}
+        <div ref={clearWrapRef} className="lg:relative">
           <Chip
             variant="action"
             icon="clear"
@@ -305,17 +323,45 @@ export function SketchToolbar({
               role="dialog"
               aria-labelledby={clearTitleId}
               onKeyDown={onPopoverKeyDown}
-              className="absolute left-0 top-full z-20 mt-2 w-64"
+              // `max-lg:inset-x-3` plus `max-lg:mx-auto` centers the fixed
+              // `w-64` box within the strip (now the containing block on
+              // compact, see above) with at least 12px of clearance on
+              // either side, whatever the toolbar's actual width or row
+              // count. `lg` and up keeps the original anchor: `left-0
+              // top-full` off the Clear chip.
+              className="absolute left-0 top-full z-20 mt-2 w-64 max-lg:inset-x-3 max-lg:mx-auto"
             >
               <Sheet tone="paper-0" lift className="flex flex-col gap-3 p-3">
                 <p id={clearTitleId} className="text-ui text-ink">
                   {CLEAR_QUESTION}
                 </p>
+                {/* Task 7 left this popover's own buttons unwidened (D-071).
+                    Both are `Button`, which never carries `tap-target` by
+                    default (see `Clean up` below), and at 24px tall both
+                    fail the 44px floor outright: this is not the swap-the-
+                    winner overlap D-071 describes elsewhere, since neither
+                    control had a hit area to overlap with. `max-lg:tap-target`
+                    gives each one, and `gap-2` (8px) already clears D-071's
+                    rule with the fix in place: Clear is 54px wide, past the
+                    44px floor with no horizontal spillover, and Keep at 44px
+                    wide spills under 2px per side, both well inside the
+                    existing gap. Measured and hit-tested after the fix
+                    (task-9-report.md). */}
                 <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="destructive" onClick={clearCanvas}>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={clearCanvas}
+                    className="max-lg:tap-target"
+                  >
                     Clear
                   </Button>
-                  <Button size="sm" variant="tertiary" onClick={keepCanvas}>
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    onClick={keepCanvas}
+                    className="max-lg:tap-target"
+                  >
                     Keep
                   </Button>
                 </div>

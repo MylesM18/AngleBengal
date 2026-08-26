@@ -31,7 +31,11 @@ export function TopBar({ chatOpen, onToggleChat, tutorRef }: TopBarProps) {
 
   return (
     <header className="z-20 flex h-12 shrink-0 items-center gap-3 bg-paper-1 px-2 shadow-sheet">
-      <Link href="/learn" className="flex items-center gap-2 rounded-chip px-1" aria-label="AngleBengal home">
+      <Link
+        href="/learn"
+        className="flex items-center gap-2 rounded-chip px-1 max-lg:tap-target"
+        aria-label="AngleBengal home"
+      >
         {/* `priority` because this mark is above the fold and is measured as
             the Largest Contentful Paint; without it Next warns to load it
             eagerly. */}
@@ -46,7 +50,7 @@ export function TopBar({ chatOpen, onToggleChat, tutorRef }: TopBarProps) {
         <span className="font-expanded text-ui-lg text-ink">AngleBengal</span>
       </Link>
 
-      <nav className="hidden flex-1 items-center gap-1 lg:flex" aria-label="Main">
+      <nav className="hidden flex-1 items-center gap-1 lg:flex" aria-label="Main tabs">
         {NAV.map((tab) => (
           <ChipLink key={tab.href} variant="nav" href={tab.href} current={isActive(tab.href)}>
             {tab.label}
