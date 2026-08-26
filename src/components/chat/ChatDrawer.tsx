@@ -207,7 +207,15 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
       aria-label="Tutor"
       aria-hidden={!open}
       inert={!open}
-      className={`absolute inset-y-0 right-0 z-10 flex w-[min(420px,100vw)] flex-col bg-paper-1 shadow-lift transition-transform duration-220 ease-paper ${
+      /*
+       * Below lg the tutor is a full-screen takeover, not a panel inside the
+       * content row: `fixed inset-0` covers the TopBar and BottomTabBar too,
+       * so nothing sits underneath it, tappable, once it is open. `absolute`
+       * would only fill the content row (AppShell's overflow-hidden middle
+       * div), leaving the tab bar exposed beneath the drawer. At lg the
+       * geometry reverts to the original 420px right-hand panel.
+       */
+      className={`fixed inset-0 z-30 flex w-full flex-col bg-paper-1 shadow-lift transition-transform duration-220 ease-paper lg:absolute lg:inset-y-0 lg:left-auto lg:right-0 lg:z-10 lg:w-[min(420px,100vw)] ${
         open ? "translate-x-0" : "translate-x-full"
       }`}
     >

@@ -47,7 +47,10 @@ export function ChatComposer({
   const canSend = !busy && value.trim().length > 0;
 
   return (
-    <div className="shrink-0 bg-paper-1 p-3">
+    // pb-safe alone would replace p-3's bottom padding outright (env()
+    // resolves to 0 on any device without an inset), so the home-indicator
+    // clearance is added on top of the existing 12px, not swapped in for it.
+    <div className="shrink-0 bg-paper-1 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
       <div className="flex items-end gap-1.5">
         <label htmlFor="tutor-composer" className="sr-only">
           Message the tutor
