@@ -198,6 +198,58 @@ ${failures.map((failure) => `- ${failure}`).join("\n")}
 Write the document again, complete, fixing every point above.`;
 }
 
+/**
+ * The next study level for a topic (spec §5). Deliberately reuses
+ * `generatorSystem()`, so the exemplar, the structure rules and the
+ * no-em-dash rule all apply unchanged and the document faces the same
+ * `validateModelDoc` gate every level 1 document faces.
+ *
+ * Only the IMMEDIATE parent contributes full text. Earlier levels contribute
+ * model titles only, which is what keeps input cost flat at roughly 12k tokens
+ * per level however long the chain grows.
+ */
+export function deepenUser(
+  topicName: string,
+  topicPath: string[],
+  targetDepth: number,
+  parentContentMd: string,
+  ancestorTitles: string[],
+): string {
+  const priorLevels = targetDepth - 1;
+  const covered =
+    ancestorTitles.length > 0
+      ? ancestorTitles.map((title) => `- ${title}`).join("\n")
+      : "- (none recorded)";
+
+  return `Topic: ${topicName}
+Taxonomy path: ${topicPath.join(" > ")}
+
+This is study level ${targetDepth} for this topic. The reader has already worked
+through ${priorLevels} document${priorLevels === 1 ? "" : "s"} on it. Write the next one: same topic,
+deeper water.
+
+Mental models already taught at earlier levels. Treat every one as known, and
+do not re-teach any of them:
+${covered}
+
+Requirements specific to this level, on top of everything in the system prompt:
+- Give this document a title distinct from the parent's, which is the "# "
+  heading of the document reproduced below. Do not reuse that title with a
+  number or a word like "Advanced" bolted on.
+- Every model here must be a genuinely new lens. You may name an earlier model
+  when a new one builds on it, but a restatement does not earn a section.
+- Go further: the harder cases, the places where the level ${priorLevels} models strain
+  or mislead, the structure sitting underneath them, and the connections to
+  neighboring topics that only become visible at this level.
+- The structure, depth, length and voice rules still apply in full. This
+  document is validated by exactly the same gate as level 1.
+
+THE LEVEL ${priorLevels} DOCUMENT, the immediate parent. Read it as the reader's current
+ceiling, not as material to summarize:
+
+${parentContentMd}`;
+}
+
 /* ------------------------------------------------------------------ */
 /* TUTOR (docs/05 §6, streaming)                                       */
 /* ------------------------------------------------------------------ */

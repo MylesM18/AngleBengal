@@ -1204,7 +1204,7 @@ unchanged.
   `ancestorTitles` are MODEL titles across every earlier level, already
   formatted as `Level {n}, Model {m}: {title}`.
 
-- [ ] **Step 1: Add the prompt**
+- [x] **Step 1: Add the prompt**
 
 ```ts
 /**
@@ -1260,7 +1260,7 @@ ${parentContentMd}`;
 }
 ```
 
-- [ ] **Step 2: Check the copy for em-dashes**
+- [x] **Step 2: Check the copy for em-dashes**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && grep -n "—" src/lib/ai/prompts.ts ; echo "exit=$?"
@@ -1268,7 +1268,21 @@ cd /Users/newmac/Desktop/AngleBengal && grep -n "—" src/lib/ai/prompts.ts ; ec
 
 Expected: no output and `exit=1`.
 
-- [ ] **Step 3: Typecheck and commit**
+> **Plan correction (applied 2026-08-26).** As printed this cannot pass. The
+> file has always held one em-dash, at `src/lib/ai/prompts.ts:34`, inside the
+> `stripEmDashes` regex `/\s*—\s*/g`. That function cannot strip the character
+> without containing it, so the grep returns that line and `exit=0` no matter
+> what this task adds. Same class of trap as Task 5 Step 6. Check the added
+> block instead, which is the actual intent:
+>
+> ```bash
+> sed -n '200,251p' src/lib/ai/prompts.ts | grep -n "—" ; echo "exit=$?"
+> ```
+>
+> That returns no output and `exit=1`. Confirmed: the only em-dash in the file
+> is the pre-existing one at line 34.
+
+- [x] **Step 3: Typecheck and commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit
