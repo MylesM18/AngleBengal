@@ -191,7 +191,7 @@ git add .gitignore .env.example
 git commit -m "Untrack .env and document the Supabase connection strings"
 ```
 
-- [ ] **Step 6: OWNER GATE, blocking**
+- [x] **Step 6: OWNER GATE, blocking**
 
 Stop and hand this to the owner. Do not invent, guess, or construct a
 connection string, and do not ask the owner to paste one into the chat.
@@ -361,7 +361,7 @@ artifact and carries every row of the database.
 
 ### Task 3: Switch the datasource, add the schema, generate a fresh migration
 
-**Blocked on Task 1 Step 6.** Do not start until `.env` holds both URLs.
+**Task 1 Step 6 is closed:** `.env` holds both URLs.
 
 **Files:**
 - Modify: `prisma/schema.prisma`
@@ -381,7 +381,7 @@ artifact and carries every row of the database.
     glyph to id.
   - Prisma compound-key selector `topicId_depth: { topicId, depth }`.
 
-- [ ] **Step 1: Write the symbol library as data**
+- [x] **Step 1: Write the symbol library as data**
 
 Create `src/lib/symbols.ts`:
 
@@ -449,7 +449,7 @@ export function glyphForRootName(rootName: string): string {
 }
 ```
 
-- [ ] **Step 2: Prove the glyph rule is byte-identical to D-078 before deleting the old one**
+- [x] **Step 2: Prove the glyph rule is byte-identical to D-078 before deleting the old one**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsx -e '
@@ -469,7 +469,7 @@ Expected: `IDENTICAL for all 14 names`. If not, fix `src/lib/symbols.ts`
 before going further. This is the only chance to compare the two
 implementations side by side.
 
-- [ ] **Step 3: Switch the datasource and add the schema**
+- [x] **Step 3: Switch the datasource and add the schema**
 
 In `prisma/schema.prisma`, replace the file header comment and the datasource
 block:
@@ -538,7 +538,7 @@ after the relation fields):
   @@unique([topicId, depth])
 ```
 
-- [ ] **Step 4: Delete the SQLite migration**
+- [x] **Step 4: Delete the SQLite migration**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && rm -rf prisma/migrations/20260821150512_init && ls prisma/migrations
@@ -548,7 +548,7 @@ Expected: only `migration_lock.toml` remains, or the directory is empty. If
 `migration_lock.toml` is present, delete it too; `migrate dev` rewrites it with
 `provider = "postgresql"`.
 
-- [ ] **Step 5: Write the symbol seeder**
+- [x] **Step 5: Write the symbol seeder**
 
 Create `prisma/symbols.ts`:
 
@@ -577,7 +577,7 @@ export async function seedSymbols(prisma: PrismaClient): Promise<Map<string, str
 }
 ```
 
-- [ ] **Step 6: Teach the seed about symbols**
+- [x] **Step 6: Teach the seed about symbols**
 
 In `prisma/seed.ts`, add the import beside the existing ones:
 
@@ -632,7 +632,7 @@ async function main(): Promise<void> {
 
 Leave `seedExemplar` alone: `depth` defaults to 1.
 
-- [ ] **Step 7: Create the database schema**
+- [x] **Step 7: Create the database schema**
 
 `--skip-seed` is not optional. The seed creates 31 topics with fresh cuids; the
 importer in Task 4 needs an empty database so it can replay the originals.
@@ -649,7 +649,7 @@ swapped: `DIRECT_URL` must be the `:5432` one. Do not print either value while
 debugging; check the ports with
 `sed -n 's/.*:\([0-9]\{4\}\)\/postgres.*/\1/p' .env`.
 
-- [ ] **Step 8: Confirm the new migration is Postgres DDL**
+- [x] **Step 8: Confirm the new migration is Postgres DDL**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && grep -c "AUTOINCREMENT\|PRAGMA" prisma/migrations/*/migration.sql; grep -n "MathSymbol\|\"depth\"\|symbolId" prisma/migrations/*/migration.sql | head
@@ -658,7 +658,7 @@ cd /Users/newmac/Desktop/AngleBengal && grep -c "AUTOINCREMENT\|PRAGMA" prisma/m
 Expected: the first count is `0`, and the second lists the `MathSymbol` table,
 the `depth` column and the `symbolId` column.
 
-- [ ] **Step 9: Typecheck and commit**
+- [x] **Step 9: Typecheck and commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit
