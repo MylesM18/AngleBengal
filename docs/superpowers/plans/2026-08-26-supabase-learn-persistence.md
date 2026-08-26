@@ -682,7 +682,7 @@ Confirm with `git status --short` before committing that
   `glyphForRootName` (Task 3).
 - Produces: a populated Postgres database with every original cuid.
 
-- [ ] **Step 1: Write the importer**
+- [x] **Step 1: Write the importer**
 
 Create `prisma/import-postgres.ts`:
 
@@ -924,7 +924,7 @@ main()
   });
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsx prisma/import-postgres.ts
@@ -934,7 +934,14 @@ Expected: `MathSymbol: 10`, `Topic level 0: 6`, then levels 1 and 2 summing to
 25, `MentalModelDoc: 7`, `Problem: 17`, `ProblemModelTag: 39`, `Attempt: 34`,
 `ChatSession: 12`, `ChatMessage: 28`, `AiCallLog: 106`.
 
-- [ ] **Step 3: Verify against Postgres, not against the script's own output**
+- [x] **Step 3: Verify against Postgres, not against the script's own output**
+
+> Harness note: the command below as written fails under `tsx -e`, which
+> compiles to CJS and rejects top-level `await`. Wrap the body in
+> `(async () => { ... })();`. The assertions themselves are unchanged and all
+> passed: roots carried the six D-078 glyphs, `topics: 31 docs: 7 symbols: 10`,
+> `sketch bytes: 56701` (byte-identical to the Task 2 SQLite baseline),
+> `depth-1 docs: 7`, 8 sketched attempts.
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsx -e '
@@ -957,6 +964,9 @@ sketch byte count, and `depth-1 docs: 7`.
 
 - [ ] **Step 4: Drive the app**
 
+> NOT YET RUN. Everything else in Task 4 is verified and committed (`85b522c`).
+> This is the one outstanding Phase 1 gate.
+
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npm run dev
 ```
@@ -966,7 +976,7 @@ glyphs as before, Recent lists 7 documents, and opening the
 Distance-Rate-Time cover still lands on the exemplar in one click (D-008).
 Also open `/practice` and confirm the topic list still renders.
 
-- [ ] **Step 5: Gates and commit**
+- [x] **Step 5: Gates and commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit && npm run build
