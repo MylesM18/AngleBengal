@@ -106,7 +106,18 @@ No new failure modes. Existing retry states carry over and get verified at phone
 ## Test plan
 
 - Browser emulation at 360x800, 390x844, 834x1194 (iPad portrait, compact), 1194x834 (iPad landscape, full), and 1280px desktop.
-- A real-device pass over LAN for touch feel, Pencil, safe areas, and the keyboard, driven by the owner with a checklist.
+- A real-device pass over LAN, driven by the owner. The checklist follows.
+
+### Owner device checklist
+
+Emulation gets close but does not reproduce real pointer hardware, real on-screen keyboards, or real notch geometry. These six items are the ones only hardware can settle.
+
+1. **Serve on the LAN.** Run `npm run dev -- -H 0.0.0.0`, get the Mac's address with `ipconfig getifaddr en0`, and open `http://<that-ip>:3000` in Safari on the iPhone and iPad, both on the same Wi-Fi network.
+2. **Apple Pencil palm rejection (criterion 5).** On the iPad, open a Distance-Rate-Time problem, tap Sketch, and write with the Pencil while resting your palm on the glass as you normally would. Confirm the palm never leaves ink, and that the Pencil stroke is never truncated or jumps to where your palm sits. Then reload, and with no Pencil use yet in that session, confirm a finger CAN draw. The behavior is session-scoped and pen-priority (D-069), and an emulator has no pressure-sensitive pointer to exercise it.
+3. **The iOS keyboard and the composer (criterion 4).** This is the one genuine unknown. On the iPhone, open the tutor and tap into the message box: confirm the keyboard does not cover what you are typing or the Send button. Repeat on a practice problem's answer field. Try portrait and landscape. The viewport key the app sets is honored by Chromium and ignored by WebKit, so iOS behavior here is unverified rather than designed (see §2's correction).
+4. **Safe areas on a notched device.** Check that the bottom tab bar clears the home indicator, that sketch mode's toolbar and canvas do not run under the status bar or the gesture bar, and that the tutor composer is never covered. Include **landscape**, where the horizontal insets matter: the utilities for those were removed as unused, which holds in portrait but is untested sideways.
+5. **Add to home screen.** Safari, Share, Add to Home Screen. Confirm the AngleBengal mark appears as the icon rather than a generic globe or a screenshot, and that launching it opens standalone with no browser chrome.
+6. **The one-handed loop (goal 2).** On the iPhone, thumb only: open Practice, pick Distance-Rate-Time, answer a problem, open and use Sketch. This is a feel check, not a pass/fail measurement, and it is the thing the whole project was for.
 
 ## Code touchpoints (expected)
 
