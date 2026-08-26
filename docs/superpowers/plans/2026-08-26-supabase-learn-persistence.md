@@ -230,7 +230,7 @@ client is provider-specific and one process cannot hold two of them.
   `chatMessages`, `aiCallLogs`. `Attempt.sketchPng` is base64 or `null`; every
   date is an ISO string.
 
-- [ ] **Step 1: Write the exporter**
+- [x] **Step 1: Write the exporter**
 
 Create `prisma/export-sqlite.ts`:
 
@@ -321,7 +321,7 @@ main()
   });
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsx prisma/export-sqlite.ts
@@ -331,7 +331,7 @@ Expected, exactly: `Topic: 31`, `MentalModelDoc: 7`, `Problem: 17`,
 `ProblemModelTag: 39`, `Attempt: 34`, `ChatSession: 12`, `ChatMessage: 28`,
 `AiCallLog: 106`. Any other number means the dump is not the baseline; stop.
 
-- [ ] **Step 3: Verify the binary round trip survived**
+- [x] **Step 3: Verify the binary round trip survived**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && node -e '
@@ -346,7 +346,7 @@ console.log("a createdAt:", d.topics[0].createdAt);
 Expected: `attempts with sketch: 8`, a byte length well above zero, and a
 createdAt that looks like `2026-...T...Z`.
 
-- [ ] **Step 4: Typecheck and commit**
+- [x] **Step 4: Typecheck and commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit
