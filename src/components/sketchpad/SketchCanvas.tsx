@@ -16,6 +16,14 @@ import {
   type StrokePoint,
 } from "@/lib/sketch/store";
 
+/** Once a real pen has drawn, finger touches stop drawing for the whole
+ *  session: the finger on canvas mid-writing is a resting palm, not intent
+ *  (mobile spec §5). Module scope so every canvas instance shares it, which
+ *  matters because the compact sketch overlay unmounts and remounts this
+ *  component every time the user leaves and re-enters sketch mode. A flag
+ *  on component state would forget the pen was ever seen; this one does not. */
+let penSeen = false;
+
 /**
  * The canvas stack (docs/06 §4): a background layer and an ink layer, both
  * devicePixelRatio-aware, sized to the panel.
@@ -162,6 +170,12 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
   }
 
   function onPointerDown(event: React.PointerEvent<HTMLCanvasElement>) {
+    // A real pen locks out touch for the rest of the session: once the
+    // student is known to have a Pencil, an incoming touch pointer while
+    // they are writing is the palm resting on the glass, not a second hand
+    // trying to draw (mobile spec §5).
+    if (event.pointerType === "pen") penSeen = true;
+    if (event.pointerType === "touch" && penSeen) return;
     if (event.button !== 0 && event.pointerType === "mouse") return;
     capturePointer(event.currentTarget, event.pointerId);
     const point = pointFrom(event);

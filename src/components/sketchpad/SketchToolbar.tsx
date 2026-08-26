@@ -165,9 +165,24 @@ export function SketchToolbar({
   return (
     <div
       ref={stripRef}
-      className="stock-textured flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft px-3 py-2"
+      // On compact, every control below carries (or gains) `tap-target`: a
+      // 44px hit area centered on it. That box overlaps a neighbor sitting
+      // closer than 44px away, and the pseudo-element has no
+      // `pointer-events: none` (it needs the input to make the hit area
+      // exist), so a tight gap silently steals the edge of the next
+      // control's taps. `gap-5` (20px) is sized for the worst case on this
+      // row: two adjacent 24px ink swatches, whose hit areas each spill 10px
+      // past their own visible edge (max(24,44) - 24, halved). It also
+      // covers the identical problem between wrapped ROWS, since every
+      // control here is 24px tall (h-6): a tight row-gap lets one row's hit
+      // area bleed into the row below. `lg` and up is untouched: gap-2, same
+      // as before.
+      className="stock-textured flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft px-3 py-2 max-lg:gap-5"
     >
-      <div className="flex gap-1" role="group" aria-label="Tool">
+      {/* 32px icon-only chips: each one's hit area spills (44 - 32) / 2 = 6px
+          past its own visible edge, so two neighbors need at least 12px
+          between them (gap-3) before their hit areas would otherwise meet. */}
+      <div className="flex gap-1 max-lg:gap-3" role="group" aria-label="Tool">
         {TOOLS.map(({ value, label, icon }) => (
           <button
             key={value}
@@ -183,7 +198,8 @@ export function SketchToolbar({
         ))}
       </div>
 
-      <div className="flex gap-1" role="group" aria-label="Stroke width">
+      {/* Same 32px-chip math as the Tool group above: gap-3. */}
+      <div className="flex gap-1 max-lg:gap-3" role="group" aria-label="Stroke width">
         {WIDTHS.map((option) => (
           <Chip
             key={option}
@@ -202,7 +218,15 @@ export function SketchToolbar({
         ))}
       </div>
 
-      <div className="flex items-center gap-1" role="group" aria-label="Ink color">
+      {/* These swatches are the smallest controls in the strip (24px), so
+          they need both the biggest gap (gap-5, 20px: (44 - 24) / 2 = 10px
+          of spillover on each side) and `tap-target` itself, which they did
+          not carry before. Both are gated to `max-lg` on purpose: adding an
+          invisible 44px hit area to a 24px swatch changes what a click near
+          its edge resolves to, and that is a real behavior change, not just
+          a visual one, so it stays off at `lg` and up where nothing about
+          this row was broken. */}
+      <div className="flex items-center gap-1 max-lg:gap-5" role="group" aria-label="Ink color">
         {(Object.keys(INK_COLORS) as InkColor[]).map((option) => (
           <button
             key={option}
@@ -212,7 +236,7 @@ export function SketchToolbar({
             aria-label={`${option} ink`}
             title={`${option} ink`}
             className={cx(
-              "h-6 w-6 rounded-full border-2",
+              "h-6 w-6 rounded-full border-2 max-lg:tap-target",
               color === option ? "border-ink inset-ring-2 inset-ring-paper-0" : "border-paper-0",
             )}
             style={{ backgroundColor: INK_COLORS[option] }}
@@ -220,6 +244,12 @@ export function SketchToolbar({
         ))}
       </div>
 
+      {/* Background chips carry text labels ("Plain" / "Grid" / "Graph"), so
+          they render 63-75px wide, already past the 44px floor: tap-target
+          (inherited from chipClasses) adds no overlay bigger than the chip
+          itself here, and the default gap-1 never has anything to spill
+          into. Verified by measuring the live layout rather than assumed;
+          see task-7-report.md. No widening needed. */}
       <div
         className="flex gap-1"
         role="radiogroup"
@@ -249,6 +279,9 @@ export function SketchToolbar({
         })}
       </div>
 
+      {/* Undo/Clear are labeled action chips (~70px), also past the 44px
+          floor: same reasoning as the Background group above, no widening
+          needed. */}
       <div className="flex gap-1">
         <Chip variant="action" icon="undo" onClick={undo} disabled={empty}>
           Undo
@@ -292,7 +325,20 @@ export function SketchToolbar({
         </div>
       </div>
 
-      <Button size="sm" onClick={onCleanUp} disabled={cleaning} className="ml-auto">
+      {/* Unlike Chip, Button never carries `tap-target`: at size="sm" it is
+          only 24px tall regardless of label width, so on its own (no
+          neighbor needed) it fails the 44px floor vertically. It is the
+          rightmost, `ml-auto`-pushed control in the strip, so widening a
+          gap cannot fix it: the fix has to be the hit area itself. Gated to
+          `max-lg` for the same reason as the swatches above, and applied
+          here rather than in Button.tsx so no other Button in the app
+          picks up a bigger click zone it was never asked for. */}
+      <Button
+        size="sm"
+        onClick={onCleanUp}
+        disabled={cleaning}
+        className="ml-auto max-lg:tap-target"
+      >
         {cleaning ? "Reading..." : "Clean up"}
       </Button>
     </div>
