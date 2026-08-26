@@ -12,7 +12,7 @@ import {
 } from "@/lib/ai/prompts";
 import { classifierResultIsCoherent, classifierSchema } from "@/lib/ai/schemas";
 import { validateModelDoc } from "@/lib/ai/validateModelDoc";
-import { prisma } from "@/lib/db";
+import { isUniqueViolation, prisma } from "@/lib/db";
 import { parseDocTitle, parseModelIndex, serializeModelIndex } from "@/lib/modelIndex";
 import { uniqueSlug } from "@/lib/slug";
 import { glyphForRootName } from "@/lib/symbols";
@@ -64,6 +64,18 @@ export async function generateModelDoc(request: string): Promise<GenerateResult>
   const topicPath = await getTopicPath(topicId);
   const topicName = classification.canonicalName || topicPath[topicPath.length - 1];
 
+  // A topic holds exactly one level 1 document (@@unique([topicId, depth])),
+  // so asking again for a topic that already has one costs nothing. This is
+  // what closes the duplicate-generation hole the old unconditional create
+  // left open.
+  const existingLevelOne = await prisma.mentalModelDoc.findUnique({
+    where: { topicId_depth: { topicId, depth: 1 } },
+    select: { id: true },
+  });
+  if (existingLevelOne) {
+    return { docId: existingLevelOne.id, topicId, topicPath };
+  }
+
   const system = await generatorSystem();
   const baseUser = generatorUser(topicName, topicPath);
 
@@ -98,18 +110,31 @@ export async function generateModelDoc(request: string): Promise<GenerateResult>
   const index = parseModelIndex(contentMd);
   const title = parseDocTitle(contentMd, `Mental Models for ${topicName}`);
 
-  const doc = await prisma.mentalModelDoc.create({
-    data: {
-      topicId,
-      title,
-      contentMd,
-      modelIndexJson: serializeModelIndex(index),
-      isExemplar: false,
-    },
-    select: { id: true },
-  });
-
-  return { docId: doc.id, topicId, topicPath };
+  try {
+    const doc = await prisma.mentalModelDoc.create({
+      data: {
+        topicId,
+        title,
+        contentMd,
+        modelIndexJson: serializeModelIndex(index),
+        isExemplar: false,
+        depth: 1,
+      },
+      select: { id: true },
+    });
+    return { docId: doc.id, topicId, topicPath };
+  } catch (error) {
+    // Two generations for the same topic finished at once. The database picked
+    // a winner; hand it back rather than failing the reader.
+    if (isUniqueViolation(error)) {
+      const winner = await prisma.mentalModelDoc.findUnique({
+        where: { topicId_depth: { topicId, depth: 1 } },
+        select: { id: true },
+      });
+      if (winner) return { docId: winner.id, topicId, topicPath };
+    }
+    throw error;
+  }
 }
 
 /**

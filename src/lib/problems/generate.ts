@@ -53,9 +53,11 @@ export async function generateProblems(
   });
   if (!topic) throw new ApiError("NOT_FOUND", "That topic does not exist.");
 
-  const doc = await prisma.mentalModelDoc.findFirst({
-    where: { topicId },
-    orderBy: { createdAt: "desc" },
+  // Depth 1, not "newest": once a topic has a chain, newest means deepest, and
+  // problems must stay tagged to the canonical models so existing
+  // ProblemModelTag and Attempt.diagnosedDocId rows keep their meaning (spec §8).
+  const doc = await prisma.mentalModelDoc.findUnique({
+    where: { topicId_depth: { topicId, depth: 1 } },
     select: { id: true, title: true, contentMd: true, modelIndexJson: true },
   });
   if (!doc) {

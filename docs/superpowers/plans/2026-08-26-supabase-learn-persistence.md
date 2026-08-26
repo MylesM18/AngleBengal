@@ -1579,7 +1579,7 @@ git commit -m "Add the deepen flow and POST /api/models/[id]/deepen"
 - Produces: no new exports. `GenerateResult` is unchanged, so
   `GenerateTopicInput` needs no edit.
 
-- [ ] **Step 1: Return an existing level 1 instead of generating a second one**
+- [x] **Step 1: Return an existing level 1 instead of generating a second one**
 
 In `src/lib/models/generate.ts`, add `isUniqueViolation` to the `@/lib/db`
 import, then insert immediately after
@@ -1599,7 +1599,7 @@ import, then insert immediately after
   }
 ```
 
-- [ ] **Step 2: Save at depth 1 and survive the race**
+- [x] **Step 2: Save at depth 1 and survive the race**
 
 Replace the `prisma.mentalModelDoc.create` call and the return at the end of
 `generateModelDoc` with:
@@ -1632,7 +1632,7 @@ Replace the `prisma.mentalModelDoc.create` call and the return at the end of
   }
 ```
 
-- [ ] **Step 3: Pin problem generation to the canonical models**
+- [x] **Step 3: Pin problem generation to the canonical models**
 
 In `src/lib/problems/generate.ts`, replace the `findFirst` at line 56:
 
@@ -1648,7 +1648,7 @@ In `src/lib/problems/generate.ts`, replace the `findFirst` at line 56:
 
 Leave the `if (!doc) throw ...` block below it exactly as it is.
 
-- [ ] **Step 4: Confirm the pin, using the chain built in Task 7**
+- [x] **Step 4: Confirm the pin, using the chain built in Task 7**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsx -e '
@@ -1666,7 +1666,7 @@ await p.$disconnect();
 Expected: `match: true`. Before this change the same query would have picked
 the level 2 document written in Task 7.
 
-- [ ] **Step 5: Confirm regenerating an existing topic is free**
+- [x] **Step 5: Confirm regenerating an existing topic is free**
 
 With `npm run dev` running, count generator calls, ask for a topic that already
 has a level 1 document, then count again:
@@ -1683,7 +1683,16 @@ are unchanged between before and after (the classifier still runs, which is
 correct: the request has to be filed before we know it is a duplicate), and
 `docs` is unchanged at 8.
 
-- [ ] **Step 6: Gates and commit**
+> **Result (2026-08-26).** Run against **port 3010**, not 3000.
+> Step 4: `match: true`. The old `orderBy: { createdAt: "desc" }` query was run
+> alongside for contrast and did pick the Task 7 level 2 doc
+> (`cmtajcwe10002k2oiedt5pmgl`, depth 2), so the pin is doing real work.
+> Step 5: `HTTP 201` carrying the existing exemplar
+> `cmt3314xb001rk2n0tow4y3aj`, returned in 4.6s instead of two-plus minutes.
+> `generator` 14 before and 14 after. `classifier` 13 to 14, which is the
+> expected single classifier call. `docs` unchanged at 8.
+
+- [x] **Step 6: Gates and commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit && npm run build
