@@ -1471,3 +1471,31 @@ spill sideways into a neighbor.
 and (for the height-constrained controls) the top and bottom spillover points
 of each control's hit area, at both 360 and 390px, for all three controls.
 Every probe resolved to the control itself.
+
+### D-078. Cover cards wear a category glyph, not the doc count
+
+The owner asked for the Learn cover cards' corner numerals to become "actual
+math symbols and shapes based on the category of that card" (2026-08-26,
+with the 7esl symbol chart as a starting point). Decisions made in carrying
+that out:
+
+- The glyph is a root-category emblem, mapped in `src/lib/topicColors.ts`
+  next to the accent map that already keys per-root identity by name:
+  Algebra `x`, Geometry `▲`, Trigonometry `θ`, Precalculus `ƒ`, Calculus
+  `∫`, Statistics & Probability `Σ`. Unseeded roots hash into an overflow
+  pool (`π ∞ ≈ Δ`) exactly the way accents do, so a topic keeps its glyph
+  across renders and reloads.
+- Geometry is the solid `▲` (U+25B2), not the outline `△` (U+25B3): the
+  outline form is hairline against the substantial strokes of the other
+  five glyphs and read as the odd one out at the 16 percent ghost opacity
+  (verified in the browser before switching).
+- The glyph renders on every cover, including zero-doc roots that used to
+  hide their numeral. The docs/08 "numerals only where they carry
+  information" rule governed the count; the emblem carries category
+  identity instead, and the counts stay in the meta line, so nothing is
+  lost. Subtopic covers under a root wear the root's glyph, matching how
+  they already wear the root's accent band.
+- `TopicCoverCard`'s `numeral: number` prop became `glyph: string`;
+  `CornerNumeral` itself is untouched (it still renders real counts on
+  `DocCard`, `ModelHeading`, and the practice panel, and already accepted
+  strings).

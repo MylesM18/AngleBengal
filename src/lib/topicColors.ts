@@ -48,3 +48,34 @@ export function accentForRoot(rootName: string): AccentName {
   }
   return OVERFLOW[hash % OVERFLOW.length];
 }
+
+/**
+ * Each root topic also owns a math glyph, the emblem its cover cards wear in
+ * the corner where the doc-count numeral used to sit. Chosen for instant
+ * recognition: the unknown for Algebra, the triangle for Geometry, theta for
+ * Trigonometry, the function sign for Precalculus, the integral for Calculus,
+ * the summation for Statistics & Probability.
+ */
+export const TOPIC_GLYPHS = {
+  Algebra: "x",
+  Geometry: "▲",
+  Trigonometry: "θ",
+  Precalculus: "ƒ",
+  Calculus: "∫",
+  "Statistics & Probability": "Σ",
+} as const;
+
+const GLYPH_OVERFLOW = ["π", "∞", "≈", "Δ"] as const;
+
+/** Deterministic for the same reason as `accentForRoot`: unseeded roots hash
+ *  their name into the overflow pool (pi, infinity, almost-equal, delta). */
+export function glyphForRoot(rootName: string): string {
+  const fixed = TOPIC_GLYPHS[rootName as keyof typeof TOPIC_GLYPHS];
+  if (fixed) return fixed;
+
+  let hash = 0;
+  for (let i = 0; i < rootName.length; i += 1) {
+    hash = (hash * 31 + rootName.charCodeAt(i)) >>> 0;
+  }
+  return GLYPH_OVERFLOW[hash % GLYPH_OVERFLOW.length];
+}
