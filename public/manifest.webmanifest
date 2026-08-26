@@ -1,0 +1,13 @@
+{
+  "name": "AngleBengal",
+  "short_name": "AngleBengal",
+  "description": "A mathematics tutor built on mental models.",
+  "start_url": "/learn",
+  "display": "standalone",
+  "background_color": "#e3dac6",
+  "theme_color": "#f1eadc",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/anglebengal-mark.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

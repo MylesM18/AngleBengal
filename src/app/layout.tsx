@@ -42,7 +42,8 @@ export const metadata: Metadata = {
   title: "AngleBengal",
   description:
     "A mathematics tutor built on mental models: learn the models, practice against them, and find out which one failed when an answer goes wrong.",
-  icons: { icon: "/anglebengal-mark.svg" },
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/anglebengal-mark.svg", apple: "/apple-touch-icon.png" },
 };
 
 /** Mobile spec §7: edge-to-edge rendering with safe-area insets, and the iOS

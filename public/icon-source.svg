@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#f1eadc"/>
+  <g transform="translate(76.8 76.8) scale(1.493333)">
+    <title>AngleBengal</title>
+  <desc>A bengal cat head cut from terracotta paper. The ear notches are die-cut holes, the coat rosettes are crescent cuts, and the nose is a measured angle: two rays meeting at a vertex under an arc tick.</desc>
+
+  <!-- head sheet with die-cut ear notches (real holes) -->
+  <path fill-rule="evenodd" fill="#B5522E" d="
+    M 58 88 L 74 34 L 98 74 L 120 78 L 142 74 L 166 34 L 182 88 L 186 130
+    C 182 168 156 198 120 204 C 84 198 58 168 54 130 Z
+    M 170.4 73.9 L 155.2 68.6 L 164.3 53.4 Z
+    M 69.6 73.9 L 75.7 53.4 L 84.8 68.6 Z"/>
+
+  <!-- forehead stripes -->
+  <path d="M 106 86 L 103 102" stroke="#322921" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 120 84 L 120 102" stroke="#322921" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 134 86 L 137 102" stroke="#322921" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- eyes -->
+  <circle cx="95" cy="126" r="7.5" fill="#322921"/>
+  <circle cx="145" cy="126" r="7.5" fill="#322921"/>
+
+  <!-- nose: the hidden measured angle -->
+  <path d="M 120 160 L 107 145" stroke="#322921" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 120 160 L 133 145" stroke="#322921" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 113.8 152.8 A 9.5 9.5 0 0 1 126.2 152.8" stroke="#322921" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+
+  <!-- crescent rosettes: ink spots with offset die-cut bites -->
+  <path fill-rule="evenodd" fill="#322921" d="
+    M 77 143 A 7 7 0 1 0 77 157 A 7 7 0 1 0 77 143 Z
+    M 80 141.2 A 5.8 5.8 0 1 0 80 152.8 A 5.8 5.8 0 1 0 80 141.2 Z"/>
+  <path fill-rule="evenodd" fill="#322921" d="
+    M 160 157 A 6 6 0 1 0 160 169 A 6 6 0 1 0 160 157 Z
+    M 157.5 160.5 A 5 5 0 1 0 157.5 170.5 A 5 5 0 1 0 157.5 160.5 Z"/>
+  <circle cx="166" cy="138" r="3.2" fill="#322921"/>
+  <circle cx="90" cy="174" r="3" fill="#322921"/>
+  </g>
+</svg>
