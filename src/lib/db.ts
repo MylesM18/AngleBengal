@@ -16,3 +16,16 @@ export const prisma =
   });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+/**
+ * Prisma's unique-constraint code. Both generation paths race the same
+ * `@@unique([topicId, depth])`, so both need to tell "somebody else already
+ * wrote this level" apart from a real failure.
+ */
+export function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: string }).code === "P2002"
+  );
+}

@@ -1309,7 +1309,7 @@ git commit -m "Add the deepen prompt for companion study levels"
   - `POST /api/models/[id]/deepen` returning that shape, 201 when generated and
     200 when an existing level was returned.
 
-- [ ] **Step 1: Share the P2002 check**
+- [x] **Step 1: Share the P2002 check**
 
 Append to `src/lib/db.ts`:
 
@@ -1328,7 +1328,7 @@ export function isUniqueViolation(error: unknown): boolean {
 }
 ```
 
-- [ ] **Step 2: Write the deepen flow**
+- [x] **Step 2: Write the deepen flow**
 
 Create `src/lib/models/deepen.ts`:
 
@@ -1468,7 +1468,7 @@ export async function deepenModelDoc(sourceDocId: string): Promise<DeepenResult>
 }
 ```
 
-- [ ] **Step 3: Write the route**
+- [x] **Step 3: Write the route**
 
 Create `src/app/api/models/[id]/deepen/route.ts`:
 
@@ -1506,7 +1506,7 @@ export async function POST(
 }
 ```
 
-- [ ] **Step 4: Generate a real level 2 and confirm it passed the unchanged gate**
+- [x] **Step 4: Generate a real level 2 and confirm it passed the unchanged gate**
 
 With `npm run dev` running, find the exemplar's id and deepen it:
 
@@ -1523,7 +1523,7 @@ await p.$disconnect();
 Expected: `201` and a body with `"depth":2` and `"reused":false`. This makes a
 real paid model call and takes a minute or more.
 
-- [ ] **Step 5: Confirm return-existing is free the second time**
+- [x] **Step 5: Confirm return-existing is free the second time**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && curl -s -o /tmp/deepen2.json -w "%{http_code}\n" -X POST "http://localhost:3000/api/models/$DOC/deepen" && cat /tmp/deepen2.json
@@ -1545,7 +1545,20 @@ await p.$disconnect();
 Expected: `docs: 8`, `level 2: 1`. Run it once before Step 5 and once after and
 confirm `generator calls` did not move across the second request.
 
-- [ ] **Step 6: Gates and commit**
+> **Result (2026-08-26).** Dev server on **port 3010**, not 3000 (the launch
+> config `anglebengal-dev` resolves there). Source doc = the exemplar
+> `cmt3314xb001rk2n0tow4y3aj`.
+> Step 4: `HTTP 201`, `{"docId":"cmtajcwe10002k2oiedt5pmgl","depth":2,"reused":false}`,
+> 2m25s, one paid generator call.
+> Step 5: `HTTP 200`, same `docId`, `"reused":true`, 0.58s.
+> `generator calls` 14 before and 14 after Step 5, so the second request cost
+> nothing. `docs: 8`, `level 2: 1`.
+> Phase 3 gate evidence: the saved level 2 re-validates with
+> `validateModelDoc(...).ok === true` unchanged, 3578 words, 5 models, 0
+> em-dashes, and its title ("Five Mental Models for Multi-Stage
+> Distance-Rate-Time Problems") is distinct from the parent's.
+
+- [x] **Step 6: Gates and commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit && npm run build
