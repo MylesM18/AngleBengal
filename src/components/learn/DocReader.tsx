@@ -124,7 +124,7 @@ export function DocReader({ contentMd, models, accent }: DocReaderProps) {
               kind={toast.kind}
               message={toast.message}
               onDismiss={hideToast}
-              className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2"
+              className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 max-lg:bottom-[calc(4.5rem+env(safe-area-inset-bottom))]"
             />,
             document.body,
           )

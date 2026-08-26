@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import { ChatDrawer } from "@/components/chat/ChatDrawer";
+import { BottomTabBar } from "@/components/shell/BottomTabBar";
 import { TopBar } from "@/components/shell/TopBar";
 
 /**
@@ -31,6 +32,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
         <ChatDrawer open={chatOpen} onClose={closeChat} />
       </div>
+
+      <BottomTabBar />
     </div>
   );
 }

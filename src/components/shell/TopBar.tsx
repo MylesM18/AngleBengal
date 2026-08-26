@@ -46,7 +46,7 @@ export function TopBar({ chatOpen, onToggleChat, tutorRef }: TopBarProps) {
         <span className="font-expanded text-ui-lg text-ink">AngleBengal</span>
       </Link>
 
-      <nav className="flex flex-1 items-center gap-1" aria-label="Main">
+      <nav className="hidden flex-1 items-center gap-1 lg:flex" aria-label="Main">
         {NAV.map((tab) => (
           <ChipLink key={tab.href} variant="nav" href={tab.href} current={isActive(tab.href)}>
             {tab.label}
@@ -64,7 +64,7 @@ export function TopBar({ chatOpen, onToggleChat, tutorRef }: TopBarProps) {
         aria-expanded={chatOpen}
         aria-controls="tutor-drawer"
         className={cx(
-          "flex h-7 shrink-0 items-center gap-1.5 rounded-chip bg-plum px-2.5 text-ui font-semibold text-paper-0 transition-[transform,box-shadow] duration-200 ease-paper focus-visible:outline-paper-0",
+          "tap-target flex h-7 shrink-0 items-center gap-1.5 rounded-chip bg-plum px-2.5 text-ui font-semibold text-paper-0 transition-[transform,box-shadow] duration-200 ease-paper focus-visible:outline-paper-0 max-lg:ml-auto",
           chatOpen ? "translate-y-px shadow-none" : "shadow-sheet active:translate-y-px active:shadow-none",
         )}
       >

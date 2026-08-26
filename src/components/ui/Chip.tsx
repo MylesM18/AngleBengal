@@ -7,7 +7,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 export type ChipVariant = "nav" | "meta" | "action" | "toggle";
 
 const BASE =
-  "inline-flex h-6 min-w-8 items-center justify-center gap-1 whitespace-nowrap rounded-chip px-2 text-ui transition-[background-color,color,box-shadow,transform] duration-150 ease-paper";
+  "tap-target inline-flex h-6 min-w-8 items-center justify-center gap-1 whitespace-nowrap rounded-chip px-2 text-ui transition-[background-color,color,box-shadow,transform] duration-150 ease-paper";
 
 const VARIANT: Record<ChipVariant, string> = {
   nav: "font-medium text-ink hover:bg-desk",
