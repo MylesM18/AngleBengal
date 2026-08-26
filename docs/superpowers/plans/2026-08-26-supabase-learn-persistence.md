@@ -1013,7 +1013,7 @@ git commit -m "Add the Postgres importer and migrate dev.db content with cuids p
   `glyph: string`. Both are the ROOT's glyph, already inherited down the tree,
   so no caller ever hashes a name again.
 
-- [ ] **Step 1: Carry the glyph on `TopicNode`**
+- [x] **Step 1: Carry the glyph on `TopicNode`**
 
 In `src/lib/topics.ts`, add the import:
 
@@ -1069,7 +1069,7 @@ and immediately before the existing `sortByName(roots)` call, add:
 
 In `getTopicTree`, add `symbol: { select: { glyph: true } },` to the `select`.
 
-- [ ] **Step 2: Carry the glyph on `TopicDetail`**
+- [x] **Step 2: Carry the glyph on `TopicDetail`**
 
 Still in `src/lib/topics.ts`, add `glyph: string;` to the `TopicDetail` type
 (after `slug`), and add `depth: number;` to each entry of its `modelDocs` array
@@ -1093,7 +1093,7 @@ type. Then in `getTopicDetail`:
 - add `glyph: root?.symbol?.glyph ?? DEFAULT_GLYPH,` to the returned object, and
   `depth: doc.depth,` inside the `modelDocs.map`.
 
-- [ ] **Step 3: Read the glyph in both pages**
+- [x] **Step 3: Read the glyph in both pages**
 
 `src/app/(tabs)/learn/page.tsx`: change the import on line 10 to
 `import { accentForRoot } from "@/lib/topicColors";` and line 93 to
@@ -1104,7 +1104,7 @@ type. Then in `getTopicDetail`:
 line 43 (`const glyph = glyphForRoot(...)`). Replace the single use at the
 subtopic cover with `glyph={topic.glyph}`.
 
-- [ ] **Step 4: Give new roots a symbol at creation time**
+- [x] **Step 4: Give new roots a symbol at creation time**
 
 In `src/lib/models/generate.ts`, add the import:
 
@@ -1134,7 +1134,7 @@ and inside `resolveTopic`, replace the `prisma.topic.create` call with:
     });
 ```
 
-- [ ] **Step 5: Delete the hardcoded map**
+- [x] **Step 5: Delete the hardcoded map**
 
 In `src/lib/topicColors.ts`, delete the `TOPIC_GLYPHS` const, the
 `GLYPH_OVERFLOW` const, the `glyphForRoot` function, and the doc comment block
@@ -1142,7 +1142,14 @@ that introduces them (lines 53 to 81). `TOPIC_ACCENTS`, `OVERFLOW`,
 `ACCENT_VAR` and `accentForRoot` stay exactly as they are: the owner scoped
 this to symbols only.
 
-- [ ] **Step 6: Verify the map is gone and nothing references it**
+- [x] **Step 6: Verify the map is gone and nothing references it**
+
+> The grep as printed cannot return empty: `glyphForRoot` is a substring of
+> `glyphForRootName`, which Step 4 of this same task deliberately imports. Run
+> it word-anchored instead. `grep -rnE "glyphForRoot\b|TOPIC_GLYPHS|GLYPH_OVERFLOW" src/ prisma/`
+> returns only the two explanatory comments this plan dictated writing
+> (`src/lib/topics.ts:75`, `prisma/import-postgres.ts:158`). No code reference
+> to the hardcoded map survives.
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && grep -rn "glyphForRoot\|TOPIC_GLYPHS\|GLYPH_OVERFLOW" src/ prisma/ ; echo "exit=$?"
@@ -1150,7 +1157,13 @@ cd /Users/newmac/Desktop/AngleBengal && grep -rn "glyphForRoot\|TOPIC_GLYPHS\|GL
 
 Expected: no output and `exit=1`.
 
-- [ ] **Step 7: Gates, then compare the covers against the screenshots you took in Phase 1**
+- [x] **Step 7: Gates, then compare the covers against the screenshots you took in Phase 1**
+
+> `npx tsc --noEmit` exit 0, `npm run build` exit 0. In the browser: the six
+> covers read `x` Algebra, `▲` Geometry, `θ` Trigonometry, `ƒ` Precalculus,
+> `∫` Calculus, `Σ` Statistics & Probability. Algebra's four subtopic covers
+> all wear `x`. Calculus > Applications shows `∫ Optimization` and
+> `∫ Related Rates`, not a hash of "Applications".
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit && npm run build && npm run dev
@@ -1162,7 +1175,7 @@ Probability respectively. Open Algebra and confirm its subtopic covers all wear
 `x`. Open Calculus > Applications and confirm its subtopic covers wear `∫`, not
 a hash of "Applications".
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/lib/topics.ts src/lib/topicColors.ts src/lib/models/generate.ts "src/app/(tabs)/learn/page.tsx" "src/app/(tabs)/learn/[topicId]/page.tsx"
