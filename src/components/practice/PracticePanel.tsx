@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { snapshotSketch } from "@/components/sketchpad/Sketchpad";
-import { SketchpadUnavailableNote } from "@/components/sketchpad/SketchpadUnavailableNote";
 import { BaseBand } from "@/components/ui/BaseBand";
 import { Button } from "@/components/ui/Button";
 import { chipClasses } from "@/components/ui/Chip";
@@ -446,10 +445,6 @@ export function PracticePanel({
           </div>
         )}
 
-        {/* Below `lg` the sketchpad pane is display:none, so this explains the
-            absence. Inside the scroll flow rather than pinned to the viewport
-            bottom, so it follows the content it refers to. */}
-        <SketchpadUnavailableNote />
       </div>
     </div>
   );

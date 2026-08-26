@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { Sketchpad } from "@/components/sketchpad/Sketchpad";
 import { Chip } from "@/components/ui/Chip";
@@ -50,15 +50,76 @@ export function PracticeWorkspace({
   const isDesktop = useIsDesktop();
   const [sketchOpen, setSketchOpen] = useState(false);
   const [statementMd, setStatementMd] = useState<string | null>(null);
+  const sketchButtonRef = useRef<HTMLButtonElement | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const returnFocusToSketch = useRef(false);
 
-  /** Inserting from the clean copy closes compact sketch mode; harmless at lg. */
+  /** The one exit. All three ways out route through it so focus return is
+   *  written once: Done, Escape, and Use as answer. */
+  const closeSketch = useCallback(() => {
+    returnFocusToSketch.current = true;
+    setSketchOpen(false);
+  }, []);
+
+  /** Inserting from the clean copy leaves compact sketch mode through the same
+   *  exit as Done, so the answer lands and focus comes back. Harmless at lg,
+   *  where there is no sketch mode to close and no button to focus. */
   const insertAnswer = useCallback(
     (latex: string) => {
       setAnswer((current) => ({ ...current, single: insertionValue(latex, answerType) }));
-      setSketchOpen(false);
+      closeSketch();
     },
-    [answerType],
+    [answerType, closeSketch],
   );
+
+  /**
+   * Escape closes sketch mode, matching the tutor drawer (ChatDrawer, D-049).
+   * No Tab trap for the same reason the drawer has none: this is a takeover
+   * over a workspace, not a modal that owns a decision. The listener is on
+   * `document` rather than on the overlay because nothing moves focus into
+   * the overlay on open, so a listener bound to the overlay would never see
+   * the key.
+   *
+   * The nested-dialog guard is load bearing. The sketch toolbar's Clear
+   * confirm is itself a `role="dialog"` with its own Escape handler, and
+   * `stopPropagation` there cannot save us: this app renders `<html>`, so
+   * React's root listener sits on `document` too, and stopping propagation
+   * never stops a listener on the same node (that would need
+   * `stopImmediatePropagation`). Without this guard one Escape dismissed the
+   * confirm and tore down the whole canvas behind it. Reading the nested
+   * dialog off `event.target` rather than querying the DOM keeps it immune to
+   * whether React has already flushed the popover's removal.
+   */
+  useEffect(() => {
+    if (!sketchOpen) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      const dialog = (event.target as HTMLElement | null)?.closest('[role="dialog"]');
+      // A dialog inside sketch mode owns Escape while it is open.
+      if (dialog && dialog !== overlayRef.current) return;
+      closeSketch();
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [sketchOpen, closeSketch]);
+
+  /**
+   * Focus return, the drawer's behavior adapted to a control that unmounts.
+   *
+   * AppShell can focus the Tutor chip synchronously inside its close handler
+   * because the chip stays mounted behind the drawer. The Sketch button does
+   * not: it is gated on `!sketchOpen`, so at the moment of closing the ref is
+   * still null. Waiting for the commit that remounts the button is the whole
+   * point of doing this in an effect. The ref flag keeps it to deliberate
+   * closes, so a first paint never steals focus.
+   */
+  useEffect(() => {
+    if (sketchOpen || !returnFocusToSketch.current) return;
+    returnFocusToSketch.current = false;
+    sketchButtonRef.current?.focus();
+  }, [sketchOpen]);
 
   return (
     <div
@@ -109,6 +170,7 @@ export function PracticeWorkspace({
 
       {isDesktop === false && !sketchOpen && (
         <button
+          ref={sketchButtonRef}
           type="button"
           onClick={() => setSketchOpen(true)}
           className="absolute right-4 bottom-4 z-10 flex h-11 items-center gap-2 rounded-chip bg-ink px-4 text-ui-lg font-semibold text-paper-0 shadow-lift transition-transform duration-150 ease-paper active:translate-y-px"
@@ -131,12 +193,14 @@ export function PracticeWorkspace({
       */}
       {isDesktop === false && sketchOpen && (
         <div
+          ref={overlayRef}
           role="dialog"
+          aria-modal="true"
           aria-label="Sketchpad"
           className="fixed inset-0 z-30 flex flex-col overscroll-contain bg-paper-0 pt-safe pb-safe"
         >
           <header className="flex h-12 shrink-0 items-center gap-2 bg-paper-1 px-2 shadow-sheet">
-            <Chip variant="action" icon="close" onClick={() => setSketchOpen(false)}>
+            <Chip variant="action" icon="close" onClick={closeSketch}>
               Done
             </Chip>
             <span className="flex-1" />
