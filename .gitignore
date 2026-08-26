@@ -17,11 +17,18 @@ next-env.d.ts
 /prisma/dev.db*
 
 # env
-# .env is committed on purpose: it holds only the local SQLite path, no secret,
-# so a fresh clone runs with just OPENAI_API_KEY set (build plan Phase 0, AC1).
-# The key itself lives in .env.local, which is never committed.
+# .env is NOT committed. It now holds the Supabase connection strings, and a
+# Supabase URL embeds the database password. The Prisma CLI reads .env and does
+# not read .env.local, so both DATABASE_URL and DIRECT_URL have to live there.
+# Copy .env.example and fill it in. This retires build plan Phase 0 AC1
+# ("a fresh clone runs with just OPENAI_API_KEY set"), which a remote database
+# ends regardless of how the secrets are filed.
+.env
 .env.local
 .env*.local
+
+# local rollback artifacts: dump.json carries every row of dev.db, sketches included
+/prisma/backup/
 
 # misc
 .DS_Store
