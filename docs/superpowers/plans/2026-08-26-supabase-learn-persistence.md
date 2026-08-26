@@ -1722,7 +1722,7 @@ topic that holds exactly one document.
   - `docTabsHref(topicId: string, open: string[], active: string): string`
   - `closeTabHref(topicId: string, open: string[], active: string, closing: string): string`
 
-- [ ] **Step 1: Write the module**
+- [x] **Step 1: Write the module**
 
 Create `src/lib/learn/docTabs.ts`:
 
@@ -1807,7 +1807,7 @@ export function closeTabHref(
 }
 ```
 
-- [ ] **Step 2: Exercise every branch before wiring any UI to it**
+- [x] **Step 2: Exercise every branch before wiring any UI to it**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsx -e '
@@ -1837,7 +1837,10 @@ Expected: every line starts `ok`. Fix `docTabs.ts` until they do. Note
 `URLSearchParams` percent-encodes the comma to `%2C`; that is fine and decodes
 back to a comma, and the expectations above assume it.
 
-- [ ] **Step 3: Typecheck and commit**
+> **Result (2026-08-26).** All 14 lines returned `ok` on the first run, with the
+> module written exactly as printed. No edits were needed.
+
+- [x] **Step 3: Typecheck and commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit
