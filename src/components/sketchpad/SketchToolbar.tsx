@@ -329,6 +329,11 @@ export function SketchToolbar({
               // either side, whatever the toolbar's actual width or row
               // count. `lg` and up keeps the original anchor: `left-0
               // top-full` off the Clear chip.
+              // Invariant: `top-full` resolves against the whole strip, so
+              // this lands flush under Clear only because Undo, Clear, and
+              // Clean up currently always share the toolbar's last wrapped
+              // row; adding or reordering a toolbar control should recheck
+              // that this row-wrap assumption still holds.
               className="absolute left-0 top-full z-20 mt-2 w-64 max-lg:inset-x-3 max-lg:mx-auto"
             >
               <Sheet tone="paper-0" lift className="flex flex-col gap-3 p-3">

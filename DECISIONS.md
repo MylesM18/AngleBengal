@@ -1230,19 +1230,33 @@ judgment calls not spelled out in the brief.
 `aria-current="page"` on the active one, which "Main tabs" describes more
 precisely than the bare "Main."
 
-**The Clear/Keep popover's real bug was positioning, not just packing.**
-The brief framed this as the same hit-area-overlap problem Task 7 fixed on
-the sketch toolbar's chips. Testing found something worse underneath: the
-popover is anchored `absolute` to the ~70px Clear-chip wrapper, and that
-wrapper's position in the toolbar depends on how many rows the toolbar
-wraps to, which depends on viewport width. At 390px (one row, Clear sits
-near the end) the popover's `w-64` box landed with its right edge 169px
-past the viewport edge, taking the Keep button with it: not overlapped,
-not mis-tappable, entirely off-screen and unreachable. At 360px (two rows,
-Clear sits near the start) the same code happened to fit, which is
-presumably why nobody caught it. Widening the gap between Clear and Keep,
-the fix the brief pointed at, would not have touched this: the buttons
-were never the problem, the anchor was.
+**The Clear/Keep popover's real bug was an anchor tied to row wrap, not
+just packing.** The brief framed this as the same hit-area-overlap problem
+Task 7 fixed on the sketch toolbar's chips. Testing found a second issue
+underneath: the popover is anchored `absolute` to the ~70px Clear-chip
+wrapper, and that wrapper's position in the toolbar depends on how many
+rows the toolbar wraps to, which depends on viewport width.
+
+**Correction, added in the Task 9 fix round:** the version of this entry
+first written here claimed the popover landed 169px past the viewport
+edge at 390px, with the Keep button entirely off-screen and unreachable,
+citing `left: 303.1, right: 559.1` as the measured rect. An independent
+review reconstructed the pre-fix classes against the real code and
+content at 360, 390, 1000, and 1023px and could not reproduce that: the
+popover fit on screen every time, with 18 to 48px of clearance. The cited
+numbers match what a stale dev bundle missing Task 7's `max-lg:gap-5`
+would produce, so that original measurement is presumed to have been
+taken against a stale Turbopack chunk (the known "edit appears not to
+apply until you touch the source file" trap) rather than the real
+pre-fix code, and should not be treated as verified.
+
+The defensible statement of the pre-existing defect is narrower: neither
+the Clear-confirm nor the Keep button carried a hit-area extension at all
+(`Button` never carries `tap-target` by default), and the popover's
+anchor point depended on where the Clear chip happened to land within the
+row wrap rather than being fixed. Widening the gap between Clear and
+Keep, the fix the brief pointed at, would not have addressed that
+dependency: the buttons' gap was never the mechanism, the anchor was.
 
 Fixed by moving the popover's containing block on compact from the small
 Clear-chip wrapper to the toolbar strip itself (`stripRef` gets

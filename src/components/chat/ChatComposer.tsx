@@ -71,13 +71,19 @@ export function ChatComposer({
           placeholder="Ask the tutor..."
           className="min-w-0 flex-1 resize-none rounded-input bg-paper-0 px-3 py-2 text-ui text-ink placeholder:text-ink-faint disabled:opacity-60"
         />
+        {/* size="sm" Button is 24px tall regardless of label width, so it
+            fails the 44px floor vertically on its own, the same gap
+            "Clean up" in SketchToolbar.tsx and the TopBar wordmark link
+            close. Its only neighbor is the textarea at gap-1.5 (6px);
+            hit-tested at 390px that Send's tap-target owns its own box and
+            does not steal the gap from the textarea (task-9-report.md). */}
         <Button
           variant="primary"
           size="sm"
           tone="plum"
           onClick={onSend}
           disabled={!canSend}
-          className="shrink-0"
+          className="shrink-0 max-lg:tap-target"
         >
           Send
         </Button>
