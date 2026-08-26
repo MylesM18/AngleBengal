@@ -87,7 +87,8 @@ chat/        ChatDrawer, ChatMessageList, ChatComposer, SessionMenu
 - Every AI-backed action has pending / success / typed-failure-with-retry states.
 - KaTeX render errors (bad LaTeX) render the raw string in a subtle mono style rather than crashing (`errorColor` + `throwOnError:false`).
 - Keyboard: problem Submit on Enter when answer input focused; Learn tree navigable by arrows.
-- Accessibility floor: all toolbar buttons labeled, focus states visible, drawer traps focus, canvas has a text alternative summarizing tool state.
+- Accessibility floor: all toolbar buttons labeled, focus states visible, canvas has a text alternative summarizing tool state.
+- Overlay behavior, as actually built: neither the tutor drawer nor the compact sketch overlay traps Tab. Each is `role="dialog"`, Escape closes it, and focus returns to the control that opened it (the Tutor chip, the Sketch button). Tab can still reach the chrome behind the overlay, and the covered chrome is not marked `inert`. This modality gap is known and deferred, not an oversight: it is recorded here so a later reader does not take "drawer traps focus" as a shipped guarantee (see D-049 and D-076).
 
 ## Modernization addendum (2026-08-21)
 
@@ -97,4 +98,4 @@ That spec's section 3d supersedes the model-doc reader described in §2 (numbere
 
 ## Mobile layouts (2026-08-25)
 
-Two layout worlds split at lg (1024px); see docs/superpowers/specs/2026-08-25-mobile-responsive-design.md for the full design. Compact (below lg): a bottom tab bar carries Learn, Practice, and Settings; the top bar keeps the wordmark and the Tutor chip; the tutor opens as a full-screen takeover (still a drawer, never a tab); Learn navigates by drill-down with a linked breadcrumb; Practice is problem-home with a full-screen sketch mode behind a Sketch button, topped by a one-line problem ribbon. Full (lg and up): the desktop layout, unchanged. Touch polish (44px tap-target hit areas, pen-priority palm rejection, safe-area padding) applies at every size and is visually inert.
+Two layout worlds split at lg (1024px); see docs/superpowers/specs/2026-08-25-mobile-responsive-design.md for the full design. Compact (below lg): a bottom tab bar carries Learn, Practice, and Settings; the top bar keeps the wordmark and the Tutor chip; the tutor opens as a full-screen takeover (still a drawer, never a tab); Learn navigates by drill-down with a linked breadcrumb; Practice is problem-home with a full-screen sketch mode behind a Sketch button, topped by a one-line problem ribbon. Full (lg and up): the desktop layout, unchanged apart from the breadcrumb, which became linked at every width so compact drill-down has a back affordance (D-075). Touch polish (44px tap-target hit areas, pen-priority palm rejection, safe-area padding) is compact only, gated behind `max-lg:`, and visually inert. It is not applied at lg and up: an unconditional 44px overlay overlapped the tight desktop chip gaps and made the edge of one chip select its neighbor (D-071, D-074). A few compact controls are still under 44px by decision, listed in the mobile spec's §6.

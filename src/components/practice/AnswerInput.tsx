@@ -12,6 +12,13 @@ import { MarkdownMath } from "@/components/shared/MarkdownMath";
  * Multi values are submitted as a JSON object keyed by part name, which is
  * what `compareToAnswer` expects and what makes "grade both parts by name"
  * true rather than positional.
+ *
+ * Every field here carries `max-lg:py-3`. An `<input>` is a replaced element,
+ * so `tap-target` cannot help it (it renders no `::after`): the only way to
+ * reach the 44px touch floor is real padding. At the desktop values these
+ * measure about 39px tall, which the practice loop runs on at 390x844
+ * (acceptance criterion 2), so the padding grows on compact only and `lg` and
+ * up keeps today's exact box.
  */
 
 export type AnswerShape = {
@@ -91,7 +98,7 @@ export function AnswerInput({
                   })
                 }
                 onKeyDown={onKeyDown}
-                className={`w-[130px] rounded-input border bg-paper-0 px-2.5 py-1.5 text-ui text-ink disabled:opacity-60 ${
+                className={`w-[130px] rounded-input border bg-paper-0 px-2.5 py-1.5 text-ui text-ink disabled:opacity-60 max-lg:py-3 ${
                   match === undefined
                     ? "border-ink-faint"
                     : match
@@ -131,7 +138,7 @@ export function AnswerInput({
             onChange={(event) => onChange({ ...value, single: event.target.value })}
             onKeyDown={onKeyDown}
             placeholder="e.g. 30t = 12(t + 1.5)"
-            className="min-w-0 flex-1 rounded-input border border-ink-faint bg-paper-0 px-3 py-2 font-mono text-ui text-ink placeholder:text-ink-faint disabled:opacity-60"
+            className="min-w-0 flex-1 rounded-input border border-ink-faint bg-paper-0 px-3 py-2 font-mono text-ui text-ink placeholder:text-ink-faint disabled:opacity-60 max-lg:py-3"
           />
         </div>
         {value.single.trim() && (
@@ -157,7 +164,7 @@ export function AnswerInput({
         onChange={(event) => onChange({ ...value, single: event.target.value })}
         onKeyDown={onKeyDown}
         placeholder="Your answer"
-        className="w-[180px] rounded-input border border-ink-faint bg-paper-0 px-3 py-2 text-ui text-ink placeholder:text-ink-faint disabled:opacity-60"
+        className="w-[180px] rounded-input border border-ink-faint bg-paper-0 px-3 py-2 text-ui text-ink placeholder:text-ink-faint disabled:opacity-60 max-lg:py-3"
       />
       {shape.unit && <span className="text-meta text-ink-soft">{shape.unit}</span>}
     </div>

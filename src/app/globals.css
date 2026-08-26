@@ -158,15 +158,11 @@ body {
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
-@utility pl-safe {
-  padding-left: env(safe-area-inset-left);
-}
-@utility pr-safe {
-  padding-right: env(safe-area-inset-right);
-}
-@utility tap-highlight-none {
-  -webkit-tap-highlight-color: transparent;
-}
+/* `pl-safe` / `pr-safe` and `tap-highlight-none` were defined here and never
+ * used: nothing in the app needs a horizontal inset (no edge chrome is pinned
+ * left or right), and tap-highlight suppression shipped as a `body` rule
+ * above, which is where it belongs. Removed rather than left as dead API for
+ * a future reader to assume is load bearing. See D-068. */
 @utility tap-target {
   position: relative;
   &::after {

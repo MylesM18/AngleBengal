@@ -46,8 +46,23 @@ export const metadata: Metadata = {
   icons: { icon: "/anglebengal-mark.svg", apple: "/apple-touch-icon.png" },
 };
 
-/** Mobile spec §7: edge-to-edge rendering with safe-area insets, and the iOS
- *  keyboard resizing the layout viewport so pinned composers stay visible. */
+/**
+ * Mobile spec §7: edge-to-edge rendering with safe-area insets, plus
+ * `interactive-widget=resizes-content` so an on-screen keyboard shrinks the
+ * layout viewport instead of covering the pinned composer.
+ *
+ * What that key does and does not buy, stated precisely because an earlier
+ * version of this comment overclaimed it: `interactive-widget` is a Chromium
+ * viewport key. It is honored on Android Chrome, where the keyboard resizes
+ * the layout viewport and every `dvh`-based layout reflows above it. WebKit
+ * ignores the key: iOS Safari resizes only the visual viewport, leaving the
+ * layout viewport and `dvh` unchanged when the keyboard opens. So on iOS the
+ * composer's position is NOT established by this, and no verification of the
+ * iOS case has been done here (no device, and emulation cannot reproduce it).
+ * The key stays because it is correct and helps on Chromium; the iOS keyboard
+ * behavior is unverified and sits on the owner's real-device checklist
+ * (spec §7, acceptance criterion 4).
+ */
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,

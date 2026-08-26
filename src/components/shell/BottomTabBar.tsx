@@ -24,7 +24,11 @@ export function BottomTabBar() {
   return (
     <nav
       aria-label="Main tabs"
-      className="z-20 flex shrink-0 bg-paper-1 pb-safe shadow-sheet-up lg:hidden"
+      // `relative`: `z-20` only means something on a positioned element, and
+      // without it the upward shadow was painted over by whatever the page
+      // rendered above the bar (it showed on Learn, not on Practice, whose
+      // background box won the paint order).
+      className="relative z-20 flex shrink-0 bg-paper-1 pb-safe shadow-sheet-up lg:hidden"
     >
       {TABS.map((tab) => (
         <Link

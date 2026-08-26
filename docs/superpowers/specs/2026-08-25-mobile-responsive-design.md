@@ -24,7 +24,7 @@ Also approved: a minimal web-app manifest (installable, standalone display), wit
 - Every screen works and feels native at 390x844, down to a 360px width floor.
 - The full practice loop (get problem, sketch, answer, check, diagnose) is completable one-handed on a phone.
 - The sketchpad becomes a first-class touch and Pencil surface.
-- Desktop (`lg+`) renders exactly as it does today.
+- Desktop (`lg+`) renders exactly as it does today, with one accepted exception: the breadcrumb (see §3 and D-075).
 
 ## Non-goals
 
@@ -45,11 +45,13 @@ Also approved: a minimal web-app manifest (installable, standalone display), wit
 - `AppShell` switches `h-screen` to `h-dvh` so the iOS collapsing URL bar does not cause layout jumps.
 - New `src/components/shell/BottomTabBar.tsx`: Learn, Practice, Settings. 56px tall plus `env(safe-area-inset-bottom)`. Paper-1, sheet shadow, active state from the Swatch Book tokens. `lg:hidden`.
 - `TopBar`: nav chips hidden below `lg` (`hidden lg:flex` on the nav), mark + wordmark + Tutor chip remain. All top bar controls reach a 44px effective hit area on compact.
-- Tutor (`ChatDrawer`): below `lg` the panel becomes `inset-0` (full-screen). Its header carries the topic context label and the close control. Focus return to the Tutor chip is unchanged. The composer stays pinned above the keyboard (dvh-based layout; `interactive-widget=resizes-content` in the viewport meta).
+- Tutor (`ChatDrawer`): below `lg` the panel becomes `inset-0` (full-screen). Its header carries the topic context label and the close control. Focus return to the Tutor chip is unchanged. The composer is pinned to the bottom of a `dvh`-based layout, with `interactive-widget=resizes-content` in the viewport meta.
+  - **Correction (post-implementation review).** `interactive-widget` is a Chromium viewport key. On Android Chrome it makes the keyboard shrink the layout viewport, so the `dvh` layout reflows and the composer stays visible. WebKit ignores it: iOS Safari resizes the visual viewport only, and the layout viewport (and therefore `dvh`) does not change when the keyboard opens. The composer's behavior on iOS is **unverified** and is on the owner's real-device checklist, not a shipped guarantee. The key stays because it is correct where it is honored.
 
 ### 3. Learn
 
 - Compact navigation is drill-down: `/learn` shelf, branch screens listing children, then the reader. The existing breadcrumb is the back affordance. The rail stays `hidden` below `lg` and unchanged above it.
+  - **Accepted deviation from "desktop renders exactly as today" (post-implementation review).** Making the breadcrumb a real back affordance changed it at every width, not just below `lg`: `Breadcrumb.tsx` gained a leading "Learn" link, turned every ancestor segment into a link, replaced the double-spaced `path.join("  ›  ")` string with `gap-1.5` segments, and added `flex-wrap`. None of it is breakpoint-gated, so 1280px sees it too. It is kept deliberately: it is the mechanism that makes compact drill-down navigable, and a breadcrumb whose ancestors are dead text on desktop and links on a phone would be two different components. This is the one place goal 4 ("Desktop renders exactly as it does today") is knowingly not met. See D-075.
 - Reader hygiene: in the shared markdown component (`MarkdownMath.tsx`), display-math KaTeX blocks and GFM tables get `overflow-x-auto` wrappers so wide content scrolls sideways instead of stretching the page.
 - History page collapses to a single column.
 
@@ -68,7 +70,9 @@ Also approved: a minimal web-app manifest (installable, standalone display), wit
 
 ### 6. Touch targets and type
 
-- All interactive chrome reaches a 44px effective hit area via visually inert hit-area extension (padding or pseudo-element), at every size so iPad landscape benefits too. Chip visuals stay at their Swatch Book sizes; rendered pixels do not change on desktop.
+- Interactive chrome reaches a 44px effective hit area via visually inert hit-area extension (padding or pseudo-element). Chip visuals stay at their Swatch Book sizes; rendered pixels do not change on desktop.
+- **Amended to what shipped (post-implementation review).** The hit areas are **compact only** (`max-lg:`), not "at every size". Applying them at `lg` and up put a 44px overlay on chips whose desktop rows keep 4px gaps, and under D-071 the overlapping halves are won by whichever control is later in DOM order: the right edge of each difficulty chip selected the next difficulty, on desktop as well as on a phone. Gating to `max-lg:` restores desktop's exact pre-project hit-testing and keeps the benefit where fingers are. The cost is that iPad landscape no longer gets enlarged hit areas, which is acceptable: decision 6 above deliberately gives iPad landscape the desktop layout (D-067). The "at every size" phrasing was an authoring detail, not an owner requirement, and it lost to shipping a control that does not mis-select. See D-074.
+- **Known exceptions, deliberately not fixed in this project.** These compact controls stay under 44px: the Learn shelf's generate `<input>` and its Generate button (`tap-target` cannot extend a replaced element), the breadcrumb links, and the 24px `size="sm"` tertiary link-buttons ("History", "Show all attempts"). All predate this project and are wide text targets rather than small icon ones. See D-076.
 - No new arbitrary values: all sizing uses the existing six-token type scale and token spacing. The D-046 discipline (zero `text-[` in `src/`) holds.
 
 ### 7. Platform plumbing
@@ -92,11 +96,11 @@ No new failure modes. Existing retry states carry over and get verified at phone
 ## Acceptance criteria
 
 1. No horizontal body scroll on any screen at 360px width.
-2. The full practice loop is completable one-handed at 390x844.
+2. The full practice loop is completable one-handed at 390x844. Every control the loop runs on (difficulty chips, answer fields, Submit, Skip, Show solution, Try again, Next problem, the Sketch button and the sketch toolbar) reaches a 44px hit area on compact, and no two of them have overlapping hit areas. The exceptions in §6 are outside the loop and stay under 44px.
 3. Sketch-mode ink survives mode flips, tab switches within the session, and the OCR round trip.
-4. The keyboard never covers the chat composer or the answer input on iOS Safari.
-5. Palm rejection: with a pen active, a resting palm produces no strokes.
-6. Desktop at 1280px renders pixel-identical to today (visual spot check).
+4. The keyboard never covers the chat composer or the answer input. **Owner-verified only:** this holds on Chromium by construction (`interactive-widget=resizes-content` plus the `dvh` layout), but iOS Safari ignores that key, so the iOS case is unverified and belongs to the real-device pass below, not to this project's shipped evidence (see §2).
+5. Palm rejection: with a pen active, a resting palm produces no strokes. Verified here only against synthesized pointer sequences (a `pen` pointerdown interleaved with `touch` pointermoves); real Pencil hardware is on the owner's checklist.
+6. Desktop at 1280px renders pixel-identical to today (visual spot check), except the breadcrumb (§3, D-075). Desktop hit-testing is also unchanged: the 44px overlays are `max-lg:` gated (§6, D-074).
 7. `npm run build`, `npm run lint`, and `npx tsc --noEmit` pass.
 
 ## Test plan

@@ -65,8 +65,11 @@ export function DiagnosisCard({
         </div>
       </div>
 
+      {/* `max-lg:gap-3` on the action row: the buttons passed in here carry a
+          compact hit area (see PracticePanel's `terminalActions`), and 32px
+          controls need 12px of clearance under D-071 once they do. */}
       {actions ? (
-        <div className="flex flex-wrap gap-2 border-t border-hairline px-4 py-3">
+        <div className="flex flex-wrap gap-2 border-t border-hairline px-4 py-3 max-lg:gap-3">
           {actions}
         </div>
       ) : null}

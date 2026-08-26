@@ -30,7 +30,10 @@ export function TopBar({ chatOpen, onToggleChat, tutorRef }: TopBarProps) {
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header className="z-20 flex h-12 shrink-0 items-center gap-3 bg-paper-1 px-2 shadow-sheet">
+    // `relative` for the same reason as BottomTabBar: `z-20` is inert on a
+    // static element, so the header's sheet shadow had no guaranteed place in
+    // the paint order over the page below it.
+    <header className="relative z-20 flex h-12 shrink-0 items-center gap-3 bg-paper-1 px-2 shadow-sheet">
       <Link
         href="/learn"
         className="flex items-center gap-2 rounded-chip px-1 max-lg:tap-target"

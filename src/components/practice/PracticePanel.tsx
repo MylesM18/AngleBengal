@@ -266,6 +266,7 @@ export function PracticePanel({
       <>
         <Button
           variant="secondary"
+          className="max-lg:tap-target"
           onClick={() => {
             setOutcome(null);
             setError(null);
@@ -273,7 +274,9 @@ export function PracticePanel({
         >
           Try again
         </Button>
-        <Button onClick={() => loadProblem()}>Next problem</Button>
+        <Button className="max-lg:tap-target" onClick={() => loadProblem()}>
+          Next problem
+        </Button>
       </>
     ) : null;
 
@@ -297,7 +300,18 @@ export function PracticePanel({
         />
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+      {/* `max-lg:pb-20`: on compact the Sketch button floats over this
+          scroller at `right-4 bottom-4` and is 44px tall, so it owns the
+          bottom 60px of the panel's right side. Measured at 360px with a
+          revealed solution, the 20px `p-5` bottom padding let content run to
+          y=724 against a button spanning y=684 to 728, and put the terminal
+          "Next problem" button's right edge (x=235.7) 1.4px from the button's
+          left edge (x=237.1). Nothing was actually covered at 360 or 390px
+          (those controls are left-aligned and the button is not), so this is
+          clearance, not a repair: 80px of padding moves the last content 36px
+          clear of the button instead of 1.4px. `lg` and up has no floating
+          button and keeps `p-5`. */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-5 max-lg:pb-20">
         {loading ? (
           <ProblemSkeleton />
         ) : !problem ? (
@@ -335,7 +349,18 @@ export function PracticePanel({
                 <MarkdownMath variant="reading">{problem.statementMd}</MarkdownMath>
 
                 {problem.modelTags.length > 0 && (
-                  <ul className="mt-3 flex flex-wrap gap-1.5">
+                  /* `max-lg:gap-y-5`, and only the y axis. These tags are
+                     meta chips, so on compact each carries a 44px hit area
+                     while rendering 24px tall: 10px of vertical spillover per
+                     side, against a 6px `gap-1.5` row gap, so the bottom 4px
+                     of every tag's visible box opened the NEXT tag's document.
+                     20px of row gap removes the overlap. The horizontal axis
+                     needs nothing: the chip is as wide as a model title, which
+                     measured 281 to 318px here at 360 and 390px, far past the
+                     44px floor, so there is no horizontal spillover to steal
+                     a neighbor's clicks. A tag short enough to fall under 44px
+                     wide would need `max-lg:gap-x-*` too. */
+                  <ul className="mt-3 flex flex-wrap gap-1.5 max-lg:gap-y-5">
                     {problem.modelTags.map((tag) => (
                       <li key={`${tag.docId}-${tag.modelNumber}`} className="min-w-0 max-w-full">
                         <Link
@@ -366,11 +391,34 @@ export function PracticePanel({
                 onSubmit={() => void submit()}
               />
 
-              <div className="flex flex-wrap items-center gap-2">
-                <Button loading={submitting} disabled={locked} onClick={() => void submit()}>
+              {/* The practice loop's own control row, which acceptance
+                  criterion 2 (one-handed at 390x844) runs on. `Button` at
+                  size="md" is 32px tall, so each control gets the hit area
+                  here rather than in `Button`'s BASE: baking it in would
+                  repeat the bug Chip had, giving every button in the app an
+                  overlay next to neighbors nobody audited (D-074, D-076).
+                  `max-lg:gap-3` satisfies D-071 on both axes: a 32px control
+                  spills (44 - 32) / 2 = 6px past each edge, which the 8px
+                  `gap-2` did not clear. Measured, the three buttons total
+                  234px and do NOT wrap at the 360px floor, so the vertical
+                  case is latent rather than live: the row is `flex-wrap`, so
+                  a longer label or a narrower panel would wrap it, and the
+                  row gap has to be right before that happens. */}
+              <div className="flex flex-wrap items-center gap-2 max-lg:gap-3">
+                <Button
+                  loading={submitting}
+                  disabled={locked}
+                  className="max-lg:tap-target"
+                  onClick={() => void submit()}
+                >
                   {submitting ? "Checking..." : "Submit"}
                 </Button>
-                <Button variant="tertiary" disabled={submitting} onClick={() => loadProblem()}>
+                <Button
+                  variant="tertiary"
+                  disabled={submitting}
+                  className="max-lg:tap-target"
+                  onClick={() => loadProblem()}
+                >
                   Skip
                 </Button>
                 {!locked && (
@@ -378,6 +426,7 @@ export function PracticePanel({
                     ref={revealTriggerRef}
                     variant="tertiary"
                     disabled={submitting}
+                    className="max-lg:tap-target"
                     onClick={() => setConfirmReveal(true)}
                   >
                     Show solution
@@ -430,14 +479,14 @@ export function PracticePanel({
             )}
 
             {outcome && !outcome.correct && !outcome.diagnosis && terminalActions && (
-              <div className="flex flex-wrap gap-2">{terminalActions}</div>
+              <div className="flex flex-wrap gap-2 max-lg:gap-3">{terminalActions}</div>
             )}
 
             {solutionShown && (
               <Sheet tone="paper-0" className="p-4">
                 <p className="meta-caps mb-2 text-ink-soft">Solution</p>
                 <MarkdownMath variant="reading">{solutionShown}</MarkdownMath>
-                <Button className="mt-3" onClick={() => loadProblem()}>
+                <Button className="mt-3 max-lg:tap-target" onClick={() => loadProblem()}>
                   Next problem
                 </Button>
               </Sheet>

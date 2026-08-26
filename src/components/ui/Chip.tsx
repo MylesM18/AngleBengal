@@ -6,8 +6,18 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 
 export type ChipVariant = "nav" | "meta" | "action" | "toggle";
 
+/**
+ * `max-lg:tap-target`, not `tap-target` (D-074). The 44px hit area is a
+ * compact-only affordance: unconditional, it applied at `lg` and up too, where
+ * chip rows keep their tight desktop gaps (`gap-1`, 4px). Under D-071's rule
+ * (gap >= 44 minus the control's own width) that meant every 32px chip row on
+ * desktop had hit areas overlapping by 8px, and the later chip in DOM order won
+ * the shared region: the last 2px of each difficulty chip selected the next
+ * difficulty. Gating it restores desktop to its exact pre-project hit-testing,
+ * not just its pixels.
+ */
 const BASE =
-  "tap-target inline-flex h-6 min-w-8 items-center justify-center gap-1 whitespace-nowrap rounded-chip px-2 text-ui transition-[background-color,color,box-shadow,transform] duration-150 ease-paper";
+  "max-lg:tap-target inline-flex h-6 min-w-8 items-center justify-center gap-1 whitespace-nowrap rounded-chip px-2 text-ui transition-[background-color,color,box-shadow,transform] duration-150 ease-paper";
 
 const VARIANT: Record<ChipVariant, string> = {
   nav: "font-medium text-ink hover:bg-desk",

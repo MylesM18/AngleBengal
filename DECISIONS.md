@@ -1158,6 +1158,18 @@ ad-hoc `box-shadow`, because the shadow scale is part of the paper physics
 docs/08 already governs, and a new shadow direction belongs in that system, not
 bolted on locally.
 
+**Amended 2026-08-25 (final review fix wave).** Two claims above no longer
+describe the code. First, the utility set: `pl-safe`, `pr-safe` and
+`tap-highlight-none` were defined here alongside `pt-safe` / `pb-safe` and were
+never used by anything. No element in the app is pinned to the left or right
+edge, so no horizontal inset was ever needed, and tap-highlight suppression
+shipped as a `-webkit-tap-highlight-color` rule on `body` instead. All three
+have been deleted; `pt-safe` and `pb-safe` stay, and D-070's trap still applies
+to them. Second, "applied per control rather than baked into a component" is no
+longer true of `tap-target`: `Chip.tsx` carries it in its BASE class, gated to
+`max-lg:` so `lg` and up is untouched. See D-074 for why the gate exists.
+`Button.tsx` still does not carry it, by deliberate rule (D-076).
+
 ### D-069. Palm rejection is pen-priority and session-scoped
 
 `SketchCanvas.tsx` (mobile spec §5) tracks a module-scope `penSeen` flag rather
@@ -1299,3 +1311,88 @@ the tutor composer's Send button, fixed in the Task 9 fix round
 a lone control past the 44px floor, next to exactly one neighbor at a
 tight gap, present on every tutor interaction on every compact screen.
 The Send button no longer belongs in the untouched list above.
+
+### D-074. Chip's 44px hit area is compact only
+
+`Chip.tsx` put `tap-target` in its BASE class unconditionally, so every chip in
+the app carried the 44px `::after` overlay at every width. D-071's rule (a row
+of `tap-target` controls needs `gap >= 44 minus the control's own width`, and
+the later control in DOM order wins any shared region) was only ever applied to
+the sketch toolbar, and only behind `max-lg:`. Everywhere else the overlay
+shipped over untouched desktop gaps.
+
+Measured at 1280px before the fix: the five 32px difficulty chips sit at
+`gap-1` (4px), so each hit area spilled 6px past its own edge and overlapped
+its neighbor by 8px. A `document.elementFromPoint` probe at the right edge of
+each chip's visible box returned the NEXT chip, on all four of chips 1 to 4.
+The practice panel's model-tag list (`flex-wrap gap-1.5`) had the same defect
+in its vertical axis, and the sketch toolbar's Tool and Stroke-width groups had
+it at `lg` and up, where their compact widening does not apply.
+
+Resolved by gating the utility: `max-lg:tap-target` in BASE. This is a real
+loss (iPad landscape no longer gets enlarged hit areas) accepted for a real
+gain, and the trade is one-sided: iPad landscape deliberately gets the desktop
+layout (D-067), so it was already being treated as a pointer device, while the
+overlap made a control select the wrong value for everyone. The mobile spec's
+"at every size so iPad landscape benefits too" was an authoring detail, not an
+owner requirement; it is amended in the spec to match. The gate also restores
+something the project claimed but had not actually delivered: desktop is now
+identical to its pre-project state in hit-testing, not only in rendered pixels.
+
+Gating alone does not fix the compact side, so the two rows that were still
+overlapping below `lg` got their gaps widened under the same rule:
+`DifficultySelector.tsx` to `max-lg:gap-3` (32px controls, 12px), and the
+model-tag list to `max-lg:gap-y-5` (24px-tall controls, 20px). The tag list
+needs the y axis only: the chips are as wide as a model title, measured 281 to
+318px at both 360 and 390px, so they never spill horizontally. The sketch
+toolbar needed no change: its `max-lg:gap-3` / `max-lg:gap-5` were already
+correct for compact, and its `lg+` overlap disappears with the gate.
+
+### D-075. The linked breadcrumb is an accepted desktop deviation
+
+The mobile project's goal 4 is "desktop renders exactly as it does today", and
+every padding, gap and layout change in it is breakpoint-gated to honor that.
+`Breadcrumb.tsx` is the one exception, and it is deliberate rather than an
+oversight. It gained a leading "Learn" link, turned every ancestor segment into
+a link, replaced the double-spaced `path.join("  ›  ")` string with `gap-1.5`
+segments, and added `flex-wrap`, none of it gated, so 1280px renders it too.
+
+It is kept. On compact the rail is hidden and drill-down is the only way
+through Learn, which makes the breadcrumb the only route back up: linking the
+ancestors is the mechanism that makes that navigation work, not decoration.
+Gating it would mean a breadcrumb whose ancestors are dead text on a desktop
+and links on a phone, which is two components wearing one name, and the
+desktop version is worse in its own right. Recorded here and in the spec so
+that "desktop is untouched" is not read as unqualified: this is the one place
+it is knowingly not true.
+
+### D-076. The 44px floor has named exceptions, and the overlays are not modal
+
+Two record corrections, both about claims that were broader than the code.
+
+**The 44px floor is not universal on compact.** The practice loop's own
+controls were brought up to it, because acceptance criterion 2 (completable
+one-handed at 390x844) runs on them: the answer fields take `max-lg:py-3` (an
+`<input>` is a replaced element, so `tap-target` renders no `::after` on it and
+padding is the only lever; 39px becomes 47px), and Submit / Skip / Show
+solution / Try again / Next problem take `max-lg:tap-target` at their call
+sites with `max-lg:gap-3` on their rows. These stay under the floor, by
+decision: the Learn shelf's generate `<input>` and its Generate button, the
+breadcrumb links, and the 24px `size="sm"` tertiary link-buttons ("History",
+"Show all attempts"). All predate this project and are wide text targets rather
+than small icon ones. The spec's §6 lists them.
+
+**`tap-target` still does not belong in `Button.tsx`'s BASE.** Putting it there
+would fix those exceptions in one line and would reintroduce D-074's bug across
+the whole app, since every `Button` row in every screen would gain an overlay
+without anyone auditing its gaps. Hit areas go on at the call site, with that
+row's clearance checked, or they do not go on.
+
+**Neither overlay traps focus.** docs/06 §7 listed "drawer traps focus" in its
+accessibility floor. The tutor drawer and the compact sketch overlay are both
+`role="dialog"`, both close on Escape, and both return focus to the control
+that opened them, but neither traps Tab and neither marks the chrome behind it
+`inert`, so a keyboard user can tab out of an overlay into the page underneath.
+That is a genuine modality gap. It is deferred rather than fixed here (it is an
+architectural change to how the shell renders behind an overlay, not a class
+tweak), and docs/06 now describes what is real instead of what was intended.

@@ -17,7 +17,13 @@ export function DifficultySelector({
   return (
     <div className="flex items-center gap-1.5">
       <span className="meta-caps text-ink-soft">Difficulty</span>
-      <div className="flex gap-1" role="group" aria-label="Difficulty">
+      {/* These render 32px wide, and on compact each carries a 44px hit area
+          (Chip's `max-lg:tap-target`), which spills (44 - 32) / 2 = 6px past
+          each visible edge. D-071's rule therefore asks for at least 12px
+          between neighbors; the desktop `gap-1` (4px) left them overlapping by
+          8px, so the right edge of one chip selected the next difficulty.
+          `lg` and up keeps `gap-1` and no longer has a hit area to overlap. */}
+      <div className="flex gap-1 max-lg:gap-3" role="group" aria-label="Difficulty">
         {[1, 2, 3, 4, 5].map((level) => {
           const active = level === value;
           const pool = counts[level] ?? 0;

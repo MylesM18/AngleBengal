@@ -54,6 +54,21 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
   const current = useRef<StrokePoint[]>([]);
   const drawing = useRef(false);
   const frame = useRef<number | null>(null);
+  /**
+   * The id of the pointer that owns the stroke in progress, null between
+   * strokes. Every pointer handler on the canvas checks it first.
+   *
+   * Without it, palm rejection only half works. Dropping a palm's
+   * `pointerdown` (below) does not stop the palm's later events: pointer
+   * capture is per pointer, so a resting palm still dispatches `pointermove`,
+   * `pointerup`, `pointercancel` and `pointerleave` to this canvas while the
+   * Pencil draws. Those moves passed the old `if (!drawing.current) return`
+   * check and appended the palm's coordinates to the pen's live stroke, so
+   * the ink jumped from the nib to the heel of the hand; then the palm
+   * lifting ran `endStroke` and committed that corrupted stroke, truncating
+   * the pen stroke still being drawn.
+   */
+  const activePointer = useRef<number | null>(null);
 
   /**
    * Measures the panel and keeps the canvases matched to it.
@@ -177,6 +192,11 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
     if (event.pointerType === "pen") penSeen = true;
     if (event.pointerType === "touch" && penSeen) return;
     if (event.button !== 0 && event.pointerType === "mouse") return;
+    // One stroke, one pointer. A second pointer arriving mid-stroke (the
+    // second finger of a pinch, a palm landing before any pen was seen) does
+    // not get to take the stroke over; it is ignored until the owner lifts.
+    if (activePointer.current !== null) return;
+    activePointer.current = event.pointerId;
     capturePointer(event.currentTarget, event.pointerId);
     const point = pointFrom(event);
 
@@ -192,6 +212,9 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
   }
 
   function onPointerMove(event: React.PointerEvent<HTMLCanvasElement>) {
+    // Not the pointer that started this stroke: a palm's move, or a second
+    // finger's. Its coordinates must never join the pen's stroke.
+    if (activePointer.current !== event.pointerId) return;
     if (!drawing.current) return;
     const point = pointFrom(event);
 
@@ -231,6 +254,12 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
   }
 
   function endStroke(event: React.PointerEvent<HTMLCanvasElement>) {
+    // Only the owning pointer ends the stroke. A palm lifting used to land
+    // here and commit the pen's half-finished stroke; now it is ignored, and
+    // so is the second `pointerleave` that follows the owner's own
+    // `pointerup` (the id no longer matches once it has been cleared).
+    if (activePointer.current !== event.pointerId) return;
+    activePointer.current = null;
     if (!drawing.current) return;
     drawing.current = false;
     releasePointer(event.currentTarget, event.pointerId);
