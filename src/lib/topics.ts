@@ -95,6 +95,7 @@ export type TopicDetail = {
   parentId: string | null;
   description: string | null;
   path: string[];
+  pathNodes: TopicPathNode[];
   docCount: number;
   verifiedProblemCount: number;
   modelDocs: {
@@ -107,25 +108,39 @@ export type TopicDetail = {
   children: { id: string; name: string }[];
 };
 
-/** Root-to-leaf name path, used by breadcrumbs and the generation progress row. */
-export async function getTopicPath(topicId: string): Promise<string[]> {
-  const path: string[] = [];
+/**
+ * A breadcrumb needs the id alongside the name to link each ancestor, while
+ * several other callers (prompts, chat context, practice header) only ever
+ * wanted the plain name chain. `path` keeps that exact string[] shape so
+ * none of those callers has to change; `pathNodes` is additive.
+ */
+export type TopicPathNode = { id: string; name: string };
+
+/** Root-to-leaf node path (id + name), used by breadcrumbs and the generation progress row. */
+export async function getTopicPathNodes(topicId: string): Promise<TopicPathNode[]> {
+  const pathNodes: TopicPathNode[] = [];
   let currentId: string | null = topicId;
 
   // The taxonomy is at most a handful of levels deep; the guard is only to
   // make a cyclic parent chain fail loudly instead of hanging.
   for (let depth = 0; currentId && depth < 12; depth += 1) {
-    const topic: { name: string; parentId: string | null } | null =
+    const topic: { id: string; name: string; parentId: string | null } | null =
       await prisma.topic.findUnique({
         where: { id: currentId },
-        select: { name: true, parentId: true },
+        select: { id: true, name: true, parentId: true },
       });
     if (!topic) break;
-    path.unshift(topic.name);
+    pathNodes.unshift({ id: topic.id, name: topic.name });
     currentId = topic.parentId;
   }
 
-  return path;
+  return pathNodes;
+}
+
+/** Root-to-leaf name path, used by breadcrumbs and the generation progress row. */
+export async function getTopicPath(topicId: string): Promise<string[]> {
+  const pathNodes = await getTopicPathNodes(topicId);
+  return pathNodes.map((node) => node.name);
 }
 
 export async function getTopicDetail(topicId: string): Promise<TopicDetail | null> {
@@ -146,10 +161,11 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
   });
   if (!topic) return null;
 
-  const [verifiedProblemCount, path] = await Promise.all([
+  const [verifiedProblemCount, pathNodes] = await Promise.all([
     prisma.problem.count({ where: { topicId, verified: true } }),
-    getTopicPath(topicId),
+    getTopicPathNodes(topicId),
   ]);
+  const path = pathNodes.map((node) => node.name);
 
   return {
     id: topic.id,
@@ -158,6 +174,7 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
     parentId: topic.parentId,
     description: topic.description,
     path,
+    pathNodes,
     docCount: topic.modelDocs.length,
     verifiedProblemCount,
     modelDocs: topic.modelDocs.map((doc) => ({

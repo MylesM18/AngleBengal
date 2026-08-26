@@ -62,7 +62,7 @@ export default async function LearnIndexPage() {
 
   return (
     <div className="h-full overflow-y-auto p-2">
-      <div className="grid grid-cols-1 gap-6 pt-16 lg:grid-cols-[minmax(280px,1fr)_2fr]">
+      <div className="grid grid-cols-1 gap-6 pt-8 sm:pt-16 lg:grid-cols-[minmax(280px,1fr)_2fr]">
         <header>
           <h1 className="display-cut text-display text-ink">Learn</h1>
           <p className="mt-3 max-w-[40ch] text-ui text-ink-soft">

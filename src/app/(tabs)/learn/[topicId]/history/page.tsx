@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { Breadcrumb } from "@/components/learn/Breadcrumb";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { ButtonLink } from "@/components/ui/Button";
 import { ChipLink, chipClasses } from "@/components/ui/Chip";
@@ -58,10 +59,8 @@ export default async function HistoryPage({
       : "Attempts show up here once you have practised this topic.";
 
   return (
-    <div className="mx-auto max-w-[860px] px-8 pt-16 pb-10">
-      <nav aria-label="Breadcrumb" className="mb-3 text-meta text-ink-soft">
-        {topic.path.join("  ›  ")}
-      </nav>
+    <div className="mx-auto max-w-[860px] px-4 pt-8 pb-10 sm:px-8 sm:pt-16">
+      <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />
       <h1 className="display-cut text-h1 text-ink">{title}</h1>
       <p className="mt-2 text-meta text-ink-soft">
         {plural(summary.total, "attempt")} on this topic · {summary.correct} correct · {summary.diagnosed}{" "}

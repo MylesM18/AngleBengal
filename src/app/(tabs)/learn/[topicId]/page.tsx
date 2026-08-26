@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { Breadcrumb } from "@/components/learn/Breadcrumb";
 import { DocCard } from "@/components/learn/DocCard";
 import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
 import { DocReader } from "@/components/learn/DocReader";
@@ -71,19 +71,19 @@ export default async function TopicPage({
       : "Not practiced yet";
 
     return (
-      <article className="flex justify-center gap-8 px-8 py-10">
+      <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10">
         <div className="min-w-0 max-w-[68ch] flex-1">
           <div className="mb-4 flex items-center justify-between gap-4 [&>nav]:mb-0">
-            <Breadcrumb path={topic.path} topicId={topic.id} hasSiblings={topic.docCount > 1} />
+            <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={topic.docCount > 1} />
             <ButtonLink href={`/learn/${topic.id}/history`} variant="tertiary" size="sm">
               History
             </ButtonLink>
           </div>
 
           <Sheet tone="paper-0" className="animate-enter-sheet overflow-hidden">
-            <h1 className="display-cut px-8 pb-5 pt-8 text-h1 text-ink">{doc.title}</h1>
+            <h1 className="display-cut px-4 pb-5 pt-6 text-h1 text-ink sm:px-8 sm:pt-8">{doc.title}</h1>
 
-            <div className="stock-textured flex flex-wrap items-center gap-3 border-y border-hairline bg-kraft px-8 py-2.5 text-meta text-ink">
+            <div className="stock-textured flex flex-wrap items-center gap-3 border-y border-hairline bg-kraft px-4 py-2.5 text-meta text-ink sm:px-8">
               {doc.isExemplar && (
                 <span className="inline-flex h-6 items-center rounded-chip bg-paper-0 px-2 text-ui font-medium text-ink">
                   Exemplar
@@ -95,7 +95,7 @@ export default async function TopicPage({
               <span>{lastPracticed}</span>
             </div>
 
-            <div className="px-8 py-8">
+            <div className="px-4 py-6 sm:px-8 sm:py-8">
               <ModelMissList misses={misses} />
               <DocReader contentMd={doc.contentMd} models={index} accent={accent} />
             </div>
@@ -122,8 +122,8 @@ export default async function TopicPage({
   ].join(" · ");
 
   return (
-    <div className="mx-auto max-w-[860px] px-8 pt-16 pb-10">
-      <Breadcrumb path={topic.path} topicId={topic.id} hasSiblings={false} />
+    <div className="mx-auto max-w-[860px] px-4 pt-8 pb-10 sm:px-8 sm:pt-16">
+      <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="display-cut text-h1 text-ink">{topic.name}</h1>
         {canPractice ? (
@@ -188,27 +188,6 @@ export default async function TopicPage({
         />
       ) : null}
     </div>
-  );
-}
-
-function Breadcrumb({
-  path,
-  topicId,
-  hasSiblings,
-}: {
-  path: string[];
-  topicId: string;
-  hasSiblings: boolean;
-}) {
-  return (
-    <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1.5 text-meta">
-      <span className="text-ink-soft">{path.join("  ›  ")}</span>
-      {hasSiblings && (
-        <Link href={`/learn/${topicId}`} className="ml-2 text-cobalt hover:underline">
-          All documents
-        </Link>
-      )}
-    </nav>
   );
 }
 
