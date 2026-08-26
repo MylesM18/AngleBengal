@@ -1275,17 +1275,27 @@ from their own text labels that spillover is under 2px a side.
 
 **Scope boundary: only chrome-level and newly-broken controls were fixed.**
 The sweep surfaced several other compact controls under the 44px floor:
-the Learn shelf's generate input and button, Submit/Skip/Show solution,
-the difficulty selector, the tutor composer's Send button, and the reader's
-breadcrumb links. None of these were touched. They are the same generic
-`Button`/text-link pattern used everywhere in the app, they predate the
-mobile-responsive project, and the eight prior tasks deliberately scoped
-their touch-target work to specific chrome (nav, tutor drawer, sketch
-toolbar, the FAB) rather than every control. Retrofitting all of them
-would mean deciding whether `Button` should carry `tap-target` on compact
-by default, a design-scope call, not a class-level fix, so they are left
-for a follow-up rather than silently swept in. The one exception is the
-TopBar wordmark link (160x24, present on every screen, sitting right next
-to the Tutor chip which already carries `tap-target`): fixed with the same
-`max-lg:tap-target`, since it is persistent chrome rather than a per-screen
-action control, and the fix is a single line with no gap-widening risk.
+the Learn shelf's generate `<input>` (`tap-target` cannot help a
+non-button element, since it renders no `::before`/`::after`) and its
+Generate button, Submit/Skip/Show solution and the difficulty selector
+(both packed at `gap-2`, either would need its own gap audit before
+widening, per D-071's clearance rule), and the reader's breadcrumb links.
+None of these were touched. They are the same generic `Button`/text-link
+pattern used everywhere in the app, they predate the mobile-responsive
+project, and the eight prior tasks deliberately scoped their touch-target
+work to specific chrome (nav, tutor drawer, sketch toolbar, the FAB)
+rather than every control. Retrofitting all of them would mean deciding
+whether `Button` should carry `tap-target` on compact by default, a
+design-scope call, not a class-level fix, so they are left for a
+follow-up rather than silently swept in.
+
+Two exceptions shipped, both persistent chrome rather than a per-screen
+action control, and both fixed with the same `max-lg:tap-target` in a
+single line with no gap-widening risk: the TopBar wordmark link (160x24,
+present on every screen, sitting right next to the Tutor chip which
+already carries `tap-target`), fixed in the original Task 9 sweep, and
+the tutor composer's Send button, fixed in the Task 9 fix round
+(`ChatComposer.tsx`) once review noticed it shares the same risk profile:
+a lone control past the 44px floor, next to exactly one neighbor at a
+tight gap, present on every tutor interaction on every compact screen.
+The Send button no longer belongs in the untouched list above.

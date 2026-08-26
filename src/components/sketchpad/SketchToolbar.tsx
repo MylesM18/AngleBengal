@@ -301,10 +301,28 @@ export function SketchToolbar({
             put its `w-64` box wherever the Clear chip happened to land, and
             the chip's position is not fixed: it sits at the end of a single
             row on a wide compact viewport (390px) or partway through a
-            wrapped second row on a narrow one (360px). At 390px that put
-            the popover's right edge 169px past the viewport edge, taking
-            Keep with it: not overlapped, not mis-tapped, entirely
-            unreachable. Measured before the fix. */}
+            wrapped second row on a narrow one (360px). Neither the
+            Clear-confirm nor the Keep button carried a `tap-target` hit-area
+            extension at that point either (see the buttons' own comment
+            below).
+
+            An earlier version of this comment (and of D-073) put a number
+            on the row-wrap defect: the popover's right edge landing 169px
+            past the viewport at 390px, `left: 303.1, right: 559.1`, Keep
+            entirely off-screen and unreachable. A later review reconstructed
+            the pre-fix code at 360, 390, 1000, and 1023px and could not
+            reproduce that, the popover fit on screen every time. The cited
+            numbers match what a stale dev bundle missing an earlier task's
+            `max-lg:gap-5` would produce, so they are presumed stale-bundle
+            artifacts rather than a verified measurement; see D-073's
+            correction for the full account. That claim should not be
+            treated as verified.
+
+            What holds regardless: the anchor point depended on where the
+            Clear chip landed in the row wrap, which depends on viewport
+            width, not on a fixed position. Anchoring to the strip instead
+            of the chip's own wrapper removes that row-wrap dependency
+            entirely, whatever the original defect's real severity was. */}
         <div ref={clearWrapRef} className="lg:relative">
           <Chip
             variant="action"
