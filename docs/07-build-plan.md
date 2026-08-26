@@ -79,4 +79,4 @@ Acceptance:
 
 ## Deferred (do not build now)
 
-Spaced repetition scheduling, multi-user/auth, mobile layouts, real-time recognition, PDF/print export of model docs, deploy pipeline (Postgres swap documented in docs/02).
+Spaced repetition scheduling, multi-user/auth, real-time recognition, PDF/print export of model docs, deploy pipeline (Postgres swap documented in docs/02).

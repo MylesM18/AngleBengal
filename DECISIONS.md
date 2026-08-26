@@ -1134,3 +1134,87 @@ What remains in brackets is layout dimension, `w-[150px]`, `max-w-[68ch]`,
 and which a scale would not improve. **A future audit should read this entry
 before "fixing" either border**, and should use `border(-[a-z]{1,2})*-\[` rather
 than `border-\[` if it wants to find them at all.
+
+### D-067. Mobile layouts split into two worlds at lg
+
+The mobile design (docs/superpowers/specs/2026-08-25-mobile-responsive-design.md)
+reuses the existing `lg` gate (1024px, `useIsDesktop`) as the compact/full seam
+rather than adding a tablet-specific breakpoint. iPad portrait deliberately gets
+the compact layout: at 768 to 834px wide it falls below `lg`, so it gets the
+bottom tab bar, drill-down Learn, and the full-screen sketch mode rather than
+the desktop split pane. A full-screen Pencil canvas beats a 350px split pane on
+a screen that size; iPad landscape clears `lg` and gets the desktop layout
+unchanged.
+
+### D-068. `tap-target` and safe-area padding as utilities, `shadow-sheet-up` as a token
+
+Hit-area extension (`tap-target` in `globals.css`) is a `::after` overlay sized
+`max(100%, 44px)`, applied per control rather than baked into a component, so it
+stays visually inert and desktop stays pixel-identical. `pt-safe` / `pb-safe`
+are utilities for the same reason: most elements that need a safe-area inset
+need only that inset and nothing else. The bottom tab bar's upward shadow
+(`shadow-sheet-up`, `BottomTabBar.tsx`) is a theme token rather than an
+ad-hoc `box-shadow`, because the shadow scale is part of the paper physics
+docs/08 already governs, and a new shadow direction belongs in that system, not
+bolted on locally.
+
+### D-069. Palm rejection is pen-priority and session-scoped
+
+`SketchCanvas.tsx` (mobile spec §5) tracks a module-scope `penSeen` flag rather
+than component state, because the compact sketch overlay unmounts and remounts
+the canvas every time the user leaves and re-enters sketch mode, and component
+state would forget the pen was ever seen. Once a real pen (`pointerType ===
+"pen"`) draws a stroke, touch pointers stop drawing for the rest of the session:
+a finger on the canvas mid-writing is read as a resting palm, not intent. There
+is no setting to turn this off and no timer to reset it. The failure mode of a
+stuck pen mode (reload the page) is cheaper than palm ink landing on every
+stroke for the rest of the session.
+
+### D-070. `pb-safe` and `pt-safe` destroy existing padding
+
+`D-068` names `pt-safe` / `pb-safe` as utilities; this records the trap in
+using them. Both set the padding on their side to the safe-area inset value
+only, nothing added to it. Stacking one on an element that already carries a
+padding class (`p-3`, for example) silently zeroes that side's padding on every
+device without a real inset: desktops, every Android device, and any iPhone
+before the notch. They are safe only on an element with no competing padding
+class, which is exactly the case in `BottomTabBar.tsx` (`pb-safe` alone,
+flex-centered content, nothing else sets its bottom padding) and in the
+sketch-mode overlay in `PracticeWorkspace.tsx` (`pt-safe pb-safe`, no padding
+class of its own). Where an element needs both a real padding value and the
+inset, the pattern used in this codebase is an explicit calc instead:
+`ChatComposer.tsx` sets `pb-[calc(0.75rem+env(safe-area-inset-bottom))]` on top
+of its own `p-3`, so the composer keeps its padding on every device and gains
+the inset only where one exists. Both forms are load-bearing at their call
+sites; the split between them is deliberate, not an inconsistency to clean up.
+
+### D-071. `tap-target` hit areas overlap on tightly packed controls
+
+The `tap-target` utility works by an absolutely positioned `::after` sized
+`max(100%, 44px)`. It deliberately does not set `pointer-events: none`, because
+the pseudo-element has to receive input for the hit area to exist at all. The
+consequence: two controls sitting closer together than 44px get overlapping hit
+areas, and whichever one is later in DOM order wins the shared region. The rule
+for any control row that uses it is that the gap must be at least 44px minus
+the control's own width. `SketchToolbar.tsx` carries the worked example: the
+32px icon-only chips (Tool, Stroke width) carry a 12px compact gap
+(`max-lg:gap-3`, `(44 - 32) / 2 = 6px` of spillover per side), and the 24px ink
+swatches carry a 20px compact gap (`max-lg:gap-5`, `(44 - 24) / 2 = 10px` per
+side), both gated behind `max-lg:` so desktop spacing (`gap-1` / `gap-2`) is
+untouched. "Just add `pointer-events: none`" is the wrong fix: it would remove
+the hit area's ability to receive input at all and silently break every use of
+`tap-target` in the app, not just the crowded rows.
+
+### D-072. The problem ribbon has no `aria-label` on purpose
+
+`ProblemRibbon.tsx` (mobile spec §4) is a `<button>` whose content is the
+problem statement, collapsed to one line by default. It deliberately carries no
+`aria-label`. An `aria-label` on the button would win the accessible-name
+computation over the button's own contents, and ARIA treats `role=button` as
+children-presentational, so the problem statement inside would be exposed
+neither as the name nor as content: a screen reader user in sketch mode would
+hear only "Expand problem statement" and have no route to the actual question,
+which is the one thing the ribbon exists to provide. The name is left to
+compute from the contents instead (the statement text, rendered through
+`MarkdownMath`), and the expand/collapse verb is carried separately by a
+visually hidden `.sr-only` span inside the button.

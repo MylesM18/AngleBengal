@@ -46,7 +46,7 @@ This diagnostic loop is the differentiator. A generic tutor says "incorrect, her
 ## Users and scope
 
 - Single user (the owner). No accounts, no auth, no sharing in Phase 1.
-- Web, desktop-first. The sketchpad must also work with touch/stylus input, but layout optimization for phones is out of scope for v1.
+- Web, responsive: desktop, tablet, and phone layouts per docs/superpowers/specs/2026-08-25-mobile-responsive-design.md. The sketchpad works with mouse, touch, and stylus input.
 - All content is AI-generated on demand and stored; nothing is hand-authored except the seeded exemplar.
 
 ## Out of scope for v1
@@ -54,7 +54,6 @@ This diagnostic loop is the differentiator. A generic tutor says "incorrect, her
 - Real-time handwriting recognition (recognition is on-demand via the Clean up button)
 - Multi-user, auth, billing
 - Spaced repetition scheduling (planned Phase 5+, schema leaves room)
-- Mobile-optimized layouts
 - Non-math subjects
 
 ## Success criteria for v1
