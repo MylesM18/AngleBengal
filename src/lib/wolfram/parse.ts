@@ -17,9 +17,25 @@ export function parseWolframResult(plaintext: string): WolframParsed | null {
   const text = plaintext.trim();
   if (!text) return null;
 
+  // Newline-joined subpod results: "x = 2\nx = -2". A line with no equality
+  // separator (a trailing note like "(assuming integer arithmetic)") is not
+  // a readable solution line, so it is dropped before counting survivors.
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (lines.length >= 2) {
+    const values = lines
+      .filter((line) => /=|≈|~~/.test(line))
+      .map((line) => rightHandSide(line))
+      .filter((value): value is string => value !== null);
+    if (values.length >= 2) return { kind: "solutions", values };
+  }
+  const firstLine = lines[0] ?? text;
+
   // Multi-solution lists: "x = 2 or x = -2".
-  if (text.includes(" or ")) {
-    const values = text
+  if (firstLine.includes(" or ")) {
+    const values = firstLine
       .split(" or ")
       .map((segment) => rightHandSide(segment))
       .filter((value): value is string => value !== null);
@@ -27,8 +43,15 @@ export function parseWolframResult(plaintext: string): WolframParsed | null {
   }
 
   // "x = 6" reads from the right; chained "18/3 = 6" reads the last segment.
-  const candidate = rightHandSide(text);
+  const candidate = rightHandSide(firstLine);
   if (candidate === null) return null;
+
+  // Plus-minus root forms: "x = ±sqrt(2)" expands into two solutions.
+  const plusMinus = candidate.match(/^(?:\+-|±)\s*(.+)$/);
+  if (plusMinus) {
+    const inner = plusMinus[1].trim();
+    return { kind: "solutions", values: [inner, "-(" + inner + ")"] };
+  }
 
   const numeric = toNumber(candidate);
   if (numeric !== null) return { kind: "numeric", value: numeric };
@@ -37,7 +60,7 @@ export function parseWolframResult(plaintext: string): WolframParsed | null {
 }
 
 function rightHandSide(segment: string): string | null {
-  const parts = segment.split("=");
+  const parts = segment.split(/=|≈|~~/);
   const last = parts[parts.length - 1]?.trim() ?? "";
   return last.length ? last : null;
 }
