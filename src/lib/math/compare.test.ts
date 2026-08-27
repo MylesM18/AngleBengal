@@ -78,3 +78,27 @@ describe("unit-aware numeric grading", () => {
     expect(compareToAnswer(students, "42 students").match).toBe(true);
   });
 });
+
+describe("expression and equation comparison", () => {
+  const expression = (value: string) => ({ type: "expression" as const, value });
+
+  it("matches identical equations up to whitespace", () => {
+    expect(compareToAnswer(expression("30t = 12(t+1.5)"), "30t=12(t+1.5)").match).toBe(true);
+  });
+
+  it("still matches equivalent pure expressions locally", () => {
+    expect(compareToAnswer(expression("x+x"), "2x").match).toBe(true);
+  });
+
+  it("routes scaled equations to the equivalence path", () => {
+    const outcome = compareToAnswer(expression("2x = 4"), "x = 2");
+    expect(outcome.match).toBe(false);
+    expect(outcome.needsEquivalenceCheck).toBe(true);
+  });
+
+  it("routes rearranged equations to the equivalence path instead of guessing", () => {
+    const outcome = compareToAnswer(expression("x - 2 = 0"), "x = 2");
+    expect(outcome.match).toBe(false);
+    expect(outcome.needsEquivalenceCheck).toBe(true);
+  });
+});

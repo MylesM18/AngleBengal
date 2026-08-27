@@ -1,4 +1,4 @@
-import { evaluate, parse, simplify, unit } from "mathjs";
+import { evaluate, simplify, unit } from "mathjs";
 
 import "./units";
 
@@ -162,8 +162,12 @@ function normalizeExpression(input: string): string {
 }
 
 /**
- * Expression equivalence. An equation is split on `=` and compared as
- * (lhs - rhs), so "30t = 12(t+1.5)" and "30t - 12(t+1.5) = 0" agree.
+ * Expression equivalence. Identical normalized strings match locally, and
+ * equivalent pure expressions are settled by simplifying their difference to
+ * zero. Anything containing "=" is an equation: equations differing by a
+ * scale factor ("2x = 4" vs "x = 2") cannot be settled by subtracting sides,
+ * so non-identical equations always escalate to the equivalence path
+ * (Wolfram first, then the LLM judge; spec section 8).
  */
 function compareExpressions(expected: string, submitted: string): CompareOutcome {
   const a = normalizeExpression(expected);
@@ -171,31 +175,19 @@ function compareExpressions(expected: string, submitted: string): CompareOutcome
 
   if (a === b) return { match: true };
 
-  const toDifference = (text: string): string | null => {
-    const sides = text.split("=");
-    if (sides.length === 1) return sides[0];
-    if (sides.length === 2) return `(${sides[0]})-(${sides[1]})`;
-    return null;
-  };
-
-  const diffA = toDifference(a);
-  const diffB = toDifference(b);
-  if (!diffA || !diffB) return { match: false, needsEquivalenceCheck: true };
+  if (a.includes("=") || b.includes("=")) {
+    return { match: false, needsEquivalenceCheck: true };
+  }
 
   try {
-    // Equations are equivalent up to a nonzero scale factor, so compare the
-    // ratio rather than the difference: "2x = 4" and "x = 2" are the same
-    // equation, but their difference is not identically zero.
-    const simplified = simplify(`(${diffA}) - (${diffB})`);
+    const simplified = simplify(`(${a}) - (${b})`);
     if (Number(simplified.toString()) === 0 || simplified.toString() === "0") {
       return { match: true };
     }
-    parse(diffA);
-    parse(diffB);
-    return { match: false, needsEquivalenceCheck: true };
   } catch {
-    return { match: false, needsEquivalenceCheck: true };
+    // Unparseable locally; the equivalence path decides.
   }
+  return { match: false, needsEquivalenceCheck: true };
 }
 
 function compareNumeric(expected: NumericAnswer, submitted: string): CompareOutcome {
