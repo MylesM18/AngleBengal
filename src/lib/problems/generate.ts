@@ -34,9 +34,13 @@ import { judgeEquivalence } from "./equivalence";
  * Problem generation and verification (docs/02 flow B, docs/05 §4).
  *
  * The verification pass is the mechanism behind non-negotiable 2: a problem is
- * saved with `verified: true` only when a second, independent solve agrees
- * with the generator. The verifier sees ONLY the statement, never the
- * generator's answer or solution, because independence is the entire point.
+ * saved with `verified: true` only when verification succeeds. The verifier
+ * first asks Wolfram Alpha to solve the problem using the generator's
+ * wolframQuery (with one rephrase retry); if Wolfram is unavailable or does
+ * not understand, it falls back to an independent LLM solve. A Wolfram
+ * disagreement discards the problem with no LLM appeal. The verifier sees
+ * ONLY the statement, never the generator's answer or solution, because
+ * independence is the entire point.
  *
  * A disagreement discards the problem silently and logs the rejection. That is
  * deliberate: the student never learns a problem existed, so a bad generation

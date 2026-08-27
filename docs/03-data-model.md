@@ -160,9 +160,9 @@ model AiCallLog {
   createdAt    DateTime @default(now())
 }
 
-/// Successful Wolfram (query, result) pairs, keyed by a sha256 hash of the
-/// whitespace-normalized query. Consulted before any network call, so
-/// re-verification and repeat grading tiebreaks never spend quota.
+// Successful Wolfram (query, result) pairs, keyed by a sha256 hash of the
+// whitespace-normalized query. Consulted before any network call, so
+// re-verification and repeat grading tiebreaks never spend quota.
 model ComputationCache {
   id         String   @id @default(cuid())
   queryHash  String   @unique
