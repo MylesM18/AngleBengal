@@ -25,7 +25,10 @@ export type AgreementVerdict = "agree" | "disagree" | "inconclusive";
 
 export type NumericAgreementOutcome = { verdict: AgreementVerdict; reason: string };
 
-const SEPARATOR = /=|≈|~~/;
+// Differs intentionally from parse.ts's SEPARATOR: this one only carves the
+// last segment of an already-numeric result for unit recovery, so the
+// inequality lookbehind is unnecessary here.
+const UNIT_SEGMENT_SEPARATOR = /=|≈|~~/;
 
 /**
  * Recovers a quantity (magnitude plus unit) for unit detection. mathjs
@@ -42,7 +45,7 @@ function recoverQuantity(resultText: string): ReturnType<typeof parseQuantity> {
 
   const trimmedFull = resultText.trim();
   const segments = resultText
-    .split(SEPARATOR)
+    .split(UNIT_SEGMENT_SEPARATOR)
     .map((segment) => segment.trim())
     .filter((segment) => segment.length > 0);
   const last = segments[segments.length - 1];
