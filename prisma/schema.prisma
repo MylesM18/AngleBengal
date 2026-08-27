@@ -90,6 +90,11 @@ model Problem {
   solutionMd  String
   difficulty  Int
   verified    Boolean  @default(false)
+  // The computable core emitted by the generator (spec section 6). Null for
+  // legacy rows only.
+  wolframQuery String?
+  // "wolfram" or "llm" (spec section 9). Null for legacy rows.
+  verifiedBy   String?
   createdAt   DateTime @default(now())
 
   modelTags ProblemModelTag[]
@@ -158,4 +163,16 @@ model AiCallLog {
   durationMs   Int
   ok           Boolean
   createdAt    DateTime @default(now())
+}
+
+// Successful Wolfram (query, result) pairs, consulted before any network
+// call so re-verification and repeat grading tiebreaks never spend quota
+// (spec section 5). Postgres-compatible: plain columns, no native arrays.
+model ComputationCache {
+  id         String   @id @default(cuid())
+  queryHash  String   @unique
+  query      String
+  resultText String
+  hits       Int      @default(0)
+  createdAt  DateTime @default(now())
 }
