@@ -10,6 +10,8 @@ import { compareToAnswer } from "@/lib/math/compare";
 import { parseAnswer } from "@/lib/math/answer";
 import { ApiError } from "@/lib/ai/errors";
 
+import { judgeEquivalence } from "./equivalence";
+
 /**
  * Grading and wrong-answer diagnosis (docs/02 flow C, docs/05 §5).
  *
@@ -67,9 +69,18 @@ export async function submitAttempt(input: {
   }
 
   const comparison = compareToAnswer(expected, input.submittedAnswer);
+
+  // Spec section 8: grading is never stricter than verification. When the
+  // local comparison cannot settle an expression or equation, escalate to the
+  // shared helper (Wolfram first, LLM judge fallback, strict on failure).
+  let correct = comparison.match;
+  if (!correct && comparison.needsEquivalenceCheck && expected.type === "expression") {
+    correct = await judgeEquivalence(expected.value, input.submittedAnswer);
+  }
+
   const ocrText = ocrBlocksToText(input.ocrBlocks);
 
-  const diagnosis = comparison.match
+  const diagnosis = correct
     ? null
     : await diagnose({
         statementMd: problem.statementMd,
@@ -83,7 +94,7 @@ export async function submitAttempt(input: {
     data: {
       problemId: problem.id,
       submittedAnswer: input.submittedAnswer,
-      correct: comparison.match,
+      correct,
       sketchPng: decodeSketch(input.sketchPngBase64),
       ocrTextJson: input.ocrBlocks ? JSON.stringify(input.ocrBlocks) : null,
       diagnosedDocId: diagnosis?.docId ?? null,
@@ -95,7 +106,7 @@ export async function submitAttempt(input: {
   });
 
   return {
-    correct: comparison.match,
+    correct,
     solutionMd: problem.solutionMd,
     diagnosis,
     parts: comparison.parts ?? null,
