@@ -10,18 +10,25 @@ import {
   problemGeneratorUser,
   VERIFIER_SYSTEM,
   verifierUser,
+  WOLFRAM_REPHRASE_SYSTEM,
+  wolframRephraseUser,
 } from "@/lib/ai/prompts";
 import {
   equivalenceSchema,
   problemBatchSchema,
   problemIsWordProblem,
   verifierSchema,
+  wolframRephraseSchema,
   type ProblemBatch,
 } from "@/lib/ai/schemas";
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
-import { compareAnswers } from "@/lib/math/compare";
+import { compareAnswers, compareToAnswer, numericMatch, parseQuantity } from "@/lib/math/compare";
 import { getTopicPath } from "@/lib/topics";
+import { computeAnswer } from "@/lib/wolfram/compute";
+import type { WolframParsed } from "@/lib/wolfram/parse";
+
+import { judgeEquivalence } from "./equivalence";
 
 /**
  * Problem generation and verification (docs/02 flow B, docs/05 §4).
@@ -97,6 +104,7 @@ export async function generateProblems(
         ? Promise.resolve<VerifyOutcome>({
             verified: false,
             reason: "not a word problem, and this topic is set to word problems only",
+            verifiedBy: null,
           })
         : verifyProblem(problem),
     ),
@@ -106,11 +114,13 @@ export async function generateProblems(
   let discarded = 0;
 
   for (const [index, problem] of batch.problems.entries()) {
-    if (!outcomes[index].verified) {
+    const outcome = outcomes[index];
+    if (!outcome.verified) {
       discarded += 1;
       console.info(
-        `verifier-reject (topic ${topicId}, difficulty ${difficulty}): ${outcomes[index].reason}`,
+        `verifier-reject (topic ${topicId}, difficulty ${difficulty}): ${outcome.reason}`,
       );
+      await logVerifierReject(outcome);
       continue;
     }
 
@@ -124,6 +134,8 @@ export async function generateProblems(
         solutionMd: problem.solutionMd,
         difficulty: problem.difficulty,
         verified: true,
+        wolframQuery: problem.wolframQuery,
+        verifiedBy: outcome.verifiedBy,
         modelTags: {
           create: tags.map((modelNumber) => ({ docId: doc.id, modelNumber })),
         },
@@ -141,9 +153,149 @@ export async function generateProblems(
   };
 }
 
-type VerifyOutcome = { verified: boolean; reason: string };
+type VerifyOutcome = {
+  verified: boolean;
+  reason: string;
+  /** Which engine confirmed it (spec section 9). Null when not verified. */
+  verifiedBy: "wolfram" | "llm" | null;
+};
 
 async function verifyProblem(
+  problem: ProblemBatch["problems"][number],
+): Promise<VerifyOutcome> {
+  // Multi answers go straight to the LLM path: a single Wolfram query cannot
+  // confirm named parts (DECISIONS entry recorded in this change).
+  if (problem.answer.type !== "multi") {
+    const outcome = await verifyWithWolfram(problem);
+    if (outcome) return outcome;
+  }
+  return verifyWithLlm(problem);
+}
+
+/**
+ * Spec section 7 steps 1-2. Returns null when Wolfram could not settle it
+ * (config, transport, quota, or still not understood after one rephrase), in
+ * which case the caller falls back to the LLM path. A Wolfram MISMATCH is not
+ * null: Wolfram outranks the model, so a disagreement is a discard with no
+ * LLM appeal.
+ */
+async function verifyWithWolfram(
+  problem: ProblemBatch["problems"][number],
+): Promise<VerifyOutcome | null> {
+  let result = await computeAnswer(problem.wolframQuery, "verify");
+
+  if (result.status === "notUnderstood") {
+    const rephrased = await rephraseQuery(problem, result.suggestions);
+    if (rephrased) {
+      result = await computeAnswer(rephrased, "verify");
+    }
+  }
+
+  if (result.status !== "ok") return null;
+
+  const agreement = await wolframAgreement(problem.answer, result.resultText, result.parsed);
+  if (agreement.agrees) {
+    return { verified: true, reason: agreement.reason, verifiedBy: "wolfram" };
+  }
+  return {
+    verified: false,
+    reason: `wolfram disagreed: ${agreement.reason}`,
+    verifiedBy: null,
+  };
+}
+
+type WolframAgreement = { agrees: boolean; reason: string };
+
+async function wolframAgreement(
+  answer: ProblemBatch["problems"][number]["answer"],
+  resultText: string,
+  parsed: WolframParsed,
+): Promise<WolframAgreement> {
+  if (answer.type === "numeric") {
+    if (parsed.kind === "numeric") {
+      const agrees = numericMatch(answer.value, parsed.value, answer.tolerance);
+      return {
+        agrees,
+        reason: `Wolfram computed ${parsed.value}, generator claimed ${answer.value}`,
+      };
+    }
+    if (parsed.kind === "solutions") {
+      const values = parsed.values
+        .map((candidate) => parseQuantity(candidate)?.value)
+        .filter((value): value is number => typeof value === "number");
+      const agrees = values.some((value) =>
+        numericMatch(answer.value, value, answer.tolerance),
+      );
+      return {
+        agrees,
+        reason: agrees
+          ? "one of Wolfram's solutions matched the numeric answer"
+          : `none of Wolfram's solutions (${resultText}) matched ${answer.value}`,
+      };
+    }
+    return {
+      agrees: false,
+      reason: `Wolfram returned a symbolic result "${parsed.value}" for a numeric answer`,
+    };
+  }
+
+  if (answer.type === "expression") {
+    const candidates = Array.from(
+      new Set([
+        resultText,
+        ...(parsed.kind === "solutions"
+          ? parsed.values
+          : [parsed.kind === "numeric" ? String(parsed.value) : parsed.value]),
+      ]),
+    );
+    let needsJudge = false;
+    for (const candidate of candidates) {
+      const outcome = compareToAnswer(answer, candidate);
+      if (outcome.match) {
+        return { agrees: true, reason: "Wolfram result matched the expression" };
+      }
+      if (outcome.needsEquivalenceCheck) needsJudge = true;
+    }
+    if (needsJudge && (await judgeEquivalence(answer.value, resultText))) {
+      return { agrees: true, reason: "Wolfram result equivalent to the expression" };
+    }
+    return {
+      agrees: false,
+      reason: `Wolfram result "${resultText}" did not match the claimed expression`,
+    };
+  }
+
+  // Unreachable for multi: verifyProblem routes multi to the LLM path.
+  return { agrees: false, reason: "unsupported answer type for wolfram agreement" };
+}
+
+/** One rephrase attempt on the cheap model; null when it fails (spec 7.2). */
+async function rephraseQuery(
+  problem: ProblemBatch["problems"][number],
+  suggestions: string[],
+): Promise<string | null> {
+  try {
+    const rephrased = await callStructured({
+      promptName: "wolfram-rephrase",
+      model: AI_MODELS.CLASSIFIER,
+      system: WOLFRAM_REPHRASE_SYSTEM,
+      user: wolframRephraseUser(problem.wolframQuery, problem.statementMd, suggestions),
+      schema: wolframRephraseSchema,
+      schemaName: "wolfram_rephrase",
+    });
+    const query = rephrased.query.trim();
+    return query.length ? query : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The pre-Wolfram verification pass, unchanged in substance (spec section 7
+ * step 3): cold solve, compareAnswers, one LLM equivalence tiebreak for
+ * expressions. Successes are tagged verifiedBy "llm".
+ */
+async function verifyWithLlm(
   problem: ProblemBatch["problems"][number],
 ): Promise<VerifyOutcome> {
   let verdict;
@@ -161,6 +313,7 @@ async function verifyProblem(
     return {
       verified: false,
       reason: `verifier call failed: ${error instanceof Error ? error.message : "unknown"}`,
+      verifiedBy: null,
     };
   }
 
@@ -168,11 +321,12 @@ async function verifyProblem(
     return {
       verified: false,
       reason: `verifier judged it unsolvable: ${verdict.reasonIfNot ?? "no reason given"}`,
+      verifiedBy: null,
     };
   }
 
   const comparison = compareAnswers(problem.answer, verdict.answer);
-  if (comparison.match) return { verified: true, reason: "agreed" };
+  if (comparison.match) return { verified: true, reason: "agreed", verifiedBy: "llm" };
 
   // docs/05 §4.3: expressions that normalization cannot settle get one
   // equivalence judgment before being discarded.
@@ -189,7 +343,9 @@ async function verifyProblem(
         schema: equivalenceSchema,
         schemaName: "equivalence",
       });
-      if (judged.equivalent) return { verified: true, reason: "agreed via equivalence check" };
+      if (judged.equivalent) {
+        return { verified: true, reason: "agreed via equivalence check", verifiedBy: "llm" };
+      }
     } catch {
       // Fall through to rejection: an unresolved equivalence is a rejection.
     }
@@ -198,5 +354,32 @@ async function verifyProblem(
   return {
     verified: false,
     reason: comparison.reason ?? "verifier answer disagreed with the generator",
+    verifiedBy: null,
   };
+}
+
+/**
+ * docs/05 §4.3: every rejection becomes an AiCallLog row so the discard rate
+ * is measurable, not stdout-only. Wolfram mismatches attribute to the Wolfram
+ * "model" (the reason prefix set in verifyWithWolfram two functions up), LLM
+ * disagreements to the verifier model. Swallows like logCall: telemetry never
+ * throws (non-negotiable 4).
+ */
+async function logVerifierReject(outcome: VerifyOutcome): Promise<void> {
+  try {
+    await prisma.aiCallLog.create({
+      data: {
+        promptName: "verifier-reject",
+        modelId: outcome.reason.startsWith("wolfram disagreed")
+          ? "wolfram-full-results"
+          : AI_MODELS.VERIFIER,
+        inputTokens: 0,
+        outputTokens: 0,
+        durationMs: 0,
+        ok: false,
+      },
+    });
+  } catch (error) {
+    console.error("AiCallLog write failed for verifier-reject:", error);
+  }
 }
