@@ -105,4 +105,8 @@ describe("parseWolframResult extended shapes", () => {
       values: ["6 miles", "9.66 kilometers"],
     });
   });
+
+  it("does not treat inequality signs as equalities", () => {
+    expect(parseWolframResult("x <= 5")).toEqual({ kind: "expression", value: "x <= 5" });
+  });
 });

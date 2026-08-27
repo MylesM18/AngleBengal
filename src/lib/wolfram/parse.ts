@@ -13,6 +13,15 @@ export type WolframParsed =
   | { kind: "expression"; value: string }
   | { kind: "solutions"; values: string[] };
 
+/**
+ * Separator between a solved variable and its value, or between chained
+ * equalities/approximations. The negative lookbehind excludes an `=` that is
+ * part of `<=`, `>=`, `!=`, or `==`, so an inequality like "x <= 5" is not
+ * misread as a numeric equality. Shared by the newline separator-line filter
+ * and `rightHandSide`'s split so the two cannot drift apart.
+ */
+const SEPARATOR = /(?<![<>!=])=|≈|~~/;
+
 export function parseWolframResult(plaintext: string): WolframParsed | null {
   const text = plaintext.trim();
   if (!text) return null;
@@ -26,7 +35,7 @@ export function parseWolframResult(plaintext: string): WolframParsed | null {
     .filter((line) => line.length > 0);
   if (lines.length >= 2) {
     const values = lines
-      .filter((line) => /=|≈|~~/.test(line))
+      .filter((line) => SEPARATOR.test(line))
       .map((line) => rightHandSide(line))
       .filter((value): value is string => value !== null);
     if (values.length >= 2) return { kind: "solutions", values };
@@ -69,7 +78,7 @@ export function parseWolframResult(plaintext: string): WolframParsed | null {
 }
 
 function rightHandSide(segment: string): string | null {
-  const parts = segment.split(/=|≈|~~/);
+  const parts = segment.split(SEPARATOR);
   const last = parts[parts.length - 1]?.trim() ?? "";
   return last.length ? last : null;
 }

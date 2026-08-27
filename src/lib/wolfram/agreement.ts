@@ -1,4 +1,4 @@
-import { convertMagnitude, numericMatch, parseQuantity } from "@/lib/math/compare";
+import { compareToAnswer, convertMagnitude, numericMatch, parseQuantity } from "@/lib/math/compare";
 
 /**
  * Unit-aware numeric agreement between a Wolfram result and an expected
@@ -131,4 +131,27 @@ export function solutionsAgreement(
     verdict: "inconclusive",
     reason: `none of Wolfram's candidates (${candidates.join(", ")}) were comparable to the expected value ${expectedLabel}`,
   };
+}
+
+/**
+ * The per-solution comparator for equation solution sets: a false here must
+ * mean genuinely different values, because equation equivalence treats set
+ * inequality as definitive. Numeric when both sides parse as quantities;
+ * otherwise the local algebra machinery decides by simplifying the
+ * difference to zero, which is what settles a synthetic negated form like
+ * "-(sqrt(a))" against its plain spelling "-sqrt(a)", or "x+1" against
+ * "1+x", while "-(a+b)" against "-a+b" simplifies to a nonzero term and
+ * correctly fails; the final fallback is whitespace-stripped lowercase text
+ * equality.
+ *
+ * The module stays pure: imports only from @/lib/math/compare.
+ */
+export function solutionsEqual(a: string, b: string): boolean {
+  const quantityA = parseQuantity(a);
+  const quantityB = parseQuantity(b);
+  if (quantityA && quantityB) return numericMatch(quantityA.value, quantityB.value, null);
+
+  if (compareToAnswer({ type: "expression", value: a }, b).match) return true;
+
+  return a.replace(/\s+/g, "").toLowerCase() === b.replace(/\s+/g, "").toLowerCase();
 }
