@@ -1679,3 +1679,53 @@ since a topic whose whole pool is symbolic would go from "practise these" to
 "nothing here" the moment the toggle flips. Adding an unused column now would
 have been speculative, and adding a filter without the backfill would hide
 every existing problem behind a null.
+
+### D-090. Wolfram Alpha is the verification authority
+
+When Wolfram computes an answer and it disagrees with the generator, the
+problem is discarded with no LLM appeal: ground truth outranks the model
+(spec 2026-08-26 section 7).
+
+### D-091. AiCallLog is reused for Wolfram telemetry, not a second table
+
+AiCallLog is reused for Wolfram telemetry instead of a second log table:
+promptName wolfram-verify / wolfram-equivalence, modelId
+wolfram-full-results, token columns zero, durationMs and ok carry the
+signal.
+
+Cache hits log ok=true with durationMs 0. costByPrompt() groups by the
+promptName string, so the settings cost view picks these up unchanged.
+
+### D-092. Unit grading is strict with a unit, lenient without one
+
+Unit grading is strict when the student supplies a unit (incompatible is
+wrong, compatible converts before tolerance comparison) and lenient when the
+unit is omitted or the expected unit is not mathjs-parseable ("students"):
+bare magnitude match. Solo learning tool, not an exam (spec section 8).
+
+parseNumeric and its unit-strip whitelist are gone; parseQuantity replaces
+them. mph and kph are registered as mathjs units (mathjs 15 lacks both).
+
+### D-093. Generated tolerance is clamped to (0, 0.05]
+
+Generated tolerance is clamped to (0, 0.05] in the zod schema. parseAnswer
+reads a stored out-of-range tolerance as null (the 0.01 default) before
+validation, so legacy Problem rows keep grading instead of throwing
+INTERNAL.
+
+### D-094. D-054 is reversed: vitest tests pure functions only
+
+D-054 is reversed: vitest is the repo's test runner, scoped to pure
+functions only (src/lib/math, src/lib/wolfram/hash, src/lib/wolfram/parse).
+No component or route tests. npx tsc --noEmit remains the phase gate.
+
+### D-095. Multi answers verify via the LLM path only
+
+Multi answers verify via the LLM path only: a single Wolfram query cannot
+confirm two named parts. Their wolframQuery is still stored for future use.
+
+### D-096. The Wolfram query rephrase runs on CLASSIFIER, not the verifier
+
+The one-shot Wolfram query rephrase runs on AI_MODELS.CLASSIFIER, not the
+verifier model: it is a phrasing task, not a math task, and it sits on the
+hot path of every generation batch.
