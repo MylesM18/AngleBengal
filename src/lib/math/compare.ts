@@ -1,4 +1,6 @@
-import { evaluate, parse, simplify } from "mathjs";
+import { evaluate, parse, simplify, unit } from "mathjs";
+
+import "./units";
 
 import {
   DEFAULT_TOLERANCE,
@@ -23,33 +25,64 @@ export type CompareOutcome = {
   reason?: string;
 };
 
-/**
- * Reads a number out of free-form student input: strips currency, commas,
- * units and stray words, then lets mathjs evaluate what is left so "3/2",
- * "1.5", and "60 mph" all work.
- */
-export function parseNumeric(input: string): number | null {
-  const cleaned = input
-    .trim()
-    .replace(/[$,]/g, "")
-    .replace(/\s*(mph|km\/h|m\/s|miles?|hours?|hrs?|minutes?|mins?|seconds?|secs?|km|kg|cm|mm|ft|in|L|mL|%)\b\.?/gi, "")
-    .replace(/[a-zA-Z]+$/g, "")
-    .trim();
+export type ParsedQuantity = {
+  value: number;
+  /** mathjs's canonical text for the unit, null for a bare number. */
+  unitText: string | null;
+};
 
+type UnitLike = { toNumber: () => number; formatUnits: () => string };
+
+function isUnitLike(value: object): value is UnitLike {
+  return (
+    "toNumber" in value &&
+    typeof (value as { toNumber: unknown }).toNumber === "function" &&
+    "formatUnits" in value &&
+    typeof (value as { formatUnits: unknown }).formatUnits === "function"
+  );
+}
+
+/**
+ * Reads a quantity out of free-form student input: strips currency and
+ * digit-group commas, then lets mathjs evaluate what is left, so "3/2",
+ * "1.5", "$4,000", and "60 mph" all work, and the unit survives instead of
+ * being thrown away. Falls back to stripping a trailing word tail
+ * ("42 students") when mathjs cannot evaluate the whole input.
+ */
+export function parseQuantity(input: string): ParsedQuantity | null {
+  const cleaned = input.trim().replace(/[$,]/g, "").replace(/%\s*$/, "").trim();
   if (!cleaned) return null;
 
+  const evaluated = tryEvaluate(cleaned);
+  if (evaluated) return evaluated;
+
+  const stripped = cleaned.replace(/[a-zA-Z/. ]+$/g, "").trim();
+  if (!stripped || stripped === cleaned) return null;
+  const fallback = tryEvaluate(stripped);
+  return fallback && fallback.unitText === null ? fallback : null;
+}
+
+function tryEvaluate(text: string): ParsedQuantity | null {
   try {
-    const value: unknown = evaluate(cleaned);
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    // mathjs returns unit/fraction objects for some inputs.
-    if (
-      value &&
-      typeof value === "object" &&
-      "toNumber" in value &&
-      typeof (value as { toNumber: unknown }).toNumber === "function"
-    ) {
-      const numeric = (value as { toNumber: () => number }).toNumber();
-      return Number.isFinite(numeric) ? numeric : null;
+    const value: unknown = evaluate(text);
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return { value, unitText: null };
+    }
+    if (value && typeof value === "object") {
+      if (isUnitLike(value)) {
+        const numeric = value.toNumber();
+        return Number.isFinite(numeric)
+          ? { value: numeric, unitText: value.formatUnits() }
+          : null;
+      }
+      // Fractions and bignumbers evaluate to objects with toNumber only.
+      if (
+        "toNumber" in value &&
+        typeof (value as { toNumber: unknown }).toNumber === "function"
+      ) {
+        const numeric = (value as { toNumber: () => number }).toNumber();
+        return Number.isFinite(numeric) ? { value: numeric, unitText: null } : null;
+      }
     }
     return null;
   } catch {
@@ -61,6 +94,60 @@ export function parseNumeric(input: string): number | null {
 export function numericMatch(a: number, b: number, tolerance: number | null): boolean {
   const t = tolerance ?? DEFAULT_TOLERANCE;
   return Math.abs(a - b) <= t * Math.max(Math.abs(a), Math.abs(b), 1);
+}
+
+/** Converts a magnitude between mathjs-parseable units, null when it cannot. */
+export function convertMagnitude(
+  value: number,
+  fromUnit: string,
+  toUnit: string,
+): number | null {
+  try {
+    const converted = unit(value, fromUnit).toNumber(toUnit);
+    return Number.isFinite(converted) ? converted : null;
+  } catch {
+    return null;
+  }
+}
+
+function canParseUnit(unitText: string): boolean {
+  try {
+    unit(1, unitText);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Unit-aware numeric comparison (spec section 8): strict when the student
+ * supplies a unit, lenient magnitude match when the unit is omitted or when
+ * the expected unit is not something mathjs can parse ("students", "trips").
+ */
+function compareQuantity(
+  expectedValue: number,
+  expectedUnit: string | null,
+  tolerance: number | null,
+  submitted: string,
+): CompareOutcome {
+  const parsed = parseQuantity(submitted);
+  if (parsed === null) {
+    return { match: false, reason: "Could not read a number from that answer." };
+  }
+
+  const lenient = () => ({ match: numericMatch(expectedValue, parsed.value, tolerance) });
+
+  if (!expectedUnit || !canParseUnit(expectedUnit)) return lenient();
+  if (parsed.unitText === null) return lenient();
+
+  const converted = convertMagnitude(parsed.value, parsed.unitText, expectedUnit);
+  if (converted === null) {
+    return {
+      match: false,
+      reason: `That unit is not compatible with the expected unit (${expectedUnit}).`,
+    };
+  }
+  return { match: numericMatch(expectedValue, converted, tolerance) };
 }
 
 function normalizeExpression(input: string): string {
@@ -112,11 +199,7 @@ function compareExpressions(expected: string, submitted: string): CompareOutcome
 }
 
 function compareNumeric(expected: NumericAnswer, submitted: string): CompareOutcome {
-  const value = parseNumeric(submitted);
-  if (value === null) {
-    return { match: false, reason: "Could not read a number from that answer." };
-  }
-  return { match: numericMatch(expected.value, value, expected.tolerance) };
+  return compareQuantity(expected.value, expected.unit, expected.tolerance, submitted);
 }
 
 /** docs/05 §4.3: all parts must match by name. */
@@ -138,12 +221,11 @@ function compareMulti(expected: MultiAnswer, submitted: string): CompareOutcome 
 
   const parts = expected.parts.map((part) => {
     const raw = byName[part.name];
-    const value = raw === undefined ? null : parseNumeric(raw);
-    return {
-      name: part.name,
-      label: part.label,
-      match: value !== null && numericMatch(part.value, value, part.tolerance),
-    };
+    const outcome =
+      raw === undefined
+        ? { match: false }
+        : compareQuantity(part.value, part.unit, part.tolerance, raw);
+    return { name: part.name, label: part.label, match: outcome.match };
   });
 
   return { match: parts.every((part) => part.match), parts };

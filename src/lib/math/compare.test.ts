@@ -44,3 +44,37 @@ describe("compareToAnswer with numeric answers", () => {
     expect(compareToAnswer(miles, "7").match).toBe(false);
   });
 });
+
+describe("unit-aware numeric grading", () => {
+  const mph = { type: "numeric" as const, value: 60, unit: "mph", tolerance: null };
+
+  it("rejects a compatible unit with the wrong magnitude", () => {
+    expect(compareToAnswer(mph, "60 km/h").match).toBe(false);
+  });
+
+  it("accepts a compatible unit after conversion", () => {
+    expect(compareToAnswer(mph, "96.56 km/h").match).toBe(true);
+  });
+
+  it("rejects a dimensionally incompatible unit with a reason", () => {
+    const outcome = compareToAnswer(mph, "60 kg");
+    expect(outcome.match).toBe(false);
+    expect(outcome.reason).toContain("compatible");
+  });
+
+  it("accepts a matching spelled-out unit", () => {
+    const miles = { type: "numeric" as const, value: 6, unit: "miles", tolerance: null };
+    expect(compareToAnswer(miles, "6 miles").match).toBe(true);
+  });
+
+  it("is lenient when the student omits the unit", () => {
+    const miles = { type: "numeric" as const, value: 6, unit: "miles", tolerance: null };
+    expect(compareToAnswer(miles, "6").match).toBe(true);
+  });
+
+  it("is lenient when the expected unit is not a physical unit", () => {
+    const students = { type: "numeric" as const, value: 42, unit: "students", tolerance: null };
+    expect(compareToAnswer(students, "42").match).toBe(true);
+    expect(compareToAnswer(students, "42 students").match).toBe(true);
+  });
+});
