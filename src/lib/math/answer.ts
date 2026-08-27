@@ -13,8 +13,8 @@ export const numericAnswerSchema = z.object({
   type: z.literal("numeric"),
   value: z.number(),
   unit: z.string().nullable(),
-  /** Relative tolerance. Null means the default (1 percent). */
-  tolerance: z.number().nullable(),
+  /** Relative tolerance in (0, 0.05]. Null means the default (1 percent). */
+  tolerance: z.number().gt(0).lte(0.05).nullable(),
 });
 
 export const expressionAnswerSchema = z.object({
@@ -32,7 +32,7 @@ export const multiAnswerSchema = z.object({
       label: z.string(),
       value: z.number(),
       unit: z.string().nullable(),
-      tolerance: z.number().nullable(),
+      tolerance: z.number().gt(0).lte(0.05).nullable(),
     }),
   ),
 });
@@ -52,11 +52,35 @@ export const DEFAULT_TOLERANCE = 0.01;
 /** Parses a stored `answerJson`, returning null rather than throwing. */
 export function parseAnswer(answerJson: string): Answer | null {
   try {
-    const result = answerSchema.safeParse(JSON.parse(answerJson));
+    const raw: unknown = JSON.parse(answerJson);
+    const result = answerSchema.safeParse(normalizeTolerances(raw));
     return result.success ? result.data : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Legacy rows were stored before the (0, 0.05] clamp existed. An out-of-range
+ * stored tolerance is read as null (the 0.01 default) instead of failing the
+ * parse, because grading throws INTERNAL when a stored answer cannot be read.
+ */
+function normalizeTolerances(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const clamp = (candidate: Record<string, unknown>): void => {
+    const tolerance = candidate.tolerance;
+    if (typeof tolerance === "number" && !(tolerance > 0 && tolerance <= 0.05)) {
+      candidate.tolerance = null;
+    }
+  };
+  const record = raw as Record<string, unknown>;
+  clamp(record);
+  if (Array.isArray(record.parts)) {
+    for (const part of record.parts) {
+      if (part && typeof part === "object") clamp(part as Record<string, unknown>);
+    }
+  }
+  return record;
 }
 
 /** What the client needs to render the right input (docs/04). */
