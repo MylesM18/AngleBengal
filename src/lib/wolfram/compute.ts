@@ -1,6 +1,6 @@
 import "server-only";
 
-import { prisma } from "@/lib/db";
+import { isUniqueViolation, prisma } from "@/lib/db";
 
 import { queryWolfram, type WolframQueryResult } from "./client";
 import { hashQuery, normalizeQuery } from "./hash";
@@ -86,9 +86,14 @@ export async function computeAnswer(
     await prisma.computationCache.create({
       data: { queryHash, query: normalized, resultText: plaintext },
     });
-  } catch {
+  } catch (error) {
     // A concurrent verification may have cached the same query first; the
-    // unique queryHash rejects the second write, which is fine.
+    // unique queryHash rejects the second write, which is fine and stays
+    // silent. Anything else is a real cache-write failure worth logging,
+    // though it still must never affect the result already computed.
+    if (!isUniqueViolation(error)) {
+      console.error("ComputationCache write failed:", error);
+    }
   }
 
   await logWolframCall(purpose, Date.now() - started, true);

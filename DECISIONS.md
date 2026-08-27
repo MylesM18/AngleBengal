@@ -1752,3 +1752,38 @@ the double tilde) as equality separators, splits newline-joined subpod
 text into a solution list, and expands a leading plus-minus into two
 solutions. These shapes previously parsed as symbolic and became terminal
 numeric discards once an AppID was configured; they now compare normally.
+
+### D-099. Wolfram polish: telemetry label, set-wise solutions, cache logging
+
+Five small fixes land together, all wiring rather than new behavior.
+
+The LLM verify path's expression equivalence tiebreak in verifyWithLlm now
+logs promptName "equivalence" instead of "verifier", matching the shared
+judgeEquivalence helper's own equivalence calls. Both equivalence paths
+now attribute to one label in the cost view instead of splitting across
+two.
+
+Equation solution sets from judgeEquivalence's Wolfram path now compare
+bidirectionally as sets, via the shared algebra-aware solutionsEqual moved
+into src/lib/wolfram/agreement.ts, instead of a length check plus a
+one-directional "every A has some match in B". Length alone let a
+duplicate root through: "x = 2 or x = 2" against "x = 2 or x = -2" has
+matching lengths and one direction of coverage but is not the same set.
+Comparing both directions closes that gap, so a definitive false now
+requires genuinely different values, not just a different count of them.
+
+The result-pod separator (src/lib/wolfram/parse.ts) already ignores the
+equals sign that is part of an inequality operator (`<=`, `>=`, `!=`,
+`==`), from the prior change in this branch; this entry is the record of
+it landing alongside the rest.
+
+vitest.config.ts is renamed to vitest.config.mts, content unchanged. This
+silences vitest's warning about an ESM-authored config being loaded as
+CommonJS. The suite still runs all 64 tests with the `@` alias resolving.
+
+ComputationCache write failures in computeAnswer are now logged with
+console.error unless isUniqueViolation(error) is true, in which case they
+stay silent as before: a concurrent verification racing the same query
+into the cache is benign and expected, but any other write failure is
+worth seeing. Either way the write failure is swallowed and never affects
+the result already computed, matching non-negotiable 4.
