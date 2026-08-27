@@ -36,17 +36,17 @@
 - Consumes: `numericMatch(a: number, b: number, tolerance: number | null): boolean` and `compareToAnswer(expected: Answer, submitted: string): CompareOutcome` from `src/lib/math/compare.ts` (already exist).
 - Produces: `npm test` runs `vitest run` over `src/**/*.test.ts` with the `@` alias resolving to `src/`. Later tasks add tests to this same setup.
 
-- [ ] **Step 1: Verify the precondition**
+- [x] **Step 1: Verify the precondition**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && git status --short`
 Expected: empty output. If ANY line prints, STOP: the word-problems WIP has not landed. Do not proceed, do not touch the tree.
 
-- [ ] **Step 2: Install vitest**
+- [x] **Step 2: Install vitest**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npm install --save-dev vitest`
 Expected: vitest 4.x lands in `devDependencies` (current release is 4.1.11).
 
-- [ ] **Step 3: Create `vitest.config.ts`**
+- [x] **Step 3: Create `vitest.config.ts`**
 
 ```ts
 import path from "node:path";
@@ -65,7 +65,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 4: Add the test script to `package.json`**
+- [x] **Step 4: Add the test script to `package.json`**
 
 Edit the scripts block. Old:
 
@@ -92,7 +92,7 @@ New:
   },
 ```
 
-- [ ] **Step 5: Write the baseline characterization test**
+- [x] **Step 5: Write the baseline characterization test**
 
 This test documents current behavior before any change, so Tasks 2 and 3 can prove they did not break what already worked. Every case below passes against today's code and must still pass after Tasks 2-4.
 
@@ -147,17 +147,17 @@ describe("compareToAnswer with numeric answers", () => {
 });
 ```
 
-- [ ] **Step 6: Run the test suite, expect all green**
+- [x] **Step 6: Run the test suite, expect all green**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npm test`
 Expected: PASS, 9 tests. (This is a characterization baseline, not a red-green cycle: it pins current behavior.)
 
-- [ ] **Step 7: Typecheck**
+- [x] **Step 7: Typecheck**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit`
 Expected: exit 0.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && git add vitest.config.ts src/lib/math/compare.test.ts package.json package-lock.json && git commit -m "test: add vitest and baseline comparison characterization tests"
@@ -176,7 +176,7 @@ cd /Users/newmac/Desktop/AngleBengal && git add vitest.config.ts src/lib/math/co
 - Consumes: mathjs `evaluate`, `unit`, `createUnit`; `NumericAnswer`/`MultiAnswer` from `src/lib/math/answer.ts`.
 - Produces: `parseQuantity(input: string): { value: number; unitText: string | null } | null` (exported), `convertMagnitude(value: number, fromUnit: string, toUnit: string): number | null` (exported). `parseNumeric` is DELETED (verified: no importers outside `src/lib`; the only other mention is a JSDoc comment naming `compareToAnswer`, which survives). Task 10 and Task 11 import `parseQuantity`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `src/lib/math/compare.test.ts`:
 
@@ -216,12 +216,12 @@ describe("unit-aware numeric grading", () => {
 });
 ```
 
-- [ ] **Step 2: Run and verify the new tests fail**
+- [x] **Step 2: Run and verify the new tests fail**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npm test`
 Expected: FAIL. "rejects a compatible unit with the wrong magnitude" fails (current code strips `km/h` via the whitelist and matches 60 to 60) and "accepts a compatible unit after conversion" fails (96.56 does not equal 60 after stripping). The baseline block stays green.
 
-- [ ] **Step 3: Create `src/lib/math/units.ts`**
+- [x] **Step 3: Create `src/lib/math/units.ts`**
 
 ```ts
 import { createUnit } from "mathjs";
@@ -245,7 +245,7 @@ try {
 }
 ```
 
-- [ ] **Step 4: Rewrite the numeric side of `src/lib/math/compare.ts`**
+- [x] **Step 4: Rewrite the numeric side of `src/lib/math/compare.ts`**
 
 Replace the entire file content from the top through the end of `compareMulti` (everything before `compareToAnswer`) with the following. `compareExpressions` and `normalizeExpression` are copied unchanged in this task (Task 3 rewrites them); `compareToAnswer` and `compareAnswers` at the bottom of the file stay byte-identical.
 
@@ -486,17 +486,17 @@ function compareMulti(expected: MultiAnswer, submitted: string): CompareOutcome 
 
 `compareToAnswer` and `compareAnswers` below this point are untouched. The old `parseNumeric` function and its whitelist regex are gone.
 
-- [ ] **Step 5: Run the tests, expect all green**
+- [x] **Step 5: Run the tests, expect all green**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npm test`
 Expected: PASS, 15 tests (9 baseline + 6 new).
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit`
 Expected: exit 0. If anything still references `parseNumeric`, the compiler names it here; nothing should (verified by grep before planning).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && git add src/lib/math/units.ts src/lib/math/compare.ts src/lib/math/compare.test.ts && git commit -m "feat: unit-aware numeric grading via mathjs units"
@@ -514,7 +514,7 @@ cd /Users/newmac/Desktop/AngleBengal && git add src/lib/math/units.ts src/lib/ma
 - Consumes: `normalizeExpression`, `simplify` (already in the file).
 - Produces: `compareExpressions` (module-private, reached via `compareToAnswer`/`compareAnswers`) now returns `{ match: false, needsEquivalenceCheck: true }` for ANY non-identical equation. Tasks 10-12 rely on `needsEquivalenceCheck` firing for equations.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `src/lib/math/compare.test.ts`:
 
@@ -544,12 +544,12 @@ describe("expression and equation comparison", () => {
 });
 ```
 
-- [ ] **Step 2: Run and verify the new tests fail**
+- [x] **Step 2: Run and verify the new tests fail**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npm test`
 Expected: FAIL on "routes rearranged equations": the difference trick currently matches "x - 2 = 0" against "x = 2" locally (both differences simplify to x-2, so their difference is 0). The other three new cases already pass; they pin the behavior that must survive.
 
-- [ ] **Step 3: Rewrite `compareExpressions`**
+- [x] **Step 3: Rewrite `compareExpressions`**
 
 In `src/lib/math/compare.ts`, replace the whole `compareExpressions` function (including its doc comment, which describes the deleted difference trick and carries the wrong ratio comment) with:
 
@@ -596,17 +596,17 @@ New:
 import { evaluate, simplify, unit } from "mathjs";
 ```
 
-- [ ] **Step 4: Run the tests, expect all green**
+- [x] **Step 4: Run the tests, expect all green**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npm test`
 Expected: PASS, 19 tests.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit`
 Expected: exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && git add src/lib/math/compare.ts src/lib/math/compare.test.ts && git commit -m "fix: route non-identical equations to the equivalence path"
@@ -624,7 +624,7 @@ cd /Users/newmac/Desktop/AngleBengal && git add src/lib/math/compare.ts src/lib/
 - Consumes: zod, `answerSchema` (in the same file).
 - Produces: `numericAnswerSchema.tolerance` and multi-part `tolerance` become `z.number().gt(0).lte(0.05).nullable()`; `parseAnswer` normalizes out-of-range stored tolerances to null BEFORE validation so legacy `Problem.answerJson` rows never fail grading (grading throws INTERNAL when `parseAnswer` returns null, so this is load-bearing).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src/lib/math/answer.test.ts`:
 
@@ -683,12 +683,12 @@ describe("parseAnswer tolerance clamp", () => {
 });
 ```
 
-- [ ] **Step 2: Run and verify the new tests fail**
+- [x] **Step 2: Run and verify the new tests fail**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npm test`
 Expected: FAIL on the out-of-range, zero, and multi-part cases (today the raw value passes straight through validation, so `tolerance` comes back 0.5, 0, and 2 instead of null).
 
-- [ ] **Step 3: Implement the clamp and the pre-validation normalizer**
+- [x] **Step 3: Implement the clamp and the pre-validation normalizer**
 
 In `src/lib/math/answer.ts`, change both tolerance fields. In `numericAnswerSchema`, old:
 
@@ -756,17 +756,17 @@ function normalizeTolerances(raw: unknown): unknown {
 
 Note on the schema bounds: `problemBatchSchema.difficulty` already uses `.min(1).max(5)` and survives `jsonSchemaFor` plus OpenAI strict mode, which proves numeric bounds are accepted end to end. `.gt(0)` emits `exclusiveMinimum`, which current OpenAI structured outputs accept. If a generation call ever rejects the schema at runtime, swap `.gt(0)` for `.min(0.001)` and record the substitution in DECISIONS.md; do not remove the upper bound.
 
-- [ ] **Step 4: Run the tests, expect all green**
+- [x] **Step 4: Run the tests, expect all green**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npm test`
 Expected: PASS, 25 tests.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit`
 Expected: exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && git add src/lib/math/answer.ts src/lib/math/answer.test.ts && git commit -m "feat: clamp answer tolerance to (0, 0.05] with legacy-safe parsing"
@@ -786,7 +786,7 @@ cd /Users/newmac/Desktop/AngleBengal && git add src/lib/math/answer.ts src/lib/m
 - Produces: `normalizeQuery(query: string): string`, `hashQuery(query: string): string` (sha256 hex of the normalized query); `type WolframParsed = { kind: "numeric"; value: number } | { kind: "expression"; value: string } | { kind: "solutions"; values: string[] }`; `parseWolframResult(plaintext: string): WolframParsed | null`. Tasks 8, 10, 11 consume all of these.
 - CRITICAL: neither file imports `server-only` or `client.ts`. vitest cannot load `server-only`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src/lib/wolfram/parse.test.ts`:
 
@@ -858,12 +858,12 @@ describe("parseWolframResult", () => {
 });
 ```
 
-- [ ] **Step 2: Run and verify the tests fail**
+- [x] **Step 2: Run and verify the tests fail**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npm test`
 Expected: FAIL with module-not-found for `@/lib/wolfram/hash` and `@/lib/wolfram/parse`.
 
-- [ ] **Step 3: Create `src/lib/wolfram/hash.ts`**
+- [x] **Step 3: Create `src/lib/wolfram/hash.ts`**
 
 ```ts
 import { createHash } from "node:crypto";
@@ -883,7 +883,7 @@ export function hashQuery(query: string): string {
 }
 ```
 
-- [ ] **Step 4: Create `src/lib/wolfram/parse.ts`**
+- [x] **Step 4: Create `src/lib/wolfram/parse.ts`**
 
 ```ts
 import { evaluate } from "mathjs";
@@ -962,17 +962,17 @@ function toNumber(text: string): number | null {
 }
 ```
 
-- [ ] **Step 5: Run the tests, expect all green**
+- [x] **Step 5: Run the tests, expect all green**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npm test`
 Expected: PASS, 37 tests.
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit`
 Expected: exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && git add src/lib/wolfram/hash.ts src/lib/wolfram/parse.ts src/lib/wolfram/parse.test.ts && git commit -m "feat: wolfram result parsing and cache-key hashing"
@@ -989,7 +989,7 @@ cd /Users/newmac/Desktop/AngleBengal && git add src/lib/wolfram/hash.ts src/lib/
 **Interfaces:**
 - Produces: `Problem.wolframQuery: string | null`, `Problem.verifiedBy: string | null`, and the `prisma.computationCache` client delegate with `{ id, queryHash (unique), query, resultText, hits, createdAt }`. Tasks 8 and 11 depend on the regenerated client.
 
-- [ ] **Step 1: Edit `prisma/schema.prisma`**
+- [x] **Step 1: Edit `prisma/schema.prisma`**
 
 In the `Problem` model, old:
 
@@ -1028,17 +1028,17 @@ model ComputationCache {
 }
 ```
 
-- [ ] **Step 2: Run the migration (additive, no backfill)**
+- [x] **Step 2: Run the migration (additive, no backfill)**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx prisma migrate dev --name wolfram_verification --skip-seed`
 Expected: one new migration directory, applied cleanly against Supabase (uses DIRECT_URL).
 
-- [ ] **Step 3: Regenerate the client and typecheck**
+- [x] **Step 3: Regenerate the client and typecheck**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx prisma generate && npx tsc --noEmit`
 Expected: exit 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Substitute the actual generated migration directory name:
 
@@ -1057,7 +1057,7 @@ cd /Users/newmac/Desktop/AngleBengal && git add prisma/schema.prisma prisma/migr
 - Consumes: `process.env.WOLFRAM_APP_ID`, global `fetch`.
 - Produces: `queryWolfram(input: string): Promise<WolframClientResult>` and the types `WolframQueryResult` and `WolframClientResult` below. Task 8 consumes both.
 
-- [ ] **Step 1: Create `src/lib/wolfram/client.ts`**
+- [x] **Step 1: Create `src/lib/wolfram/client.ts`**
 
 ```ts
 import "server-only";
@@ -1152,12 +1152,12 @@ export async function queryWolfram(input: string): Promise<WolframClientResult> 
 }
 ```
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit`
 Expected: exit 0. (No vitest coverage: this file is server-only network code, out of test scope per spec section 12.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && git add src/lib/wolfram/client.ts && git commit -m "feat: wolfram full results api client"
@@ -1174,7 +1174,7 @@ cd /Users/newmac/Desktop/AngleBengal && git add src/lib/wolfram/client.ts && git
 - Consumes: `queryWolfram`/`WolframQueryResult` (Task 7), `hashQuery`/`normalizeQuery` (Task 5), `parseWolframResult`/`WolframParsed` (Task 5), `prisma` from `@/lib/db`, the `computationCache` and `aiCallLog` delegates (Task 6).
 - Produces: `computeAnswer(query: string, purpose: "verify" | "equivalence"): Promise<ComputeResult>` where `ComputeResult` is `{ status: "ok"; resultText: string; parsed: WolframParsed } | { status: "notUnderstood"; suggestions: string[] } | { status: "unavailable"; reason: string }`. Tasks 10 and 11 consume this as their only Wolfram entry point.
 
-- [ ] **Step 1: Create `src/lib/wolfram/compute.ts`**
+- [x] **Step 1: Create `src/lib/wolfram/compute.ts`**
 
 ```ts
 import "server-only";
@@ -1329,12 +1329,12 @@ async function logWolframCall(
 }
 ```
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit`
 Expected: exit 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && git add src/lib/wolfram/compute.ts && git commit -m "feat: computeAnswer with ComputationCache and AiCallLog telemetry"
@@ -1354,7 +1354,7 @@ cd /Users/newmac/Desktop/AngleBengal && git add src/lib/wolfram/compute.ts && gi
 - Produces: `PromptName` gains `"equivalence"`, `"wolfram-rephrase"`, `"wolfram-verify"`, `"wolfram-equivalence"`; `problemBatchSchema` problems each carry a required `wolframQuery: string`; `wolframRephraseSchema = z.object({ query: z.string() })`; `WOLFRAM_REPHRASE_SYSTEM: string` and `wolframRephraseUser(originalQuery: string, statementMd: string, suggestions: string[]): string`. Tasks 10 and 11 consume all of these.
 - Resolved during planning: `costByPrompt()` (`src/lib/attempts.ts:174`) groups `AiCallLog` rows by the `promptName` STRING via Prisma groupBy and its `CostRow.promptName` is typed `string`, so the new prompt names appear in the settings cost view automatically. No change to attempts.ts or the settings page is needed.
 
-- [ ] **Step 1: Extend the PromptName union in `src/lib/ai/config.ts`**
+- [x] **Step 1: Extend the PromptName union in `src/lib/ai/config.ts`**
 
 Old:
 
@@ -1386,7 +1386,7 @@ export type PromptName =
   | "ocr";
 ```
 
-- [ ] **Step 2: Add `wolframQuery` to `problemBatchSchema` in `src/lib/ai/schemas.ts`**
+- [x] **Step 2: Add `wolframQuery` to `problemBatchSchema` in `src/lib/ai/schemas.ts`**
 
 Old:
 
@@ -1409,7 +1409,7 @@ New:
     }),
 ```
 
-- [ ] **Step 3: Add `wolframRephraseSchema` to `src/lib/ai/schemas.ts`**
+- [x] **Step 3: Add `wolframRephraseSchema` to `src/lib/ai/schemas.ts`**
 
 Insert directly after the `equivalenceSchema` declaration:
 
@@ -1420,7 +1420,7 @@ export const wolframRephraseSchema = z.object({
 });
 ```
 
-- [ ] **Step 4: Add the wolframQuery bullet to `problemGeneratorSystem` in `src/lib/ai/prompts.ts`**
+- [x] **Step 4: Add the wolframQuery bullet to `problemGeneratorSystem` in `src/lib/ai/prompts.ts`**
 
 Old:
 
@@ -1438,7 +1438,7 @@ New:
   query, following the WOLFRAM QUERY RULES below.
 ```
 
-- [ ] **Step 5: Add the WOLFRAM QUERY RULES block to `problemGeneratorSystem`**
+- [x] **Step 5: Add the WOLFRAM QUERY RULES block to `problemGeneratorSystem`**
 
 Old:
 
@@ -1470,7 +1470,7 @@ WOLFRAM QUERY RULES:
 - Plain ASCII, a single line.
 ```
 
-- [ ] **Step 6: Add the rephrase prompts to `src/lib/ai/prompts.ts`**
+- [x] **Step 6: Add the rephrase prompts to `src/lib/ai/prompts.ts`**
 
 Insert directly after the `equivalenceUser` function:
 
@@ -1510,12 +1510,12 @@ Rewrite the query so Wolfram Alpha can compute it.`;
 }
 ```
 
-- [ ] **Step 7: Typecheck (expect ONE expected failure, then fix forward)**
+- [x] **Step 7: Typecheck (expect ONE expected failure, then fix forward)**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit`
 Expected: exit 0. `problemBatchSchema` gaining a required field compiles cleanly because the only consumers (generate.ts) read fields, never construct batch objects. If an error names `wolframQuery`, Task 11 is where the field gets consumed; a construction site erroring here means an unexpected caller and must be reported, not patched silently.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && git add src/lib/ai/config.ts src/lib/ai/schemas.ts src/lib/ai/prompts.ts && git commit -m "feat: wolframQuery generator contract, rephrase prompt, new prompt names"
@@ -1532,7 +1532,7 @@ cd /Users/newmac/Desktop/AngleBengal && git add src/lib/ai/config.ts src/lib/ai/
 - Consumes: `computeAnswer` (Task 8), `parseQuantity`/`numericMatch` (Task 2), `callStructured` from `@/lib/ai/call`, `AI_MODELS` from `@/lib/ai/config`, `EQUIVALENCE_SYSTEM`/`equivalenceUser` from `@/lib/ai/prompts`, `equivalenceSchema` from `@/lib/ai/schemas`, `WolframParsed` (Task 5).
 - Produces: `judgeEquivalence(a: string, b: string): Promise<boolean>`. Tasks 11 and 12 consume it. Escalation order is spec-locked (section 8): Wolfram first, LLM judge on Wolfram failure, strict `false` when both fail.
 
-- [ ] **Step 1: Create `src/lib/problems/equivalence.ts`**
+- [x] **Step 1: Create `src/lib/problems/equivalence.ts`**
 
 ```ts
 import "server-only";
@@ -1628,12 +1628,12 @@ function solutionsEqual(a: string, b: string): boolean {
 }
 ```
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit`
 Expected: exit 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && git add src/lib/problems/equivalence.ts && git commit -m "feat: shared wolfram-first equivalence helper"
@@ -1650,7 +1650,7 @@ cd /Users/newmac/Desktop/AngleBengal && git add src/lib/problems/equivalence.ts 
 - Consumes: `computeAnswer` (Task 8), `judgeEquivalence` (Task 10), `parseQuantity`/`numericMatch`/`compareToAnswer` (Tasks 2-3), `WolframParsed` (Task 5), `WOLFRAM_REPHRASE_SYSTEM`/`wolframRephraseUser`/`wolframRephraseSchema` (Task 9), plus everything the file already imports.
 - Produces: `VerifyOutcome` gains `verifiedBy: "wolfram" | "llm" | null`; `prisma.problem.create` persists `wolframQuery` and `verifiedBy`; every discard writes an `AiCallLog` row with `promptName: "verifier-reject"`. The response shape `{requested, verified, discarded, problemIds}` is UNCHANGED (spec section 7). The D-088 word-problem pre-gate stays first, ahead of all verification spend.
 
-- [ ] **Step 1: Update the imports**
+- [x] **Step 1: Update the imports**
 
 In `src/lib/problems/generate.ts`, replace the import block. Old:
 
@@ -1713,7 +1713,7 @@ import type { WolframParsed } from "@/lib/wolfram/parse";
 import { judgeEquivalence } from "./equivalence";
 ```
 
-- [ ] **Step 2: Give the word-problem gate outcome the new field**
+- [x] **Step 2: Give the word-problem gate outcome the new field**
 
 Old:
 
@@ -1738,7 +1738,7 @@ New:
         : verifyProblem(problem),
 ```
 
-- [ ] **Step 3: Log every discard and persist the new columns**
+- [x] **Step 3: Log every discard and persist the new columns**
 
 Replace the save loop. Old:
 
@@ -1808,7 +1808,7 @@ New:
   }
 ```
 
-- [ ] **Step 4: Replace everything from `type VerifyOutcome` to the end of the file**
+- [x] **Step 4: Replace everything from `type VerifyOutcome` to the end of the file**
 
 Delete the current `type VerifyOutcome` line and the whole current `verifyProblem` function, and put this in their place (end of file):
 
@@ -2045,17 +2045,17 @@ async function logVerifierReject(outcome: VerifyOutcome): Promise<void> {
 }
 ```
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit`
 Expected: exit 0.
 
-- [ ] **Step 6: Run the test suite (regression only, this file has no unit tests)**
+- [x] **Step 6: Run the test suite (regression only, this file has no unit tests)**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npm test`
 Expected: PASS, 37 tests, unchanged.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && git add src/lib/problems/generate.ts && git commit -m "feat: wolfram-first verification with rephrase retry and reject telemetry"
@@ -2072,7 +2072,7 @@ cd /Users/newmac/Desktop/AngleBengal && git add src/lib/problems/generate.ts && 
 - Consumes: `judgeEquivalence` (Task 10), `needsEquivalenceCheck` from `compareToAnswer` (Task 3).
 - Produces: `submitAttempt` grades an algebraically equivalent expression or equation as correct. The corrected flag drives all three consumers: diagnosis skip, the Attempt row, and the response. Cached equivalence queries make repeat attempts free (spec section 8).
 
-- [ ] **Step 1: Add the import**
+- [x] **Step 1: Add the import**
 
 Old:
 
@@ -2092,7 +2092,7 @@ import { ApiError } from "@/lib/ai/errors";
 import { judgeEquivalence } from "./equivalence";
 ```
 
-- [ ] **Step 2: Escalate inconclusive comparisons**
+- [x] **Step 2: Escalate inconclusive comparisons**
 
 Old:
 
@@ -2125,7 +2125,7 @@ New:
     : await diagnose({
 ```
 
-- [ ] **Step 3: Drive the Attempt row and the response from the corrected flag**
+- [x] **Step 3: Drive the Attempt row and the response from the corrected flag**
 
 Old:
 
@@ -2157,12 +2157,12 @@ New:
     solutionMd: problem.solutionMd,
 ```
 
-- [ ] **Step 4: Typecheck and test**
+- [x] **Step 4: Typecheck and test**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npx tsc --noEmit && npm test`
 Expected: both exit 0, 37 tests green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && git add src/lib/problems/grade.ts && git commit -m "fix: grading escalates inconclusive comparisons to the equivalence path"
@@ -2178,7 +2178,7 @@ cd /Users/newmac/Desktop/AngleBengal && git add src/lib/problems/grade.ts && git
 - Modify: `docs/05-ai-integration.md`
 - Modify: `DECISIONS.md` (append only)
 
-- [ ] **Step 1: Add the Wolfram block to `.env.example`**
+- [x] **Step 1: Add the Wolfram block to `.env.example`**
 
 Append after the existing DIRECT_URL block:
 
@@ -2191,7 +2191,7 @@ Append after the existing DIRECT_URL block:
 WOLFRAM_APP_ID=
 ```
 
-- [ ] **Step 2: Update `docs/03-data-model.md`**
+- [x] **Step 2: Update `docs/03-data-model.md`**
 
 Two additions, matching the document's existing prose and table style (read the file first to place them):
 
@@ -2223,7 +2223,7 @@ re-verification and repeat grading tiebreaks never spend quota.
 - `createdAt` (DateTime)
 ```
 
-- [ ] **Step 3: Update `docs/05-ai-integration.md` §4**
+- [x] **Step 3: Update `docs/05-ai-integration.md` §4**
 
 Read the section first, then make these three changes in the document's own voice:
 
@@ -2231,7 +2231,7 @@ Read the section first, then make these three changes in the document's own voic
 2. Add the WOLFRAM QUERY RULES block (identical text to Task 9 Step 5) to the §4.1 generator prompt documentation, plus the `wolframQuery` field in the batch schema listing.
 3. In §4.3, note that verifier-reject logging is now real: every discard writes an AiCallLog row (`promptName: "verifier-reject"`, `ok: false`, modelId `wolfram-full-results` for Wolfram mismatches, the verifier model otherwise), and Wolfram telemetry rows use `wolfram-verify` / `wolfram-equivalence` with modelId `wolfram-full-results` and zero token columns.
 
-- [ ] **Step 4: Append the DECISIONS entries**
+- [x] **Step 4: Append the DECISIONS entries**
 
 First confirm the tail: the file currently ends at D-089. Append after whatever the tail is at execution time, numbering sequentially from the next free number, matching the entry format already used in the file. Never renumber existing entries. Entry content (numbered here assuming D-090 onward; shift if the tail moved):
 
@@ -2271,7 +2271,7 @@ the verifier model: it is a phrasing task, not a math task, and it sits on
 the hot path of every generation batch.
 ```
 
-- [ ] **Step 5: Run every gate**
+- [x] **Step 5: Run every gate**
 
 Run: `cd /Users/newmac/Desktop/AngleBengal && npm run lint`
 Expected: exit 0.
@@ -2287,7 +2287,7 @@ Stop any dev server on port 3010, then build:
 Run: `cd /Users/newmac/Desktop/AngleBengal && lsof -ti tcp:3010 | xargs kill 2>/dev/null; npm run build`
 Expected: build succeeds.
 
-- [ ] **Step 6: Manual smoke of the fallback path (WOLFRAM_APP_ID unset)**
+- [x] **Step 6: Manual smoke of the fallback path (WOLFRAM_APP_ID unset)**
 
 With `WOLFRAM_APP_ID` absent from `.env` (do not add it):
 
@@ -2299,13 +2299,13 @@ With `WOLFRAM_APP_ID` absent from `.env` (do not add it):
 
 This proves the entire ladder in spec section 10 with zero Wolfram access. The owner's Wolfram AppID smoke (spec section 13) happens after they register; nothing in this plan blocks on it.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /Users/newmac/Desktop/AngleBengal && git add .env.example docs/03-data-model.md docs/05-ai-integration.md DECISIONS.md && git commit -m "docs: wolfram verification data model, ai integration, and decisions"
 ```
 
-- [ ] **Step 8: Em-dash sweep of everything this plan touched**
+- [x] **Step 8: Em-dash sweep of everything this plan touched**
 
 The pattern below is the em-dash written as escaped UTF-8 bytes, so this plan file itself stays free of the character:
 
