@@ -63,6 +63,7 @@ export function PracticePanel({
   topicId,
   topicPath,
   initialCounts,
+  wordProblemsOnly,
   answer,
   onAnswerChange,
   onProblemChange,
@@ -70,6 +71,12 @@ export function PracticePanel({
   topicId: string;
   topicPath: string[];
   initialCounts: Record<number, number>;
+  /**
+   * Reflected, never edited here. The single control lives on the topic's card
+   * on /practice, so this panel reads the setting as it was when the page was
+   * rendered and does not offer a second switch.
+   */
+  wordProblemsOnly: boolean;
   /** Controlled by the workspace: the sketchpad can insert into it. */
   answer: AnswerValue;
   onAnswerChange: (value: AnswerValue) => void;
@@ -284,6 +291,15 @@ export function PracticePanel({
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline bg-paper-1 px-4 py-2.5">
         <p className="min-w-0 flex-1 truncate text-meta text-ink">{topicPath.join("  ›  ")}</p>
+        {wordProblemsOnly && (
+          /* A meta chip's look, hand-written rather than `chipClasses`, because
+             `Chip`'s BASE carries `max-lg:tap-target`: a 44px invisible overlay
+             on a span that nothing can click, sitting next to difficulty chips
+             that can. The look is the point here, not the hit area. */
+          <span className="stock-textured inline-flex h-6 shrink-0 items-center rounded-chip bg-kraft px-2 text-ui font-medium text-ink">
+            Word problems only
+          </span>
+        )}
         <DifficultySelector
           value={difficulty}
           counts={counts}
@@ -321,7 +337,11 @@ export function PracticePanel({
               line={
                 generating
                   ? "Each problem is solved a second time, independently, before it can be shown to you. Problems the check disagrees with are discarded."
-                  : `Nothing verified and unsolved at difficulty ${difficulty} yet.`
+                  : `Nothing verified and unsolved at difficulty ${difficulty} yet.${
+                      wordProblemsOnly
+                        ? " This topic is set to word problems, so the set will be real-world scenarios."
+                        : ""
+                    }`
               }
               accent={accent}
               action={
@@ -330,7 +350,11 @@ export function PracticePanel({
                   className="max-lg:tap-target"
                   onClick={() => void generate()}
                 >
-                  {generating ? "Working..." : "Generate 5 problems"}
+                  {generating
+                    ? "Working..."
+                    : wordProblemsOnly
+                      ? "Generate 5 word problems"
+                      : "Generate 5 problems"}
                 </Button>
               }
             />

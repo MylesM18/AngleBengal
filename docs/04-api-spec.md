@@ -12,7 +12,15 @@ Returns the full topic tree with doc/problem counts.
 ```
 
 ### GET /api/topics/[id]
-One topic with its `modelDocs` (id, title, createdAt) and counts.
+One topic with its `modelDocs` (id, title, createdAt) and counts, including `wordProblemsOnly`.
+
+### PATCH /api/topics/[id]
+```json
+{ "wordProblemsOnly": true }
+```
+The topic's only mutable field, set from the topic card on /practice. The body schema names it rather than accepting a partial topic, so nothing else about a topic can be edited through this route.
+Success `200`: `{ "id": "...", "wordProblemsOnly": true }`
+Failures: `400 BAD_REQUEST` (body is not `{ wordProblemsOnly: boolean }`), `404 NOT_FOUND`.
 
 ## Mental model docs
 

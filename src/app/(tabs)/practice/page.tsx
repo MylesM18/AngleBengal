@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { WordProblemsToggle } from "@/components/practice/WordProblemsToggle";
 import { getRootNameByTopicId, getTopicTree, type TopicNode } from "@/lib/topics";
 import { accentForRoot, ACCENT_VAR } from "@/lib/topicColors";
 
@@ -119,13 +120,19 @@ function TopicRow({
 }) {
   const accent = accentForRoot(rootName);
   return (
-    <li>
-      <Link
-        href={`/practice/${topic.id}`}
-        className={`flex items-center gap-3 rounded-card p-3.5 shadow-sheet transition-all hover:-translate-y-px hover:shadow-lift ${
-          muted ? "bg-paper-1/70" : "bg-paper-1"
-        }`}
-      >
+    /*
+     * The card chrome moved from the link to this wrapper so the toggle can sit
+     * inside the card without being inside the link: a button nested in an
+     * anchor is invalid markup, and every click on it would also navigate. The
+     * lift now belongs to the whole card, which is also what it looks like it
+     * should do once the card has two rows.
+     */
+    <li
+      className={`rounded-card shadow-sheet transition-all hover:-translate-y-px hover:shadow-lift ${
+        muted ? "bg-paper-1/70" : "bg-paper-1"
+      }`}
+    >
+      <Link href={`/practice/${topic.id}`} className="flex items-center gap-3 rounded-card p-3.5">
         <span
           aria-hidden
           className="h-9 w-1.5 shrink-0 rounded-chip"
@@ -138,6 +145,15 @@ function TopicRow({
           </span>
         </span>
       </Link>
+      {/* `flex-wrap` and not `justify-between`: at the 360px floor the sentence
+          and the chip together run past the card, so they stack rather than
+          crush the chip's label onto two lines. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-hairline px-3.5 py-2.5">
+        <p className="min-w-0 flex-1 text-meta text-ink-soft">
+          Applies to problems generated from here on, not to the pool already verified.
+        </p>
+        <WordProblemsToggle topicId={topic.id} initial={topic.wordProblemsOnly} />
+      </div>
     </li>
   );
 }

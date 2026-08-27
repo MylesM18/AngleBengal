@@ -371,6 +371,7 @@ export function problemGeneratorSystem(
   doc: { title: string; contentMd: string },
   count: number,
   difficulty: number,
+  wordProblemsOnly: boolean,
 ): string {
   return `You are writing practice problems for a specific mathematics topic, targeted
 at specific mental models the student is training. You will receive the
@@ -393,11 +394,30 @@ For each problem:
   model (by number and name) fires at each step.
 - modelTags: the model numbers this problem exercises (1-based, from the
   provided document).
+- isWordProblem: true only when the statement poses a real-world situation in
+  prose, with people, objects, or events the student could picture. A bare
+  instruction over symbols ("Solve $3x + 5 = 20$", "Differentiate $x^2\\sin x$")
+  is false, even if it opens with a sentence of framing.
+- scenario: the situation in a short phrase, for example "two trains leaving
+  the same station". Null when isWordProblem is false.
 - Recompute all arithmetic before finalizing. An arithmetic slip makes the
   problem worthless.
 
 Vary surface features across the batch (contexts, number ranges, which
-quantity is unknown) so no two problems are template-identical. No em-dashes.
+quantity is unknown) so no two problems are template-identical. No em-dashes.${
+    wordProblemsOnly
+      ? `
+
+WORD PROBLEMS ONLY. This topic is set to word problems, so every one of the
+${count} problems must be a real-world scenario stated in prose: a situation
+with a named person, place, object, or event, where the student has to read the
+setting and decide for themselves what to compute. Do not emit a single bare
+symbolic exercise, and do not dress one up by adding a sentence in front of it.
+isWordProblem must be true and scenario must be filled in for every problem.
+Problems that arrive any other way are discarded, so a batch of four genuine
+word problems beats five where one is symbolic.`
+      : ""
+  }
 
 ANSWER FIELD RULES:
 - "unit" and "tolerance" must always be present. Use null when not applicable.
@@ -415,10 +435,17 @@ THE TOPIC'S MENTAL MODEL DOCUMENT:
 ${doc.contentMd}`;
 }
 
-export function problemGeneratorUser(topicPath: string[], count: number, difficulty: number): string {
+export function problemGeneratorUser(
+  topicPath: string[],
+  count: number,
+  difficulty: number,
+  wordProblemsOnly: boolean,
+): string {
   return `Topic: ${topicPath[topicPath.length - 1]}
 Taxonomy path: ${topicPath.join(" > ")}
-Write ${count} problems at difficulty ${difficulty}.`;
+Write ${count} problems at difficulty ${difficulty}.${
+    wordProblemsOnly ? "\nEvery problem must be a word problem." : ""
+  }`;
 }
 
 /**
