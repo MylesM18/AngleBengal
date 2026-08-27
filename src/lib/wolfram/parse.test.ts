@@ -94,4 +94,15 @@ describe("parseWolframResult extended shapes", () => {
       value: 42,
     });
   });
+
+  it("splits bare separator-less lines into solutions when they all parse", () => {
+    expect(parseWolframResult("2\n-2")).toEqual({ kind: "solutions", values: ["2", "-2"] });
+  });
+
+  it("keeps units on bare multi-line solutions", () => {
+    expect(parseWolframResult("6 miles\n9.66 kilometers")).toEqual({
+      kind: "solutions",
+      values: ["6 miles", "9.66 kilometers"],
+    });
+  });
 });

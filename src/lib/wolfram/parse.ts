@@ -30,6 +30,15 @@ export function parseWolframResult(plaintext: string): WolframParsed | null {
       .map((line) => rightHandSide(line))
       .filter((value): value is string => value !== null);
     if (values.length >= 2) return { kind: "solutions", values };
+
+    // Bare separator-less lines, e.g. "6 miles\n9.66 kilometers": if at
+    // least two lines individually evaluate as quantities, treat the set as
+    // a solution list. The raw trimmed line text is kept as the value (not
+    // the evaluated number) so a unit on the line survives for the
+    // solutions arm; a lone parseable line among unreadable notes still
+    // falls through to the first-line fallback below.
+    const bareQuantityLines = lines.filter((line) => toNumber(line) !== null);
+    if (bareQuantityLines.length >= 2) return { kind: "solutions", values: bareQuantityLines };
   }
   const firstLine = lines[0] ?? text;
 

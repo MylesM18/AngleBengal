@@ -23,9 +23,9 @@ import {
 } from "@/lib/ai/schemas";
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
-import { compareAnswers, compareToAnswer, numericMatch, parseQuantity } from "@/lib/math/compare";
+import { compareAnswers, compareToAnswer } from "@/lib/math/compare";
 import { getTopicPath } from "@/lib/topics";
-import { numericAgreement } from "@/lib/wolfram/agreement";
+import { numericAgreement, solutionsAgreement } from "@/lib/wolfram/agreement";
 import { computeAnswer } from "@/lib/wolfram/compute";
 import type { WolframParsed } from "@/lib/wolfram/parse";
 
@@ -222,17 +222,10 @@ async function wolframAgreement(
       return numericAgreement(answer.value, answer.unit, answer.tolerance, resultText, parsed.value);
     }
     if (parsed.kind === "solutions") {
-      const values = parsed.values
-        .map((candidate) => parseQuantity(candidate)?.value)
-        .filter((value): value is number => typeof value === "number");
-      const agrees = values.some((value) =>
-        numericMatch(answer.value, value, answer.tolerance),
-      );
+      const outcome = solutionsAgreement(answer.value, answer.unit, answer.tolerance, parsed.values);
       return {
-        verdict: agrees ? "agree" : "disagree",
-        reason: agrees
-          ? "one of Wolfram's solutions matched the numeric answer"
-          : `none of Wolfram's solutions (${resultText}) matched ${answer.value}`,
+        verdict: outcome.verdict,
+        reason: `${outcome.reason} (wolfram result: ${resultText})`,
       };
     }
     // Wolfram succeeded but returned a symbolic result for a numeric answer:
