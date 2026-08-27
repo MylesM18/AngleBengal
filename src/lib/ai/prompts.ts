@@ -400,6 +400,8 @@ For each problem:
   is false, even if it opens with a sentence of framing.
 - scenario: the situation in a short phrase, for example "two trains leaving
   the same station". Null when isWordProblem is false.
+- wolframQuery: the computable core of the problem as one short Wolfram Alpha
+  query, following the WOLFRAM QUERY RULES below.
 - Recompute all arithmetic before finalizing. An arithmetic slip makes the
   problem worthless.
 
@@ -424,6 +426,16 @@ ANSWER FIELD RULES:
 - For "multi", every part needs name (machine name, camelCase), label (shown
   to the student), value, unit, tolerance.
 - The answer is a single final value, not a restatement of the question.
+
+WOLFRAM QUERY RULES:
+- English keywords plus linear math syntax: "solve 3x - 7 = 11",
+  "integrate x^2 sin(x) dx", "45 mph * 2.5 hours".
+- Exponent notation 6*10^14, never 6e14.
+- Single-letter variable names.
+- Units spelled out and attached to their quantities.
+- One computation per query. For word problems the query is the extracted
+  computation, never the prose.
+- Plain ASCII, a single line.
 
 NOTATION: write all mathematics as LaTeX delimited by $ or $$, in the problem
 statement and the solution alike. The document below may write formulas as
@@ -480,6 +492,40 @@ are equivalent. Return only the boolean.`;
 
 export function equivalenceUser(a: string, b: string): string {
   return `Expression A: ${a}\nExpression B: ${b}\nAre they mathematically equivalent?`;
+}
+
+/**
+ * Spec section 7 step 2: when Wolfram does not understand a query, one cheap
+ * rephrase attempt (CLASSIFIER model) before falling back to LLM
+ * verification. Same query rules the generator follows.
+ */
+export const WOLFRAM_REPHRASE_SYSTEM = `You rewrite a failed Wolfram Alpha query so Wolfram can compute it. Keep the
+same computation: never change the mathematics, only the phrasing. Rules:
+English keywords plus linear math syntax ("solve 3x - 7 = 11"), exponent
+notation 6*10^14 never 6e14, single-letter variable names, units spelled out
+and attached to quantities, one computation per query, plain ASCII on a
+single line. Return only the rewritten query.`;
+
+export function wolframRephraseUser(
+  originalQuery: string,
+  statementMd: string,
+  suggestions: string[],
+): string {
+  return `Wolfram Alpha did not understand this query:
+
+${originalQuery}
+
+The query is meant to compute the answer to this problem:
+
+${statementMd}
+${
+    suggestions.length
+      ? `\nWolfram suggested these interpretations:\n${suggestions
+          .map((suggestion) => `- ${suggestion}`)
+          .join("\n")}\n`
+      : ""
+  }
+Rewrite the query so Wolfram Alpha can compute it.`;
 }
 
 /* ------------------------------------------------------------------ */

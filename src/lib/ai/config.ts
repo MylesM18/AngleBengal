@@ -23,6 +23,10 @@ export type PromptName =
   | "classifier"
   | "verifier"
   | "verifier-reject"
+  | "equivalence"
+  | "wolfram-rephrase"
+  | "wolfram-verify"
+  | "wolfram-equivalence"
   | "diagnostic"
   | "tutor"
   | "ocr";

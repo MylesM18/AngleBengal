@@ -95,6 +95,11 @@ export const problemBatchSchema = z.object({
       isWordProblem: z.boolean(),
       /** The situation in a short phrase ("two trains leaving a station"), null when isWordProblem is false. */
       scenario: z.string().nullable(),
+      /**
+       * The computable core of the problem as one short single-line ASCII
+       * Wolfram Alpha query (spec section 6), e.g. "solve 3x - 7 = 11".
+       */
+      wolframQuery: z.string(),
     }),
   ),
 });
@@ -121,6 +126,11 @@ export const verifierSchema = z.object({
 /** docs/05 §4.3 fallback when normalization cannot settle equivalence. */
 export const equivalenceSchema = z.object({
   equivalent: z.boolean(),
+});
+
+/** Spec section 7 step 2: one rephrase when Wolfram does not understand. */
+export const wolframRephraseSchema = z.object({
+  query: z.string(),
 });
 
 /** docs/05 §5: which model failed. */
