@@ -19,6 +19,8 @@ export type TopicNode = {
   parentId: string | null;
   docCount: number;
   verifiedProblemCount: number;
+  /** Practice generation constraint, owned per topic (docs/06 §3). */
+  wordProblemsOnly: boolean;
   children: TopicNode[];
 };
 
@@ -27,6 +29,7 @@ type TopicRow = {
   name: string;
   slug: string;
   parentId: string | null;
+  wordProblemsOnly: boolean;
   symbol: { glyph: string } | null;
   _count: { modelDocs: number };
 };
@@ -56,6 +59,7 @@ function buildTree(rows: TopicRow[], verified: Map<string, number>): TopicNode[]
       parentId: row.parentId,
       docCount: row._count.modelDocs,
       verifiedProblemCount: verified.get(row.id) ?? 0,
+      wordProblemsOnly: row.wordProblemsOnly,
       children: [],
     });
   }
@@ -94,6 +98,7 @@ export async function getTopicTree(): Promise<TopicNode[]> {
         name: true,
         slug: true,
         parentId: true,
+        wordProblemsOnly: true,
         symbol: { select: { glyph: true } },
         _count: { select: { modelDocs: true } },
       },
@@ -114,6 +119,8 @@ export type TopicDetail = {
   pathNodes: TopicPathNode[];
   docCount: number;
   verifiedProblemCount: number;
+  /** Practice generation constraint, owned per topic (docs/06 §3). */
+  wordProblemsOnly: boolean;
   modelDocs: {
     id: string;
     title: string;
@@ -169,6 +176,7 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
       slug: true,
       parentId: true,
       description: true,
+      wordProblemsOnly: true,
       modelDocs: {
         select: {
           id: true,
@@ -209,6 +217,7 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
     pathNodes,
     docCount: topic.modelDocs.length,
     verifiedProblemCount,
+    wordProblemsOnly: topic.wordProblemsOnly,
     modelDocs: topic.modelDocs.map((doc) => ({
       id: doc.id,
       title: doc.title,

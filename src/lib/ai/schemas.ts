@@ -86,9 +86,30 @@ export const problemBatchSchema = z.object({
       /** 1-based model numbers from the topic's document. */
       modelTags: z.array(z.number().int()),
       difficulty: z.number().int().min(1).max(5),
+      /**
+       * docs/05 §4.1. True when the statement poses a real-world situation in
+       * prose rather than a bare symbolic exercise. Always requested, so the
+       * generator has to classify what it just wrote whether or not the topic
+       * demands word problems.
+       */
+      isWordProblem: z.boolean(),
+      /** The situation in a short phrase ("two trains leaving a station"), null when isWordProblem is false. */
+      scenario: z.string().nullable(),
     }),
   ),
 });
+
+/**
+ * The word-problem contract (docs/05 §4.1), checked the way
+ * `classifierResultIsCoherent` is: a JSON Schema can require the fields but
+ * cannot say "and mean it", so a topic with `wordProblemsOnly` gets its answer
+ * here. Naming the scenario is what makes the boolean cost something: a
+ * generator that ticks the box on a bare "Solve for $x$" still has to invent a
+ * situation, and there is none to invent.
+ */
+export function problemIsWordProblem(problem: ProblemBatch["problems"][number]): boolean {
+  return problem.isWordProblem && (problem.scenario ?? "").trim().length > 0;
+}
 
 /** docs/05 §4.2: the verifier solving the statement cold. */
 export const verifierSchema = z.object({

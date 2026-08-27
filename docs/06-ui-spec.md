@@ -47,6 +47,8 @@ Split view, resizable divider, default 45/55.
   - Wrong without diagnosis (null): "Not quite" + Try again / Show solution. No fake attribution.
 - `POOL_EMPTY`: empty state with "Generate 5 problems" button showing the verify progress ("Generated 5, verifying... 4 passed").
 
+**Word problems only.** Each topic card on `/practice` carries a toggle chip, "Word problems only", writing `Topic.wordProblemsOnly` through `PATCH /api/topics/[id]`. It is the single control for the setting: the session panel at `/practice/[topicId]` reflects it (a meta chip in the header, and "Generate 5 word problems" on the empty state) but offers no switch of its own, so there is never a question of which one won. The setting gates generation only. Problems already in the pool are neither relabelled nor filtered, and the card says so.
+
 **Right panel: the sketchpad.** See §4.
 
 ## §4 Sketchpad spec

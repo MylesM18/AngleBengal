@@ -1614,3 +1614,68 @@ Two sub-choices the spec left open:
 ascending rather than `createdAt` descending. With `@@unique([topicId, depth])`
 in place, the only way a topic holds more than one document is a chain, and
 level order is the only order that reads correctly for one.
+
+### D-087. The word-problem setting lives on Topic, and the card owns the only switch
+
+Practice needed a per-topic "Word problems only" control. It is one boolean on
+`Topic` (`wordProblemsOnly`, default false, migration
+`20260827012023_topic_word_problems_only`), set from the topic card on
+`/practice` through a new `PATCH /api/topics/[id]`.
+
+The session panel at `/practice/[topicId]` reflects the setting and offers no
+switch. Two controls for one boolean is a question about which one is
+authoritative that nobody should have to ask, and the topic card is where the
+decision belongs: it is the surface where you choose what to practise, before a
+session exists to change your mind in.
+
+`PATCH` names `wordProblemsOnly` in its body schema rather than accepting a
+partial topic. A route that takes whatever it is handed would let a stray key
+rename a topic or reparent it, and nothing asks for that.
+
+The card is now a two-row card. That is not decoration: the row used to be a
+single `<Link>` covering everything, and a button inside an anchor is invalid
+markup where every click on the toggle would also navigate. The chrome (fill,
+shadow, hover lift) moved to the wrapper, so the whole card lifts and the
+toggle sits inside the card without sitting inside the link.
+
+### D-088. The contract is two fields, and the gate runs before the verifier
+
+`problemBatchSchema` gains `isWordProblem` and `scenario` on every problem, and
+both are always requested, on every topic. A boolean the generator sets about
+its own output is cheap to rubber-stamp; making it name the situation in a
+phrase is not, because there is no situation to name in "Solve $3x + 5 = 20$".
+`problemIsWordProblem` requires both, the way `classifierResultIsCoherent`
+enforces what a JSON Schema cannot express.
+
+The gate runs before the verifier call and short-circuits it. This does not
+weaken the verification pass (non-negotiable 2): a problem that clears the gate
+still gets solved independently, cold, and still has to agree before it is
+saved. It only declines to spend a verifier call on a problem the topic would
+discard either way. Rejections land in the existing `verifier-reject` log line
+and count toward `discarded`, so the panel's "generated 5, passed 4, discarded
+1" stays honest without a new category of failure to explain.
+
+Asking for the fields on every topic rather than only on `wordProblemsOnly`
+ones costs a few tokens per problem and buys a schema that does not change
+shape depending on a setting, which is what makes the JSON Schema cacheable and
+the failure modes uniform.
+
+### D-089. Newly generated only: no column on Problem, no filter on the pool
+
+The setting gates generation. `Problem` gets no word-problem column, so nothing
+is backfilled onto the 17 existing verified Distance-Rate-Time problems, and
+`serve.ts` is untouched.
+
+The consequence, stated plainly because it is the honest reading and the card
+says it too: with the toggle on, a session can still serve older symbolic
+problems from the pool that already exists. Only what is generated from now on
+is guaranteed to be a word problem.
+
+Closing that gap later is a different change with its own costs, and it is
+three steps, not one: add `Problem.isWordProblem` and persist the generator's
+answer; classify the existing pool (a cheap model pass, or a hand pass over 17
+rows); then filter in `serve.ts` and decide what an empty filtered pool does,
+since a topic whose whole pool is symbolic would go from "practise these" to
+"nothing here" the moment the toggle flips. Adding an unused column now would
+have been speculative, and adding a filter without the backfill would hide
+every existing problem behind a null.

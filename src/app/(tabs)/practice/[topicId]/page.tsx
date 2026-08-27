@@ -19,6 +19,11 @@ export default async function PracticeTopicPage({
   if (!topic) notFound();
 
   return (
-    <PracticeWorkspace topicId={topic.id} topicPath={topic.path} initialCounts={counts} />
+    <PracticeWorkspace
+      topicId={topic.id}
+      topicPath={topic.path}
+      initialCounts={counts}
+      wordProblemsOnly={topic.wordProblemsOnly}
+    />
   );
 }

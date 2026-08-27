@@ -14,6 +14,7 @@ import {
 import {
   equivalenceSchema,
   problemBatchSchema,
+  problemIsWordProblem,
   verifierSchema,
   type ProblemBatch,
 } from "@/lib/ai/schemas";
@@ -49,7 +50,7 @@ export async function generateProblems(
 ): Promise<GenerateProblemsResult> {
   const topic = await prisma.topic.findUnique({
     where: { id: topicId },
-    select: { id: true },
+    select: { id: true, wordProblemsOnly: true },
   });
   if (!topic) throw new ApiError("NOT_FOUND", "That topic does not exist.");
 
@@ -72,8 +73,8 @@ export async function generateProblems(
   const batch = await callStructured({
     promptName: "generator",
     model: AI_MODELS.GENERATOR,
-    system: problemGeneratorSystem(doc, count, difficulty),
-    user: problemGeneratorUser(topicPath, count, difficulty),
+    system: problemGeneratorSystem(doc, count, difficulty, topic.wordProblemsOnly),
+    user: problemGeneratorUser(topicPath, count, difficulty, topic.wordProblemsOnly),
     schema: problemBatchSchema,
     schemaName: "problem_batch",
   });
@@ -84,8 +85,21 @@ export async function generateProblems(
 
   // Verify concurrently: each problem's check is independent, and a batch of
   // five otherwise costs five sequential model calls.
+  //
+  // The word-problem gate runs first and short-circuits the verifier call. It
+  // is not a relaxation of the verification pass: a problem that clears the
+  // gate still has to be solved independently and agreed with before it is
+  // saved (non-negotiable 2). It only declines to spend a verifier call on a
+  // problem this topic would discard either way.
   const outcomes = await Promise.all(
-    batch.problems.map((problem) => verifyProblem(problem)),
+    batch.problems.map((problem) =>
+      topic.wordProblemsOnly && !problemIsWordProblem(problem)
+        ? Promise.resolve<VerifyOutcome>({
+            verified: false,
+            reason: "not a word problem, and this topic is set to word problems only",
+          })
+        : verifyProblem(problem),
+    ),
   );
 
   const problemIds: string[] = [];

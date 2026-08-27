@@ -198,6 +198,12 @@ For each problem:
   model (by number and name) fires at each step.
 - modelTags: the model numbers this problem exercises (1-based, from the
   provided document).
+- isWordProblem: true only when the statement poses a real-world situation in
+  prose, with people, objects, or events the student could picture. A bare
+  instruction over symbols ("Solve $3x + 5 = 20$", "Differentiate $x^2\sin x$")
+  is false, even if it opens with a sentence of framing.
+- scenario: the situation in a short phrase, for example "two trains leaving
+  the same station". Null when isWordProblem is false.
 - Recompute all arithmetic before finalizing. An arithmetic slip makes the
   problem worthless.
 
@@ -205,7 +211,24 @@ Vary surface features across the batch (contexts, number ranges, which
 quantity is unknown) so no two problems are template-identical. No em-dashes.
 ```
 
-JSON schema: `{ problems: [{ statementMd, answerJson, solutionMd, modelTags: number[], difficulty }] }`
+When the topic has `wordProblemsOnly` set, this block is appended:
+
+```
+WORD PROBLEMS ONLY. This topic is set to word problems, so every one of the
+{count} problems must be a real-world scenario stated in prose: a situation
+with a named person, place, object, or event, where the student has to read the
+setting and decide for themselves what to compute. Do not emit a single bare
+symbolic exercise, and do not dress one up by adding a sentence in front of it.
+isWordProblem must be true and scenario must be filled in for every problem.
+Problems that arrive any other way are discarded, so a batch of four genuine
+word problems beats five where one is symbolic.
+```
+
+and the user message gains the line "Every problem must be a word problem."
+
+JSON schema: `{ problems: [{ statementMd, answerJson, solutionMd, modelTags: number[], difficulty, isWordProblem: boolean, scenario: string | null }] }`
+
+`isWordProblem` and `scenario` are always requested, so the generator classifies what it wrote whether or not the topic demands word problems. On a `wordProblemsOnly` topic, `problemIsWordProblem` in `schemas.ts` requires both (true, and a non-blank scenario), the way `classifierResultIsCoherent` enforces what a JSON Schema cannot say. A problem that fails it is discarded before the verifier is called: that is a saving, not a relaxation, since a problem clearing the gate still has to pass §4.2 in full before it is saved. The setting gates generation only. `Problem` carries no word-problem column, so existing problems are neither relabelled nor filtered out of a session.
 
 ### 4.2 Verifier system prompt
 

@@ -38,6 +38,12 @@ model Topic {
   parent      Topic?   @relation("TopicTree", fields: [parentId], references: [id])
   children    Topic[]  @relation("TopicTree")
   description String?
+  /// Practice generation constraint (docs/05 §4.1). True means every problem
+  /// generated for this topic from now on must be a word problem: a real-world
+  /// scenario stated in prose. It gates generation only. The existing pool is
+  /// neither backfilled nor filtered, so a session can still serve older
+  /// symbolic problems (DECISIONS.md D-089).
+  wordProblemsOnly Boolean @default(false)
   /// Nullable because only ROOT topics carry a glyph (spec §4).
   symbolId    String?
   symbol      MathSymbol? @relation(fields: [symbolId], references: [id])
