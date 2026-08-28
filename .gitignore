@@ -52,3 +52,6 @@ yarn-error.log*
 
 # brainstorming companion
 .superpowers/
+
+# graphify knowledge graph (regenerable from the tree; holds graph.json, viz, caches)
+/graphify-out/
