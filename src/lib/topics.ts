@@ -121,6 +121,8 @@ export type TopicDetail = {
   verifiedProblemCount: number;
   /** Practice generation constraint, owned per topic (docs/06 §3). */
   wordProblemsOnly: boolean;
+  /** The topic's narrative companion doc, or null before generation (perspective spec §7). */
+  perspective: { id: string; contentMd: string; createdAt: Date } | null;
   modelDocs: {
     id: string;
     title: string;
@@ -177,6 +179,7 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
       parentId: true,
       description: true,
       wordProblemsOnly: true,
+      perspectiveDoc: { select: { id: true, contentMd: true, createdAt: true } },
       modelDocs: {
         select: {
           id: true,
@@ -218,6 +221,7 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
     docCount: topic.modelDocs.length,
     verifiedProblemCount,
     wordProblemsOnly: topic.wordProblemsOnly,
+    perspective: topic.perspectiveDoc,
     modelDocs: topic.modelDocs.map((doc) => ({
       id: doc.id,
       title: doc.title,
