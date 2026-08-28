@@ -8,6 +8,7 @@ import { DocTabStrip } from "@/components/learn/DocTabStrip";
 import { GenerateMoreStudy } from "@/components/learn/GenerateMoreStudy";
 import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
 import { ModelMissList } from "@/components/learn/ModelMissList";
+import { PerspectiveTabs } from "@/components/learn/PerspectiveTabs";
 import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
 import { ButtonLink, buttonClasses } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -20,7 +21,7 @@ import { getDescendantCounts, getTopicDetail } from "@/lib/topics";
 import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
 
 type Params = { topicId: string };
-type Search = { doc?: string; docs?: string; active?: string };
+type Search = { doc?: string; docs?: string; active?: string; new?: string };
 
 /**
  * A topic, and optionally one of its documents.
@@ -101,29 +102,35 @@ export default async function TopicPage({
           </div>
 
           <Sheet tone="paper-0" className="animate-enter-sheet overflow-hidden">
-            <DocTabStrip topicId={topic.id} tabs={tabLabels} activeId={doc.id} />
+            <PerspectiveTabs
+              topicId={topic.id}
+              perspective={topic.perspective ? { contentMd: topic.perspective.contentMd } : null}
+              autoFire={search.new === "1" && !topic.perspective}
+            >
+              <DocTabStrip topicId={topic.id} tabs={tabLabels} activeId={doc.id} />
 
-            <h1 className="display-cut px-4 pb-5 pt-6 text-h1 text-ink sm:px-8 sm:pt-8">{doc.title}</h1>
+              <h1 className="display-cut px-4 pb-5 pt-6 text-h1 text-ink sm:px-8 sm:pt-8">{doc.title}</h1>
 
-            <div className="stock-textured flex flex-wrap items-center gap-3 border-y border-hairline bg-kraft px-4 py-2.5 text-meta text-ink sm:px-8">
-              {doc.isExemplar && (
-                <span className="inline-flex h-6 items-center rounded-chip bg-paper-0 px-2 text-ui font-medium text-ink">
-                  Exemplar
+              <div className="stock-textured flex flex-wrap items-center gap-3 border-y border-hairline bg-kraft px-4 py-2.5 text-meta text-ink sm:px-8">
+                {doc.isExemplar && (
+                  <span className="inline-flex h-6 items-center rounded-chip bg-paper-0 px-2 text-ui font-medium text-ink">
+                    Exemplar
+                  </span>
+                )}
+                <span>
+                  {index.length} {index.length === 1 ? "model" : "models"}
                 </span>
-              )}
-              <span>
-                {index.length} {index.length === 1 ? "model" : "models"}
-              </span>
-              <span>{lastPracticed}</span>
-              <span className="ml-auto">
-                <GenerateMoreStudy topicId={topic.id} sourceDocId={doc.id} openIds={openIds} />
-              </span>
-            </div>
+                <span>{lastPracticed}</span>
+                <span className="ml-auto">
+                  <GenerateMoreStudy topicId={topic.id} sourceDocId={doc.id} openIds={openIds} />
+                </span>
+              </div>
 
-            <div className="px-4 py-6 sm:px-8 sm:py-8">
-              <ModelMissList misses={misses} />
-              <DocReader contentMd={doc.contentMd} models={index} accent={accent} />
-            </div>
+              <div className="px-4 py-6 sm:px-8 sm:py-8">
+                <ModelMissList misses={misses} />
+                <DocReader contentMd={doc.contentMd} models={index} accent={accent} />
+              </div>
+            </PerspectiveTabs>
           </Sheet>
         </div>
 

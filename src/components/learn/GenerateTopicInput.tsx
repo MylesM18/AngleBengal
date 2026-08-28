@@ -107,7 +107,7 @@ export function GenerateTopicInput({
         setFiledPath(result.topicPath);
         setStage("filing");
         setValue("");
-        router.push(`/learn/${result.topicId}?doc=${result.docId}`);
+        router.push(`/learn/${result.topicId}?doc=${result.docId}&new=1`);
         router.refresh();
         // Leave the filing line up briefly so the destination registers.
         timer.current = setTimeout(() => setStage("idle"), FILED_LINGER_MS);

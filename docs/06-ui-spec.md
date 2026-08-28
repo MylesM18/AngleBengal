@@ -114,3 +114,21 @@ That spec's section 3d supersedes the model-doc reader described in §2 (numbere
 ## Mobile layouts (2026-08-25)
 
 Two layout worlds split at lg (1024px); see docs/superpowers/specs/2026-08-25-mobile-responsive-design.md for the full design. Compact (below lg): a bottom tab bar carries Learn, Practice, and Settings; the top bar keeps the wordmark and the Tutor chip; the tutor opens as a full-screen takeover (still a drawer, never a tab); Learn navigates by drill-down with a linked breadcrumb; Practice is problem-home with a full-screen sketch mode behind a Sketch button, topped by a one-line problem ribbon. Full (lg and up): the desktop layout, unchanged apart from the breadcrumb, which became linked at every width so compact drill-down has a back affordance (D-075). Touch polish (44px tap-target hit areas, pen-priority palm rejection, safe-area padding) is compact only, gated behind `max-lg:`, and visually inert. It is not applied at lg and up: an unconditional 44px overlay overlapped the tight desktop chip gaps and made the edge of one chip select its neighbor (D-071, D-074). A few compact controls are still under 44px by decision, listed in the mobile spec's §6.
+
+## Perspective layer (2026-08-27)
+
+The doc reader (§2) gains a top-level two-tab control inside the reading
+sheet, ordered Perspective | Models (`PerspectiveTabs`). Default active
+tab: Perspective when the topic's perspective doc exists, Models when it
+does not. Client-local state, no persistence, no read tracking; both panes
+stay mounted so an in-flight generation survives tab switches. The Models
+pane is the entire existing reader, unchanged, including the level tab
+strip and deepen affordance. The Perspective pane (`PerspectivePane`) has
+no level UI: it renders the doc through the standard markdown + KaTeX
+pipeline, or, when the doc is missing, shows the "Generate perspective"
+affordance with loading copy and a typed retry state (never a blank
+screen). Topic creation navigates to the reader with `&new=1`; the pane
+auto-fires one generation when that flag is present and no doc exists, so
+the user reads models while the perspective writes itself in the
+background. The topic index page and empty states are unchanged. Swatch
+Book tokens throughout; the tab strip reuses the DocTabStrip treatment.

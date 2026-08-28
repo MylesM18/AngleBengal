@@ -1815,3 +1815,24 @@ the created status. `/api/models/generate` returns 201 for a fresh
 resource, so the perspective route does the same, and the `created` flag
 stays server-side (the client treats both as success and reads
 `contentMd`).
+
+### D-103. Perspective | Models tabs hold client-local state, not URL state
+
+House preference is URL state (D-008's reader, the docTabs scheme), but the
+Perspective pane owns an in-flight generation fetch and its loading state;
+a URL navigation remounts the server subtree and drops both, which would
+orphan the auto-fired generation the spec requires to keep running while
+the user reads the Models tab. The spec explicitly waives persistence
+("no read-tracking, no persistence"), so `useState` in PerspectiveTabs is
+the smallest correct choice. Both panes stay mounted; the inactive one is
+`hidden`.
+
+### D-104. The tab control lives on the doc-selected reader view only
+
+The spec places the perspective "in the reader alongside the model doc".
+The topic index (multi-doc grid, subtopic covers) and the empty state keep
+their current layouts; a topic reaches its perspective by opening any of
+its documents. The xl-only DocMiniTOC stays model-scoped and visible
+regardless of active tab: it is outside the sheet, and hiding it per-tab
+would cost a client boundary around layout that D-061 deliberately kept
+server-side.
