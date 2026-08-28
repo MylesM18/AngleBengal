@@ -184,6 +184,15 @@ understood after the retry, or the answer being `multi` (a single query
 cannot confirm two named parts, so multi always takes this path) falls back
 to the LLM flow in §4.2-4.3 unchanged, tagging `verifiedBy: "llm"`.
 
+Numeric agreement converts Wolfram's result into the expected answer's unit
+before the tolerance comparison, the same mathjs conversion §4.3 grading
+uses. A result in an incompatible unit, or a symbolic result for a numeric
+answer, is not comparable: it falls back to the LLM flow rather than being
+discarded outright. The Result-pod parser also recognizes approximation
+markers, newline-joined subpod lines, and a leading plus-minus as multiple
+solutions, so these shapes compare normally instead of being treated as
+unparseable.
+
 ### 4.1 Problem generator system prompt
 
 ```

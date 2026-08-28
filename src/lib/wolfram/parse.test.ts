@@ -63,3 +63,46 @@ describe("parseWolframResult", () => {
     expect(parseWolframResult("   ")).toBeNull();
   });
 });
+
+describe("parseWolframResult extended shapes", () => {
+  it("reads an approximation with no equals sign", () => {
+    expect(parseWolframResult("x ≈ 1.2599")).toEqual({ kind: "numeric", value: 1.2599 });
+  });
+
+  it("reads a tilde-tilde approximation", () => {
+    expect(parseWolframResult("x~~1.26")).toEqual({ kind: "numeric", value: 1.26 });
+  });
+
+  it("splits newline-joined subpod results into solutions", () => {
+    expect(parseWolframResult("x = 2\nx = -2")).toEqual({
+      kind: "solutions",
+      values: ["2", "-2"],
+    });
+  });
+
+  it("expands a plus-minus result into two numeric solutions", () => {
+    const parsed = parseWolframResult("x = ±sqrt(2)");
+    expect(parsed?.kind).toBe("solutions");
+    if (parsed?.kind === "solutions") {
+      expect(parsed.values).toHaveLength(2);
+    }
+  });
+
+  it("falls back to the first line when later lines are unreadable", () => {
+    expect(parseWolframResult("42\n(assuming integer arithmetic)")).toEqual({
+      kind: "numeric",
+      value: 42,
+    });
+  });
+
+  it("splits bare separator-less lines into solutions when they all parse", () => {
+    expect(parseWolframResult("2\n-2")).toEqual({ kind: "solutions", values: ["2", "-2"] });
+  });
+
+  it("keeps units on bare multi-line solutions", () => {
+    expect(parseWolframResult("6 miles\n9.66 kilometers")).toEqual({
+      kind: "solutions",
+      values: ["6 miles", "9.66 kilometers"],
+    });
+  });
+});

@@ -1729,3 +1729,26 @@ confirm two named parts. Their wolframQuery is still stored for future use.
 The one-shot Wolfram query rephrase runs on AI_MODELS.CLASSIFIER, not the
 verifier model: it is a phrasing task, not a math task, and it sits on the
 hot path of every generation batch.
+
+### D-097. Wolfram numeric agreement is unit-aware
+
+Wolfram numeric agreement now converts the result into the expected
+answer's unit before the tolerance comparison, using the same mathjs
+conversion grading uses (D-092). When the result is not comparable
+(dimensionally incompatible units, or a symbolic result for a numeric
+answer), the verdict is inconclusive and verification falls back to the
+LLM path instead of discarding.
+
+D-090's no-LLM-appeal rule is unchanged for genuine magnitude
+disagreements after unit normalization; it never applied to results
+Wolfram expressed in a form we cannot compare. The comparison logic lives
+in the pure module src/lib/wolfram/agreement.ts so it is unit-tested,
+extending D-094's pure-test scope to include it.
+
+### D-098. parseWolframResult recognizes more Wolfram result shapes
+
+parseWolframResult now treats approximation markers (the approx sign and
+the double tilde) as equality separators, splits newline-joined subpod
+text into a solution list, and expands a leading plus-minus into two
+solutions. These shapes previously parsed as symbolic and became terminal
+numeric discards once an AppID was configured; they now compare normally.

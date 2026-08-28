@@ -23,8 +23,9 @@ import {
 } from "@/lib/ai/schemas";
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
-import { compareAnswers, compareToAnswer, numericMatch, parseQuantity } from "@/lib/math/compare";
+import { compareAnswers, compareToAnswer } from "@/lib/math/compare";
 import { getTopicPath } from "@/lib/topics";
+import { numericAgreement, solutionsAgreement } from "@/lib/wolfram/agreement";
 import { computeAnswer } from "@/lib/wolfram/compute";
 import type { WolframParsed } from "@/lib/wolfram/parse";
 
@@ -198,9 +199,10 @@ async function verifyWithWolfram(
   if (result.status !== "ok") return null;
 
   const agreement = await wolframAgreement(problem.answer, result.resultText, result.parsed);
-  if (agreement.agrees) {
+  if (agreement.verdict === "agree") {
     return { verified: true, reason: agreement.reason, verifiedBy: "wolfram" };
   }
+  if (agreement.verdict === "inconclusive") return null;
   return {
     verified: false,
     reason: `wolfram disagreed: ${agreement.reason}`,
@@ -208,7 +210,7 @@ async function verifyWithWolfram(
   };
 }
 
-type WolframAgreement = { agrees: boolean; reason: string };
+type WolframAgreement = { verdict: "agree" | "disagree" | "inconclusive"; reason: string };
 
 async function wolframAgreement(
   answer: ProblemBatch["problems"][number]["answer"],
@@ -217,28 +219,19 @@ async function wolframAgreement(
 ): Promise<WolframAgreement> {
   if (answer.type === "numeric") {
     if (parsed.kind === "numeric") {
-      const agrees = numericMatch(answer.value, parsed.value, answer.tolerance);
-      return {
-        agrees,
-        reason: `Wolfram computed ${parsed.value}, generator claimed ${answer.value}`,
-      };
+      return numericAgreement(answer.value, answer.unit, answer.tolerance, resultText, parsed.value);
     }
     if (parsed.kind === "solutions") {
-      const values = parsed.values
-        .map((candidate) => parseQuantity(candidate)?.value)
-        .filter((value): value is number => typeof value === "number");
-      const agrees = values.some((value) =>
-        numericMatch(answer.value, value, answer.tolerance),
-      );
+      const outcome = solutionsAgreement(answer.value, answer.unit, answer.tolerance, parsed.values);
       return {
-        agrees,
-        reason: agrees
-          ? "one of Wolfram's solutions matched the numeric answer"
-          : `none of Wolfram's solutions (${resultText}) matched ${answer.value}`,
+        verdict: outcome.verdict,
+        reason: `${outcome.reason} (wolfram result: ${resultText})`,
       };
     }
+    // Wolfram succeeded but returned a symbolic result for a numeric answer:
+    // not comparable, so the LLM path decides instead of a hard discard.
     return {
-      agrees: false,
+      verdict: "inconclusive",
       reason: `Wolfram returned a symbolic result "${parsed.value}" for a numeric answer`,
     };
   }
@@ -256,21 +249,21 @@ async function wolframAgreement(
     for (const candidate of candidates) {
       const outcome = compareToAnswer(answer, candidate);
       if (outcome.match) {
-        return { agrees: true, reason: "Wolfram result matched the expression" };
+        return { verdict: "agree", reason: "Wolfram result matched the expression" };
       }
       if (outcome.needsEquivalenceCheck) needsJudge = true;
     }
     if (needsJudge && (await judgeEquivalence(answer.value, resultText))) {
-      return { agrees: true, reason: "Wolfram result equivalent to the expression" };
+      return { verdict: "agree", reason: "Wolfram result equivalent to the expression" };
     }
     return {
-      agrees: false,
+      verdict: "disagree",
       reason: `Wolfram result "${resultText}" did not match the claimed expression`,
     };
   }
 
   // Unreachable for multi: verifyProblem routes multi to the LLM path.
-  return { agrees: false, reason: "unsupported answer type for wolfram agreement" };
+  return { verdict: "disagree", reason: "unsupported answer type for wolfram agreement" };
 }
 
 /** One rephrase attempt on the cheap model; null when it fails (spec 7.2). */
