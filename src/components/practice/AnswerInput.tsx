@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { cx } from "@/lib/cx";
 
 /**
  * The answer row, which adapts to the problem's answer type (docs/06 §3):
@@ -98,21 +99,16 @@ export function AnswerInput({
                   })
                 }
                 onKeyDown={onKeyDown}
-                className={`w-[130px] rounded-input border bg-paper-0 px-2.5 py-1.5 text-ui text-ink disabled:opacity-60 max-lg:py-3 ${
-                  match === undefined
-                    ? "border-ink-faint"
-                    : match
-                      ? "border-green"
-                      : "border-red"
-                }`}
+                className={cx(
+                  "w-[130px] rounded-input border bg-paper-0 px-2.5 py-1.5 text-ui text-ink disabled:opacity-60 max-lg:py-3",
+                  match === undefined ? "border-ink-faint" : match ? "border-green" : "border-red",
+                )}
               />
               {part.unit && (
                 <span className="text-meta text-ink-soft">{part.unit}</span>
               )}
               {match !== undefined && (
-                <span
-                  className={`text-meta font-semibold ${match ? "text-green" : "text-red"}`}
-                >
+                <span className={cx("text-meta font-semibold", match ? "text-green" : "text-red")}>
                   {match ? "✓ correct" : "✗ not yet"}
                 </span>
               )}

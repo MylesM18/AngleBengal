@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
+import { cx } from "@/lib/cx";
 
 /** Recent chats plus New chat (docs/06 §5). */
 
@@ -111,9 +112,10 @@ export function SessionMenu({
                       setOpen(false);
                     }}
                     aria-current={session.id === currentSessionId ? "true" : undefined}
-                    className={`relative w-full px-3 py-2 text-left text-ui font-medium hover:bg-paper-1 ${
-                      session.id === currentSessionId ? "bg-paper-1" : ""
-                    }`}
+                    className={cx(
+                      "relative w-full px-3 py-2 text-left text-ui font-medium hover:bg-paper-1",
+                      session.id === currentSessionId ? "bg-paper-1" : "",
+                    )}
                   >
                     {session.id === currentSessionId && (
                       <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-plum" />

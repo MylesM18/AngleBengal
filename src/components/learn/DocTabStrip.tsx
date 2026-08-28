@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { cx } from "@/lib/cx";
 import { closeTabHref, docTabsHref } from "@/lib/learn/docTabs";
 
 export type DocTabStripProps = {
@@ -36,11 +37,12 @@ export function DocTabStrip({ topicId, tabs, activeId }: DocTabStripProps) {
         return (
           <span
             key={tab.id}
-            className={`flex shrink-0 items-center gap-1 rounded-t-chip border border-b-0 px-2.5 py-1.5 ${
+            className={cx(
+              "flex shrink-0 items-center gap-1 rounded-t-chip border border-b-0 px-2.5 py-1.5",
               active
                 ? "border-hairline bg-paper-0 text-ink"
-                : "border-transparent bg-transparent text-ink-soft hover:text-ink"
-            }`}
+                : "border-transparent bg-transparent text-ink-soft hover:text-ink",
+            )}
           >
             <Link
               href={docTabsHref(topicId, openIds, tab.id)}
