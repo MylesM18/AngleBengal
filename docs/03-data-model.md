@@ -173,6 +173,23 @@ model ComputationCache {
 }
 ```
 
+Added 2026-08-27 (perspective layer): the `Topic` model gains
+`perspectiveDoc PerspectiveDoc?`, and:
+
+```prisma
+/// The topic's narrative companion (perspective spec §6): why this
+/// mathematics exists, what it really is, why its rules are forced moves.
+/// One per topic, enforced by the unique constraint so a concurrent
+/// auto-fire and button click cannot both win.
+model PerspectiveDoc {
+  id        String   @id @default(cuid())
+  topicId   String   @unique
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  contentMd String
+  createdAt DateTime @default(now())
+}
+```
+
 ## Notes and rationale
 
 - **`MathSymbol`**: the symbol library is a table, not a map in code. Ten rows: six category emblems (`isDefault: true`) and a four-glyph overflow pool. `glyph` is unique, so the seed upserts on it and re-running the seed reassigns names and ordering instead of inserting duplicates. `sortOrder` is the stable display order.
