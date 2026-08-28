@@ -1836,3 +1836,55 @@ its documents. The xl-only DocMiniTOC stays model-scoped and visible
 regardless of active tab: it is outside the sheet, and hiding it per-tab
 would cost a client boundary around layout that D-061 deliberately kept
 server-side.
+
+### D-105. A login wall supersedes the Phase 1 no-auth locked decision
+
+CLAUDE.md locks "Auth: None in Phase 1". The owner ruled on 2026-08-28 that
+the deployed app needs a wall, and approved this shape: a `/login` page, a
+Prisma `User` table in the same Supabase Postgres the app already uses
+(reached through Prisma only, no supabase-js), and exactly one account,
+created by `scripts/seed-admin.ts` from ADMIN_USERNAME / ADMIN_PASSWORD in
+the environment. There is no public signup, no roles, and no multi-tenancy;
+every other locked decision stands.
+
+### D-106. The wall is a proxy allowlist; pages redirect, APIs get 401 JSON
+
+Next 16 renamed middleware.ts to proxy.ts (the old name is deprecated and
+the export must be named `proxy`), so the wall lives in `src/proxy.ts` with
+its path rules unit-tested in `src/lib/auth/guard.ts`. The allowlist is
+`/login`, `/api/auth/login`, `/_next/*`, and root-level public files
+(svg, png, ico, webmanifest). Everything else requires a valid session:
+pages redirect to `/login`, `/api/*` returns the house error shape with
+status 401 because a JSON caller cannot follow a redirect to an HTML form.
+A missing SESSION_SECRET fails closed: nothing verifies and every walled
+path redirects.
+
+### D-107. Session cookie: HMAC-signed value, browser-session lifetime
+
+The cookie value is `base64url(username).issuedAt.base64url(sig)` where sig
+is HMAC-SHA256 over the first two parts, computed with Web Crypto so the
+same helper runs in route handlers and the proxy with zero dependencies.
+No maxAge and no expires: the session ends when the browser closes, per the
+owner's ruling. HttpOnly, SameSite=Lax, Secure in production. Logout is a
+plain cookie clear; there is no server-side session table to invalidate,
+which is an accepted trade for a single-user app.
+
+### D-108. bcryptjs at cost 12, one vague 401 for every login failure
+
+bcryptjs is pure JavaScript, so it adds no native build step and runs
+anywhere the Node runtime does; 3.x ships its own types. Cost 12 keeps a
+hash near 250ms, which also rate-limits guessing. A failed login never says
+which field was wrong: unknown username and wrong password both compare
+against a bcrypt hash (a phantom hash when the user does not exist, so both
+paths cost one compare) and both return the same UNAUTHORIZED body.
+UNAUTHORIZED (401) joined ApiErrorCode for this; no earlier route needed it
+because no earlier route had auth.
+
+### D-109. Logout lives in the TopBar's desktop nav row
+
+The owner asked for a logout control in the TopBar. It sits after Settings
+in the nav row, which is hidden below lg like the rest of that row, so
+phones have no logout button in this pass. Accepted because the session
+already dies with the browser (D-107) and the bottom tab bar's five slots
+are a designed set this feature should not silently reflow; a mobile
+logout affordance can be its own decision if the owner wants one.
