@@ -4,7 +4,7 @@ import { callStructured } from "@/lib/ai/call";
 import { AI_MODELS } from "@/lib/ai/config";
 import { EQUIVALENCE_SYSTEM, equivalenceUser } from "@/lib/ai/prompts";
 import { equivalenceSchema } from "@/lib/ai/schemas";
-import { numericMatch, parseQuantity } from "@/lib/math/compare";
+import { solutionsEqual } from "@/lib/wolfram/agreement";
 import { computeAnswer } from "@/lib/wolfram/compute";
 import type { WolframParsed } from "@/lib/wolfram/parse";
 
@@ -54,10 +54,15 @@ async function equationEquivalence(a: string, b: string): Promise<boolean | null
   const solutionsA = toSolutions(first.parsed);
   const solutionsB = toSolutions(second.parsed);
   if (solutionsA.length === 0 || solutionsB.length === 0) return null;
-  if (solutionsA.length !== solutionsB.length) return false;
 
-  return solutionsA.every((solution) =>
-    solutionsB.some((candidate) => solutionsEqual(solution, candidate)),
+  // Compare as sets, bidirectionally: a duplicate root ("x = 2 or x = 2")
+  // must not let [2, 2] pass against [2, -2], and a solution set with
+  // repeated members is still the same set as the deduplicated one, so
+  // length alone cannot decide this. Every solution in A must match some
+  // solution in B, and every solution in B must match some solution in A.
+  return (
+    solutionsA.every((solution) => solutionsB.some((candidate) => solutionsEqual(solution, candidate))) &&
+    solutionsB.every((solution) => solutionsA.some((candidate) => solutionsEqual(solution, candidate)))
   );
 }
 
@@ -78,14 +83,4 @@ function toSolutions(parsed: WolframParsed): string[] {
   if (parsed.kind === "solutions") return parsed.values;
   if (parsed.kind === "numeric") return [String(parsed.value)];
   return parsed.value.trim().length ? [parsed.value] : [];
-}
-
-/** Numeric where possible (default tolerance), else normalized text. */
-function solutionsEqual(a: string, b: string): boolean {
-  const quantityA = parseQuantity(a);
-  const quantityB = parseQuantity(b);
-  if (quantityA && quantityB) return numericMatch(quantityA.value, quantityB.value, null);
-  return (
-    a.replace(/\s+/g, "").toLowerCase() === b.replace(/\s+/g, "").toLowerCase()
-  );
 }

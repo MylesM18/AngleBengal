@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { numericAgreement, solutionsAgreement } from "@/lib/wolfram/agreement";
+import { numericAgreement, solutionsAgreement, solutionsEqual } from "@/lib/wolfram/agreement";
 
 describe("numericAgreement", () => {
   it("agrees after converting a compatible unit", () => {
@@ -65,5 +65,27 @@ describe("solutionsAgreement", () => {
 
   it("still matches plain numeric roots", () => {
     expect(solutionsAgreement(-2, null, null, ["2", "-2"]).verdict).toBe("agree");
+  });
+});
+
+describe("solutionsEqual", () => {
+  it("matches numerically comparable values", () => {
+    expect(solutionsEqual("2", "2.0")).toBe(true);
+  });
+
+  it("matches the synthetic negated form against its plain spelling", () => {
+    expect(solutionsEqual("-(sqrt(a))", "-sqrt(a)")).toBe(true);
+  });
+
+  it("matches algebraically equal symbolic forms", () => {
+    expect(solutionsEqual("x+1", "1+x")).toBe(true);
+  });
+
+  it("rejects distinct symbolic values", () => {
+    expect(solutionsEqual("-(a+b)", "-a+b")).toBe(false);
+  });
+
+  it("rejects different numbers", () => {
+    expect(solutionsEqual("2", "3")).toBe(false);
   });
 });

@@ -330,7 +330,7 @@ async function verifyWithLlm(
   if (comparison.needsEquivalenceCheck && problem.answer.type === "expression") {
     try {
       const judged = await callStructured({
-        promptName: "verifier",
+        promptName: "equivalence",
         model: AI_MODELS.VERIFIER,
         system: EQUIVALENCE_SYSTEM,
         user: equivalenceUser(
