@@ -1798,3 +1798,12 @@ fixture builder lives in `src/lib/ai/perspectiveFixture.ts` (not a .test.ts
 file, so vitest does not collect it; app code never imports it), and holds
 the repo's one deliberate em-dash as a unicode escape, because rejecting
 that character is a behavior under test.
+
+### D-101. The perspective exemplar is injected verbatim
+
+`loadPerspectiveExemplar` performs no em-dash stripping, unlike
+`loadExemplarForPrompt` (D-001): the trig exemplar was authored under the
+house rule and approved by the owner, so the bytes on disk are exactly what
+the model should imitate. The spec's "injected verbatim, never edited" is
+therefore literal. The retry turn reuses `generatorRetryUser` unchanged;
+its wording is not doc-generator specific.

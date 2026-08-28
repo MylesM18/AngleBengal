@@ -20,6 +20,7 @@ export const AI_MODELS = {
 
 export type PromptName =
   | "generator"
+  | "perspective"
   | "classifier"
   | "verifier"
   | "verifier-reject"
