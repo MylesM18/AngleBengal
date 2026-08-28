@@ -87,6 +87,9 @@ model Problem {
   solutionMd  String
   difficulty  Int      // 1-5
   verified    Boolean  @default(false)
+  wolframQuery String? // the computable core the generator emitted (docs/05 §4);
+                       // null for legacy rows only
+  verifiedBy   String? // "wolfram" or "llm" (docs/05 §4); null for legacy rows
   createdAt   DateTime @default(now())
 
   modelTags ProblemModelTag[]
@@ -156,6 +159,18 @@ model AiCallLog {
   ok           Boolean
   createdAt    DateTime @default(now())
 }
+
+// Successful Wolfram (query, result) pairs, keyed by a sha256 hash of the
+// whitespace-normalized query. Consulted before any network call, so
+// re-verification and repeat grading tiebreaks never spend quota.
+model ComputationCache {
+  id         String   @id @default(cuid())
+  queryHash  String   @unique
+  query      String
+  resultText String
+  hits       Int      @default(0)
+  createdAt  DateTime @default(now())
+}
 ```
 
 ## Notes and rationale
@@ -167,6 +182,8 @@ model AiCallLog {
 - **No `parentDocId`**: deliberate. With `@@unique([topicId, depth])` a topic holds exactly one chain, so the parent of level N is level N-1 of the same topic and is fully derivable from the two columns already present. An explicit parent column would be a second source of truth for a fact the constraint already fixes.
 - **`modelIndexJson`**: after saving a generated doc, parse its `## Model N - Title` headings into `[{number, title, anchor}]`. This is what lets diagnosis results deep-link to `#model-3` and lets problems display human-readable model tags without re-parsing markdown on every read.
 - **`answerJson` types**: `numeric` is the common case and is graded in code (mathjs, relative tolerance, default 1%). `expression` answers are normalized (whitespace, mathjs `simplify` where parseable) and fall back to a VERIFIER equivalence judgment. `multi` covers problems asking for two values (e.g., boat speed and current).
+- **`wolframQuery` / `verifiedBy`**: `wolframQuery` (String?) is the computable core of the problem emitted by the generator (docs/05 §4), used as the verification query. Null for legacy rows only; every new problem carries its best-attempt query even when Wolfram ends up not understanding it. `verifiedBy` (String?) is which engine confirmed the problem, `"wolfram"` or `"llm"`. Null for legacy rows.
+- **`ComputationCache`**: successful Wolfram (query, result) pairs, keyed by a sha256 hash of the whitespace-normalized query. Consulted before any network call, so re-verification and repeat grading tiebreaks never spend quota.
 - **`sketchPng` as Bytes**: fine for a single user. If it bloats, move to file storage; the column becomes a path. Not a v1 concern.
 - **`isExemplar`**: the seeded DRT doc is browsable like any other doc but excluded from deletion in the UI.
 - **No User table**: intentional. Adding one later means adding `userId` columns and backfilling a single user; the shape does not otherwise change.

@@ -174,6 +174,16 @@ Exactly one of `existingTopicId` / `newTopicPath` is non-null.
 
 ## §4 Problem generation (GENERATOR) and verification (VERIFIER)
 
+Verification runs Wolfram-first (spec section 7), not as two independent
+solves that must agree. Wolfram Full Results computes the `wolframQuery` from
+§4.1: agreement saves the problem with `verifiedBy: "wolfram"`; disagreement
+discards it outright, with no LLM appeal, because Wolfram outranks the model.
+A query Wolfram does not understand gets one rephrase on CLASSIFIER (prompt
+`wolfram-rephrase`) and one retry. Wolfram being unavailable, still not
+understood after the retry, or the answer being `multi` (a single query
+cannot confirm two named parts, so multi always takes this path) falls back
+to the LLM flow in §4.2-4.3 unchanged, tagging `verifiedBy: "llm"`.
+
 ### 4.1 Problem generator system prompt
 
 ```
@@ -204,11 +214,23 @@ For each problem:
   is false, even if it opens with a sentence of framing.
 - scenario: the situation in a short phrase, for example "two trains leaving
   the same station". Null when isWordProblem is false.
+- wolframQuery: the computable core of the problem as one short Wolfram Alpha
+  query, following the WOLFRAM QUERY RULES below.
 - Recompute all arithmetic before finalizing. An arithmetic slip makes the
   problem worthless.
 
 Vary surface features across the batch (contexts, number ranges, which
 quantity is unknown) so no two problems are template-identical. No em-dashes.
+
+WOLFRAM QUERY RULES:
+- English keywords plus linear math syntax: "solve 3x - 7 = 11",
+  "integrate x^2 sin(x) dx", "45 mph * 2.5 hours".
+- Exponent notation 6*10^14, never 6e14.
+- Single-letter variable names.
+- Units spelled out and attached to their quantities.
+- One computation per query. For word problems the query is the extracted
+  computation, never the prose.
+- Plain ASCII, a single line.
 ```
 
 When the topic has `wordProblemsOnly` set, this block is appended:
@@ -226,7 +248,7 @@ word problems beats five where one is symbolic.
 
 and the user message gains the line "Every problem must be a word problem."
 
-JSON schema: `{ problems: [{ statementMd, answerJson, solutionMd, modelTags: number[], difficulty, isWordProblem: boolean, scenario: string | null }] }`
+JSON schema: `{ problems: [{ statementMd, answerJson, solutionMd, modelTags: number[], difficulty, isWordProblem: boolean, scenario: string | null, wolframQuery: string }] }`
 
 `isWordProblem` and `scenario` are always requested, so the generator classifies what it wrote whether or not the topic demands word problems. On a `wordProblemsOnly` topic, `problemIsWordProblem` in `schemas.ts` requires both (true, and a non-blank scenario), the way `classifierResultIsCoherent` enforces what a JSON Schema cannot say. A problem that fails it is discarded before the verifier is called: that is a saving, not a relaxation, since a problem clearing the gate still has to pass §4.2 in full before it is saved. The setting gates generation only. `Problem` carries no word-problem column, so existing problems are neither relabelled nor filtered out of a session.
 
@@ -247,7 +269,8 @@ JSON schema: `{ solvable: boolean, reasonIfNot: string | null, answer: <same ans
 - numeric: parse both with mathjs; equal if `|a-b| <= tolerance * max(|a|,|b|, 1)`; default tolerance 0.01, generator may tighten.
 - expression: normalize whitespace; attempt mathjs `simplify(a - b) == 0`; if unparseable, one extra VERIFIER call asking "are these mathematically equivalent" returning `{equivalent: boolean}`.
 - multi: all parts must match by name.
-- Any mismatch or `solvable:false` → discard the problem, log to AiCallLog with ok=false semantics (promptName "verifier-reject").
+- Any mismatch or `solvable:false` discards the problem. This logging is real, not aspirational: every discard writes an AiCallLog row (`promptName: "verifier-reject"`, `ok: false`), with `modelId` set to `wolfram-full-results` for a Wolfram mismatch and to the verifier model for everything else.
+- Wolfram verification calls carry their own telemetry too: `wolfram-verify` for the initial check and `wolfram-equivalence` for the expression-equivalence tiebreak, both with `modelId: "wolfram-full-results"` and the token columns zeroed, since Wolfram has no token cost to report.
 
 ## §5 Wrong-answer diagnosis (DIAGNOSTIC)
 
