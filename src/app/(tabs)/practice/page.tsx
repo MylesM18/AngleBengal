@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { WordProblemsToggle } from "@/components/practice/WordProblemsToggle";
+import { cx } from "@/lib/cx";
 import { getRootNameByTopicId, getTopicTree, type TopicNode } from "@/lib/topics";
 import { accentForRoot, ACCENT_VAR } from "@/lib/topicColors";
 
@@ -128,9 +129,10 @@ function TopicRow({
      * should do once the card has two rows.
      */
     <li
-      className={`rounded-card shadow-sheet transition-all hover:-translate-y-px hover:shadow-lift ${
-        muted ? "bg-paper-1/70" : "bg-paper-1"
-      }`}
+      className={cx(
+        "rounded-card shadow-sheet transition-all hover:-translate-y-px hover:shadow-lift",
+        muted ? "bg-paper-1/70" : "bg-paper-1",
+      )}
     >
       <Link href={`/practice/${topic.id}`} className="flex items-center gap-3 rounded-card p-3.5">
         <span
