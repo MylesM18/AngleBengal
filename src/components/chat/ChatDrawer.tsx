@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Chip, chipClasses } from "@/components/ui/Chip";
+import { cx } from "@/lib/cx";
 import { truncateMiddle } from "@/lib/text";
 
 import { ChatComposer } from "./ChatComposer";
@@ -215,9 +216,10 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
        * div), leaving the tab bar exposed beneath the drawer. At lg the
        * geometry reverts to the original 420px right-hand panel.
        */
-      className={`fixed inset-0 z-30 flex w-full flex-col bg-paper-1 shadow-lift transition-transform duration-220 ease-paper lg:absolute lg:inset-y-0 lg:left-auto lg:right-0 lg:z-10 lg:w-[min(420px,100vw)] ${
-        open ? "translate-x-0" : "translate-x-full"
-      }`}
+      className={cx(
+        "fixed inset-0 z-30 flex w-full flex-col bg-paper-1 shadow-lift transition-transform duration-220 ease-paper lg:absolute lg:inset-y-0 lg:left-auto lg:right-0 lg:z-10 lg:w-[min(420px,100vw)]",
+        open ? "translate-x-0" : "translate-x-full",
+      )}
     >
       <div className="flex h-12 shrink-0 items-center gap-2 bg-plum px-3">
         <Image src="/anglebengal-mark-dark.svg" alt="" width={20} height={20} className="shrink-0" />

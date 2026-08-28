@@ -1,3 +1,5 @@
+import { cx } from "@/lib/cx";
+
 /**
  * Loading placeholders (docs/07 Phase 5).
  *
@@ -9,7 +11,7 @@ export function Skeleton({ className = "" }: { className?: string }) {
   return (
     <span
       aria-hidden
-      className={`block rounded-chip bg-ink/10 ${className}`}
+      className={cx("block rounded-chip bg-ink/10", className)}
       style={{ animation: "pulse 1.6s ease-in-out infinite" }}
     />
   );
