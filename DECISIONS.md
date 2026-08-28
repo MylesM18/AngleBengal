@@ -1787,3 +1787,14 @@ stay silent as before: a concurrent verification racing the same query
 into the cache is benign and expected, but any other write failure is
 worth seeing. Either way the write failure is swallowed and never affects
 the result already computed, matching non-negotiable 4.
+
+### D-100. Perspective validator pins the locked exemplar
+
+`validatePerspectiveDoc.test.ts` reads `content/exemplars/trig-perspective.md`
+and asserts it validates clean. Unlike the DRT exemplar (grandfathered,
+D-001), the trig exemplar was authored under the gate it feeds, so the test
+is what keeps the gate and the locked file from drifting apart. The test
+fixture builder lives in `src/lib/ai/perspectiveFixture.ts` (not a .test.ts
+file, so vitest does not collect it; app code never imports it), and holds
+the repo's one deliberate em-dash as a unicode escape, because rejecting
+that character is a behavior under test.
