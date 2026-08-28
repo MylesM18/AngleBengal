@@ -22,6 +22,25 @@ The topic's only mutable field, set from the topic card on /practice. The body s
 Success `200`: `{ "id": "...", "wordProblemsOnly": true }`
 Failures: `400 BAD_REQUEST` (body is not `{ wordProblemsOnly: boolean }`), `404 NOT_FOUND`.
 
+### POST `/api/topics/[id]/perspective`
+
+Generates the topic's perspective document (docs/05 §9) and saves it.
+Idempotent: when a `PerspectiveDoc` already exists for the topic, it is
+returned with `200` and nothing is generated; a concurrent duplicate that
+loses the unique-constraint race refetches and returns the winner. On
+create the status is `201`. Success bodies carry the saved doc so the
+client renders without a refetch:
+
+    { "id": "...", "topicId": "...", "contentMd": "...", "createdAt": "..." }
+
+Errors: `404 NOT_FOUND` for an unknown topic; `422 GENERATION_INVALID`
+with `failures: string[]` when the single retry also fails structural
+validation; otherwise the shared AI error codes (Conventions).
+
+`GET /api/topics/[id]` and the reader's server fetch now include
+`perspective` (`{ id, contentMd, createdAt }` or `null`) alongside
+`modelDocs`; there is no separate GET route.
+
 ## Mental model docs
 
 ### POST /api/models/generate

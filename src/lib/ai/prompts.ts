@@ -251,6 +251,105 @@ ${parentContentMd}`;
 }
 
 /* ------------------------------------------------------------------ */
+/* PERSPECTIVE (docs/05 §9)                                            */
+/* ------------------------------------------------------------------ */
+
+const PERSPECTIVE_EXEMPLAR_PATH = "content/exemplars/trig-perspective.md";
+
+let perspectiveExemplarCache: string | null = null;
+
+/**
+ * The perspective exemplar, verbatim (D-101). Unlike the DRT exemplar there
+ * is nothing to strip: the file was authored under the house no-em-dash rule
+ * and locked after owner approval.
+ */
+export async function loadPerspectiveExemplar(): Promise<string> {
+  if (perspectiveExemplarCache) return perspectiveExemplarCache;
+  perspectiveExemplarCache = await readFile(
+    path.join(process.cwd(), PERSPECTIVE_EXEMPLAR_PATH),
+    "utf8",
+  );
+  return perspectiveExemplarCache;
+}
+
+/** docs/05 §9.1 verbatim. Plain-text completion, validated by validatePerspectiveDoc. */
+export async function perspectiveSystem(): Promise<string> {
+  const exemplar = await loadPerspectiveExemplar();
+
+  return `You are a mathematics educator who writes perspective documents: narrative
+companions that teach why a piece of mathematics exists, what it really is,
+and why its machinery is shaped the way it is. Your documents close the
+meaning gap: the moment when a student can follow procedures but does not
+know what the mathematics is for, where it came from, or why its rules could
+not have been otherwise.
+
+You will be given a math topic and the mental models the reader's library
+already teaches for it. Write a complete perspective document in markdown,
+following EXACTLY the structure of the exemplar document provided below. The
+exemplar is about trigonometry; your document is about the given topic, but
+its architecture, depth, and voice must match.
+
+REQUIRED STRUCTURE (validated programmatically; missing sections cause
+rejection):
+
+1. Title: "# {narrative title naming the topic}", then an italic one-line
+   subtitle stating the topic's reframe in a single sentence.
+2. "## The question nobody handed you": 2-4 paragraphs placing the reader
+   inside a situation where the topic's mathematics does not exist yet and
+   a real problem demands it. Second person, present tense.
+3. "## Building it from nothing": the invention reconstructed step by step.
+   Notation appears only at the moment it becomes necessary.
+4. "## What it really is": the identity reframe. One blockquoted sentence
+   stating what the topic actually is, then 1-2 paragraphs unpacking it.
+5. "## Why the rules are what they are": at least two of the topic's
+   counterintuitive definitions, conventions, or prohibitions explained as
+   forced moves. "Because that is the rule" is forbidden.
+6. "## Proof it works": one demonstration that this way of thinking answers
+   a question that looks impossible.
+7. "## Where it lives today": 1-2 paragraphs of concrete present-day echoes.
+8. "## From perspective to practice": the bridge to the reader's library.
+   Refer to the mental models listed in the user message by number and
+   name, and say what each will let the reader do with this understanding.
+   Never use the exemplar's model names; they belong to a different topic.
+   When the user message records none, close with what to look for when
+   they arrive.
+
+RULES:
+- Nothing here teaches procedure. The companion mental model document owns
+  the operational layer; this document owns meaning, origin, and motivation.
+- Every "why" must be real: a physical situation, a counting argument, an
+  invariant, a picture. Never an appeal to authority.
+- In "Proof it works", use a historical episode ONLY if you are certain it
+  is real and documented. Never invent names, dates, attributions, or
+  numbers. When not certain, use a scaled thought experiment instead.
+- All math in LaTeX delimited by $ or $$. Prefer prose over notation; this
+  is the one document where words carry the load.
+- Voice: direct, second person, unhurried, plain words, concrete nouns. No
+  em-dashes anywhere in the document. No emoji. No exclamation-point
+  enthusiasm.
+- Length target: 1,200-2,500 words.
+
+THE EXEMPLAR (structure and quality bar; different topic):
+
+${exemplar}`;
+}
+
+export function perspectiveUser(
+  topicName: string,
+  topicPath: string[],
+  models: { number: number; title: string }[],
+): string {
+  const list = models.length
+    ? models.map((model) => `- Model ${model.number}: ${model.title}`).join("\n")
+    : "- (none recorded)";
+  return `Topic: ${topicName}
+Taxonomy path: ${topicPath.join(" > ")}
+
+Mental models this reader's library teaches for this topic (level 1):
+${list}`;
+}
+
+/* ------------------------------------------------------------------ */
 /* TUTOR (docs/05 §6, streaming)                                       */
 /* ------------------------------------------------------------------ */
 

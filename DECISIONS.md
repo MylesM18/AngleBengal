@@ -1787,3 +1787,52 @@ stay silent as before: a concurrent verification racing the same query
 into the cache is benign and expected, but any other write failure is
 worth seeing. Either way the write failure is swallowed and never affects
 the result already computed, matching non-negotiable 4.
+
+### D-100. Perspective validator pins the locked exemplar
+
+`validatePerspectiveDoc.test.ts` reads `content/exemplars/trig-perspective.md`
+and asserts it validates clean. Unlike the DRT exemplar (grandfathered,
+D-001), the trig exemplar was authored under the gate it feeds, so the test
+is what keeps the gate and the locked file from drifting apart. The test
+fixture builder lives in `src/lib/ai/perspectiveFixture.ts` (not a .test.ts
+file, so vitest does not collect it; app code never imports it), and holds
+the repo's one deliberate em-dash as a unicode escape, because rejecting
+that character is a behavior under test.
+
+### D-101. The perspective exemplar is injected verbatim
+
+`loadPerspectiveExemplar` performs no em-dash stripping, unlike
+`loadExemplarForPrompt` (D-001): the trig exemplar was authored under the
+house rule and approved by the owner, so the bytes on disk are exactly what
+the model should imitate. The spec's "injected verbatim, never edited" is
+therefore literal. The retry turn reuses `generatorRetryUser` unchanged;
+its wording is not doc-generator specific.
+
+### D-102. Perspective POST: 201 on create, 200 on existing
+
+The perspective spec fixes 200 for the already-exists path and is silent on
+the created status. `/api/models/generate` returns 201 for a fresh
+resource, so the perspective route does the same, and the `created` flag
+stays server-side (the client treats both as success and reads
+`contentMd`).
+
+### D-103. Perspective | Models tabs hold client-local state, not URL state
+
+House preference is URL state (D-008's reader, the docTabs scheme), but the
+Perspective pane owns an in-flight generation fetch and its loading state;
+a URL navigation remounts the server subtree and drops both, which would
+orphan the auto-fired generation the spec requires to keep running while
+the user reads the Models tab. The spec explicitly waives persistence
+("no read-tracking, no persistence"), so `useState` in PerspectiveTabs is
+the smallest correct choice. Both panes stay mounted; the inactive one is
+`hidden`.
+
+### D-104. The tab control lives on the doc-selected reader view only
+
+The spec places the perspective "in the reader alongside the model doc".
+The topic index (multi-doc grid, subtopic covers) and the empty state keep
+their current layouts; a topic reaches its perspective by opening any of
+its documents. The xl-only DocMiniTOC stays model-scoped and visible
+regardless of active tab: it is outside the sheet, and hiding it per-tab
+would cost a client boundary around layout that D-061 deliberately kept
+server-side.

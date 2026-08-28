@@ -51,6 +51,7 @@ model Topic {
 
   modelDocs MentalModelDoc[]
   problems  Problem[]
+  perspectiveDoc PerspectiveDoc?
 
   @@unique([parentId, name])
 }
@@ -76,6 +77,18 @@ model MentalModelDoc {
   /// THE rule "never regenerate a topic+depth that already exists", enforced in
   /// the database so two concurrent generations cannot both win (spec §3).
   @@unique([topicId, depth])
+}
+
+/// The topic's narrative companion (perspective spec §6): why this
+/// mathematics exists, what it really is, why its rules are forced moves.
+/// One per topic, enforced by the unique constraint so a concurrent
+/// auto-fire and button click cannot both win.
+model PerspectiveDoc {
+  id        String   @id @default(cuid())
+  topicId   String   @unique
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  contentMd String
+  createdAt DateTime @default(now())
 }
 
 model Problem {

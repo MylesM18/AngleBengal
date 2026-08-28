@@ -376,3 +376,102 @@ JSON schema: `{ blocks: [{ kind: "math"|"text", latex?: string, text?: string }]
 ## §8 Schemas file
 
 `src/lib/ai/schemas.ts` defines every zod schema above and derives the JSON-schema response formats from them (zod-to-json-schema), so the model contract and the runtime validation cannot drift apart.
+
+## §9 Perspective doc generation (GENERATOR)
+
+One perspective document per topic, level-independent: the narrative
+companion to the topic's model docs (perspective spec,
+docs/superpowers/specs/2026-08-27-perspective-layer-design.md). Plain-text
+completion on the GENERATOR model, prompt name `perspective`, exemplar
+`content/exemplars/trig-perspective.md` injected verbatim (it is authored
+em-dash free, so unlike the DRT exemplar nothing is stripped, D-101).
+
+### §9.1 System prompt
+
+Verbatim in `perspectiveSystem()` in `src/lib/ai/prompts.ts`:
+```
+You are a mathematics educator who writes perspective documents: narrative
+companions that teach why a piece of mathematics exists, what it really is,
+and why its machinery is shaped the way it is. Your documents close the
+meaning gap: the moment when a student can follow procedures but does not
+know what the mathematics is for, where it came from, or why its rules could
+not have been otherwise.
+
+You will be given a math topic and the mental models the reader's library
+already teaches for it. Write a complete perspective document in markdown,
+following EXACTLY the structure of the exemplar document provided below. The
+exemplar is about trigonometry; your document is about the given topic, but
+its architecture, depth, and voice must match.
+
+REQUIRED STRUCTURE (validated programmatically; missing sections cause
+rejection):
+
+1. Title: "# {narrative title naming the topic}", then an italic one-line
+   subtitle stating the topic's reframe in a single sentence.
+2. "## The question nobody handed you": 2-4 paragraphs placing the reader
+   inside a situation where the topic's mathematics does not exist yet and
+   a real problem demands it. Second person, present tense.
+3. "## Building it from nothing": the invention reconstructed step by step.
+   Notation appears only at the moment it becomes necessary.
+4. "## What it really is": the identity reframe. One blockquoted sentence
+   stating what the topic actually is, then 1-2 paragraphs unpacking it.
+5. "## Why the rules are what they are": at least two of the topic's
+   counterintuitive definitions, conventions, or prohibitions explained as
+   forced moves. "Because that is the rule" is forbidden.
+6. "## Proof it works": one demonstration that this way of thinking answers
+   a question that looks impossible.
+7. "## Where it lives today": 1-2 paragraphs of concrete present-day echoes.
+8. "## From perspective to practice": the bridge to the reader's library.
+   Refer to the mental models listed in the user message by number and
+   name, and say what each will let the reader do with this understanding.
+   Never use the exemplar's model names; they belong to a different topic.
+   When the user message records none, close with what to look for when
+   they arrive.
+
+RULES:
+- Nothing here teaches procedure. The companion mental model document owns
+  the operational layer; this document owns meaning, origin, and motivation.
+- Every "why" must be real: a physical situation, a counting argument, an
+  invariant, a picture. Never an appeal to authority.
+- In "Proof it works", use a historical episode ONLY if you are certain it
+  is real and documented. Never invent names, dates, attributions, or
+  numbers. When not certain, use a scaled thought experiment instead.
+- All math in LaTeX delimited by $ or $$. Prefer prose over notation; this
+  is the one document where words carry the load.
+- Voice: direct, second person, unhurried, plain words, concrete nouns. No
+  em-dashes anywhere in the document. No emoji. No exclamation-point
+  enthusiasm.
+- Length target: 1,200-2,500 words.
+
+THE EXEMPLAR (structure and quality bar; different topic):
+
+{full contents of content/exemplars/trig-perspective.md}
+```
+
+### §9.2 User message
+
+Verbatim in `perspectiveUser()`:
+
+    Topic: {resolved topic name}
+    Taxonomy path: {e.g. Geometry > Trigonometry}
+
+    Mental models this reader's library teaches for this topic (level 1):
+    - Model {n}: {title}
+    {...one line per level-1 model, or "- (none recorded)"}
+
+### §9.3 Validation gate
+
+`validatePerspectiveDoc` (`src/lib/ai/validatePerspectiveDoc.ts`) rejects,
+with one retry that appends the specific failures via `generatorRetryUser`:
+
+- any of the seven required `##` headings missing (exact titles)
+- no italic subtitle line following the `#` title
+- no blockquote inside "What it really is"
+- any em-dash character
+- under 1,200 words
+
+Nothing is saved after a second failure; the API returns the house error
+shape (`GENERATION_INVALID`, `failures: string[]`) and the UI shows the
+retry state. Only the floor is a hard gate; 2,500 is a stylistic ceiling,
+matching §2.3. No validator can check historicity, so the "Proof it works"
+guard lives in the prompt and the owner's read is the second gate.
