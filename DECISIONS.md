@@ -1807,3 +1807,11 @@ house rule and approved by the owner, so the bytes on disk are exactly what
 the model should imitate. The spec's "injected verbatim, never edited" is
 therefore literal. The retry turn reuses `generatorRetryUser` unchanged;
 its wording is not doc-generator specific.
+
+### D-102. Perspective POST: 201 on create, 200 on existing
+
+The perspective spec fixes 200 for the already-exists path and is silent on
+the created status. `/api/models/generate` returns 201 for a fresh
+resource, so the perspective route does the same, and the `created` flag
+stays server-side (the client treats both as success and reads
+`contentMd`).
