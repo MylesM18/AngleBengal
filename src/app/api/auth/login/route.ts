@@ -5,9 +5,12 @@ import { ApiError, errorBody } from "@/lib/ai/errors";
 import { verifyCredentials } from "@/lib/auth/credentials";
 import { SESSION_COOKIE, createSessionValue } from "@/lib/auth/session";
 
+// 256 caps both fields well above any real credential while keeping the one
+// public endpoint from buffering unbounded input into bcrypt (DECISIONS.md
+// D-110). Over-limit bodies fall into the same vague 401 as any bad parse.
 const BodySchema = z.object({
-  username: z.string().min(1),
-  password: z.string().min(1),
+  username: z.string().min(1).max(256),
+  password: z.string().min(1).max(256),
 });
 
 /**

@@ -1888,3 +1888,16 @@ phones have no logout button in this pass. Accepted because the session
 already dies with the browser (D-107) and the bottom tab bar's five slots
 are a designed set this feature should not silently reflow; a mobile
 logout affordance can be its own decision if the owner wants one.
+
+### D-110. Login credentials are capped at 256 characters
+
+The 2026-08-29 security pass over the auth surface found the one public
+endpoint accepted unbounded credential strings, buffering arbitrarily
+large bodies into JSON parse and bcrypt. Both fields now carry
+`.max(256)` in the login route's zod schema: far above any real
+credential, and over-limit input falls into the same deliberately vague
+401 as any other bad parse (D-106's one-error shape). The rest of the
+audit found no bypass, leak, or injection; per-IP rate limiting on
+`/api/auth/login`, a session max-age check, and Supabase-side RLS on the
+`User` table were noted as deploy-time follow-ups, acceptable while the
+app runs on localhost for one user.
