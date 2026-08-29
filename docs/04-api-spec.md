@@ -146,6 +146,26 @@ These are pages, not API handlers, but the reader's tab state is a URL contract 
 - An `active` that is not among the surviving open ids falls back to the first one. When nothing survives, the page renders the topic index rather than an empty reader.
 - Closing a tab is a plain link to the same URL minus that id, which is what lets the strip stay a server component. Closing the last tab returns to `/learn/[topicId]`.
 
+## Auth
+
+The login wall (DECISIONS.md D-105 to D-109). Both handlers are outside the
+wall's session requirement only where noted; every other route in this file
+now requires the session cookie and returns `UNAUTHORIZED` (401) without it,
+while pages redirect to `/login`.
+
+### POST /api/auth/login
+```json
+{ "username": "...", "password": "..." }
+```
+Public (allowlisted). Verifies the username and bcrypt-compares the password.
+Success: `{ "ok": true }` plus the signed session cookie (HttpOnly,
+SameSite=Lax, Secure in production, browser-session lifetime). Any failure,
+malformed body included, returns the one vague `UNAUTHORIZED` body so the
+response never says which field was wrong.
+
+### POST /api/auth/logout
+Walled like every other route. Clears the session cookie; always `{ "ok": true }`.
+
 ## Conventions
 
 - Route handlers stay thin: parse/validate → call a function in `src/lib/` → shape the response. AI logic lives in `lib/ai/`, grading in `lib/math/`.

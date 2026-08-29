@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { RefObject } from "react";
 
+import Button from "@/components/ui/Button";
 import { ChipLink } from "@/components/ui/Chip";
 import { cx } from "@/lib/cx";
 
@@ -62,6 +63,20 @@ export function TopBar({ chatOpen, onToggleChat, tutorRef }: TopBarProps) {
         <ChipLink variant="nav" href="/settings" current={isActive("/settings")} className="ml-auto">
           Settings
         </ChipLink>
+        <Button
+          variant="tertiary"
+          size="sm"
+          onClick={async () => {
+            try {
+              await fetch("/api/auth/logout", { method: "POST" });
+            } catch {
+              // The redirect below still lands on /login; the wall takes over.
+            }
+            window.location.replace("/login");
+          }}
+        >
+          Log out
+        </Button>
       </nav>
 
       <button

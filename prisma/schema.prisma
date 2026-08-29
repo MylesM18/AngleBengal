@@ -30,6 +30,16 @@ model MathSymbol {
   topics Topic[]
 }
 
+/// Login-wall accounts (DECISIONS.md D-105). Single-user in practice: rows
+/// exist only via the admin seed script, there is no public signup. The hash
+/// is bcrypt; plaintext never touches the database.
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
 model Topic {
   id          String   @id @default(cuid())
   name        String

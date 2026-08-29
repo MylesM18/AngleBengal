@@ -15,6 +15,7 @@ export type ApiErrorCode =
   | "NOT_MATH"
   | "POOL_EMPTY"
   | "UNREADABLE"
+  | "UNAUTHORIZED"
   | "INTERNAL";
 
 const STATUS: Record<ApiErrorCode, number> = {
@@ -28,6 +29,7 @@ const STATUS: Record<ApiErrorCode, number> = {
   NOT_MATH: 422,
   POOL_EMPTY: 404,
   UNREADABLE: 422,
+  UNAUTHORIZED: 401,
   INTERNAL: 500,
 };
 
