@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import Button from "@/components/ui/Button";
+import { loginErrorMessage } from "@/lib/auth/loginMessage";
 
 const INPUT =
   "w-full rounded-input border border-ink-faint bg-paper-0 px-2.5 py-1.5 text-ui text-ink disabled:opacity-60 max-lg:py-3";
@@ -30,13 +31,9 @@ export function LoginForm() {
         window.location.replace("/learn");
         return;
       }
-      setError(
-        response.status === 401
-          ? "Wrong username or password."
-          : "Something went wrong. Try again.",
-      );
+      setError(loginErrorMessage(response.status));
     } catch {
-      setError("Something went wrong. Try again.");
+      setError(loginErrorMessage(0));
     }
     setChecking(false);
   }

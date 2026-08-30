@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { ApiError, errorBody } from "@/lib/ai/errors";
 import { verifyCredentials } from "@/lib/auth/credentials";
+import { clientKey, loginRateLimiter } from "@/lib/auth/rateLimit";
 import { SESSION_COOKIE, createSessionValue } from "@/lib/auth/session";
 
 // 256 caps both fields well above any real credential while keeping the one
@@ -21,6 +22,24 @@ const BodySchema = z.object({
  */
 export async function POST(request: Request) {
   try {
+    // Cheapest rejection first, so a guessing run stops before it can spend
+    // JSON parsing or a bcrypt compare (DECISIONS.md D-111).
+    const key = clientKey(request.headers);
+    if (loginRateLimiter.isLimited(key)) {
+      const apiError = new ApiError(
+        "RATE_LIMITED",
+        "Too many sign-in attempts. Try again later.",
+      );
+      return NextResponse.json(errorBody(apiError), {
+        status: apiError.status,
+        headers: {
+          "Retry-After": String(
+            Math.ceil(loginRateLimiter.retryAfterMs(key) / 1000),
+          ),
+        },
+      });
+    }
+
     const secret = process.env.SESSION_SECRET;
     if (!secret) {
       const apiError = new ApiError("INTERNAL", "Sign-in is not configured.");
@@ -32,9 +51,14 @@ export async function POST(request: Request) {
       ? await verifyCredentials(body.data.username, body.data.password)
       : null;
     if (!username) {
+      loginRateLimiter.recordFailure(key);
       const apiError = new ApiError("UNAUTHORIZED", "Wrong username or password.");
       return NextResponse.json(errorBody(apiError), { status: apiError.status });
     }
+
+    // A correct password clears the slate: a real person who mistyped
+    // twice never carries those failures forward.
+    loginRateLimiter.clear(key);
 
     const response = NextResponse.json({ ok: true });
     response.cookies.set({

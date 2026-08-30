@@ -7,6 +7,14 @@
 
 export const SESSION_COOKIE = "anglebengal_session";
 
+/**
+ * Server-side lifetime cap on a signed value (DECISIONS.md D-112). The cookie
+ * itself still ends with the browser session (D-107); this bounds how long a
+ * value that escaped the browser stays usable, which no cookie attribute can
+ * enforce because the attacker holds the value, not the browser.
+ */
+export const SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
 const encoder = new TextEncoder();
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -66,5 +74,10 @@ export async function verifySessionValue(
     encoder.encode(`${encodedName}.${issuedAt}`),
   );
   if (!ok) return null;
+
+  // Age is checked only after the signature, so policy never runs on a
+  // payload the secret has not vouched for.
+  if (Date.now() - Number(issuedAt) > SESSION_MAX_AGE_MS) return null;
+
   return new TextDecoder().decode(nameBytes);
 }

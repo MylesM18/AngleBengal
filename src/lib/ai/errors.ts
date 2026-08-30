@@ -16,6 +16,7 @@ export type ApiErrorCode =
   | "POOL_EMPTY"
   | "UNREADABLE"
   | "UNAUTHORIZED"
+  | "RATE_LIMITED"
   | "INTERNAL";
 
 const STATUS: Record<ApiErrorCode, number> = {
@@ -30,6 +31,7 @@ const STATUS: Record<ApiErrorCode, number> = {
   POOL_EMPTY: 404,
   UNREADABLE: 422,
   UNAUTHORIZED: 401,
+  RATE_LIMITED: 429,
   INTERNAL: 500,
 };
 

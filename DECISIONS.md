@@ -1901,3 +1901,74 @@ audit found no bypass, leak, or injection; per-IP rate limiting on
 `/api/auth/login`, a session max-age check, and Supabase-side RLS on the
 `User` table were noted as deploy-time follow-ups, acceptable while the
 app runs on localhost for one user.
+
+### D-111. Per-address failure limiting on the login endpoint
+
+Deploying to Vercel puts `/api/auth/login` on the public internet, which
+retires D-110's "acceptable while the app runs on localhost". Ten failed
+attempts per address per fifteen minutes now earn a 429 carrying
+`Retry-After`; a correct password clears the count, so mistyping twice costs
+nothing. The check runs before JSON parsing and before bcrypt, so a blocked
+attempt is the cheapest response the route can give. The sign-in form maps
+429 to its own line ("Too many attempts. Wait a few minutes and try again.")
+because the generic "try again" invites exactly the retrying the limiter
+exists to stop; the mapping is a pure function so the copy is unit-tested.
+
+State is a module-level Map in `src/lib/auth/rateLimit.ts`, not a table. It
+is therefore per instance and does not survive a cold start: a caller who
+gets Vercel to scale out gets one window per warm instance. That is a real
+limit, recorded rather than hidden. A `LoginAttempt` table would make the
+count global at the price of two queries on every attempt plus a migration,
+which is not worth it for a single-user app whose real backstop is bcrypt at
+cost 12, roughly 250ms per guess. Writes sweep expired keys so the Map stays
+bounded against an address-rotating caller.
+
+The address comes from `x-forwarded-for`, which Vercel overwrites with the
+true client IP and refuses to forward from outside, so it cannot be spoofed
+there. Requests with no address header share one bucket rather than escaping
+the limit.
+
+### D-112. A signed session value expires twelve hours after it was issued
+
+D-107 gave the cookie a browser-session lifetime and never checked
+`issuedAt`, so a value copied out of a browser stayed valid forever.
+`verifySessionValue` now rejects anything older than `SESSION_MAX_AGE_MS`
+(twelve hours), checked after the HMAC so policy never runs on a payload the
+secret has not vouched for.
+
+Twelve hours outlives any real sitting, and the cookie usually dies with the
+browser long before, so in practice nobody meets this bound. What it buys is
+an upper limit on how long a stolen value is worth holding. There is still
+no server-side session table to revoke against, which remains the D-107
+trade.
+
+### D-113. Row level security on the User table, and the Data API off
+
+Supabase serves every `public` table through the Data API (PostgREST) under
+the `anon` and `authenticated` roles. Localhost hid that; a deployment does
+not, because the project URL is guessable. Migration
+`20260829200000_lock_user_table_from_data_api` enables row level security on
+`User` with no policies, which denies those roles every row while leaving
+the app untouched: Prisma connects as the role that owns the table, and an
+owner bypasses RLS unless FORCE ROW LEVEL SECURITY is set, which it
+deliberately is not.
+
+That covers the credential table only. Every other table stays reachable
+while the Data API is on, so the owner is also asked to turn the Data API
+off in the Supabase dashboard. Nothing in the app depends on it: AngleBengal
+reaches Postgres only through Prisma and never calls PostgREST.
+
+### D-114. prisma generate runs on postinstall
+
+Vercel caches `node_modules` between deployments, so Prisma's own
+auto-generation does not re-run and the client can drift out of date against
+a changed schema. An explicit `postinstall` script is Prisma's documented
+fix for exactly this, and it also means a fresh clone gets a client from
+`npm install` alone. `prisma` stays in devDependencies, which Vercel does
+install during a build.
+
+Migrations are deliberately NOT run from the build command. `prisma migrate
+deploy` against the production database is an owner action taken knowingly,
+not a side effect of every deployment: a build that migrates can half-apply
+a schema change while the previous version is still serving traffic.
+
