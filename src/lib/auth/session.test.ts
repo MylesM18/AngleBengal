@@ -1,6 +1,11 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { SESSION_COOKIE, createSessionValue, verifySessionValue } from "@/lib/auth/session";
+import {
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_MS,
+  createSessionValue,
+  verifySessionValue,
+} from "@/lib/auth/session";
 
 const SECRET = "test-secret-0123456789abcdef0123456789abcdef";
 
@@ -43,5 +48,45 @@ describe("session cookie value", () => {
 
   test("exports a stable cookie name", () => {
     expect(SESSION_COOKIE).toBe("anglebengal_session");
+  });
+});
+
+describe("session cookie max age", () => {
+  const secret = "unit-test-secret-0123456789abcdef";
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-29T12:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("a freshly issued value verifies", async () => {
+    const value = await createSessionValue("myles", secret);
+
+    expect(await verifySessionValue(value, secret)).toBe("myles");
+  });
+
+  test("the same value stops verifying once it outlives the max age", async () => {
+    const value = await createSessionValue("myles", secret);
+    expect(await verifySessionValue(value, secret)).toBe("myles");
+
+    vi.setSystemTime(Date.now() + SESSION_MAX_AGE_MS + 1);
+
+    expect(await verifySessionValue(value, secret)).toBeNull();
+  });
+
+  test("a value at exactly the max age still verifies", async () => {
+    const value = await createSessionValue("myles", secret);
+
+    vi.setSystemTime(Date.now() + SESSION_MAX_AGE_MS);
+
+    expect(await verifySessionValue(value, secret)).toBe("myles");
+  });
+
+  test("the max age is twelve hours", () => {
+    expect(SESSION_MAX_AGE_MS).toBe(12 * 60 * 60 * 1000);
   });
 });

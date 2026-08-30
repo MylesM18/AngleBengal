@@ -1,0 +1,16 @@
+-- Row level security on "User" (DECISIONS.md D-113).
+--
+-- Supabase exposes every table in `public` through the Data API (PostgREST)
+-- under the `anon` and `authenticated` roles. On localhost that was reachable
+-- only by the owner; a public deployment makes the project URL guessable, and
+-- the one table that must never answer a stranger is the credential table.
+--
+-- Enabling RLS with NO policies denies those roles every row: a policyless
+-- table returns nothing and accepts nothing. The app is untouched, because
+-- Prisma connects as the role that owns the table and a table owner bypasses
+-- RLS unless FORCE ROW LEVEL SECURITY is set, which it deliberately is not.
+--
+-- This locks one table. Turning the Data API off entirely in the Supabase
+-- dashboard is the wider fix and is recommended: AngleBengal only ever reaches
+-- Postgres through Prisma and never calls PostgREST.
+ALTER TABLE "User" ENABLE ROW LEVEL SECURITY;
