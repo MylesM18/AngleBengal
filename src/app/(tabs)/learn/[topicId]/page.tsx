@@ -72,12 +72,16 @@ export default async function TopicPage({
     if (!doc) notFound();
 
     const index = deserializeModelIndex(doc.modelIndexJson);
-    const misses = await modelMissCounts(doc.id);
-    const lastAttempt = await prisma.attempt.findFirst({
-      where: { problem: { topicId: topic.id } },
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true },
-    });
+    // Independent reads, so they go together: awaiting them in turn cost two
+    // round trips to the pooler before this page could render (D-117).
+    const [misses, lastAttempt] = await Promise.all([
+      modelMissCounts(doc.id),
+      prisma.attempt.findFirst({
+        where: { problem: { topicId: topic.id } },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
+    ]);
     const lastPracticed = lastAttempt
       ? `Last practiced ${lastAttempt.createdAt.toLocaleDateString("en-US", {
           year: "numeric",

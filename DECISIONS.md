@@ -1972,3 +1972,106 @@ deploy` against the production database is an owner action taken knowingly,
 not a side effect of every deployment: a build that migrates can half-apply
 a schema change while the previous version is still serving traffic.
 
+
+### D-115
+
+`DATABASE_URL` carries `connection_limit=8`, not `connection_limit=1`.
+
+At 1, Prisma's client-side pool holds a single connection, so every
+`Promise.all` in a server component silently serialises. The Learn index fires
+seven queries expecting them to overlap; they queued instead. Measured against
+the production database, the same seven queries: 1445ms at `=1`, 521ms at `=3`,
+410ms at `=5`, 245ms at `=8`. End to end through `next start`, `/api/topics`
+(two queries) went from 436ms to 250ms.
+
+The `=1` advice this project inherited is written for high-concurrency
+multi-tenant serverless, where hundreds of function instances each holding a
+pool would exhaust the pooler. AngleBengal is single-user by design (see the
+Auth row in CLAUDE.md), so a handful of connections per instance is nowhere
+near the transaction pooler's ceiling.
+
+The value must be changed in the Vercel project environment as well as `.env`.
+A code deploy alone does not move it.
+
+### D-116
+
+Every tab route has a `loading.tsx`.
+
+There were none, and every page is `force-dynamic`. In the App Router a
+dynamic route's `<Link>` prefetch only reaches as far as the nearest loading
+boundary, so with no boundary there is nothing to prefetch and nothing to
+paint: a click left the browser sitting on the previous screen, showing no
+feedback at all, until the whole server render came back. That is what made
+the app feel like it was hanging rather than loading, independent of how long
+the render actually took.
+
+The skeletons render the static page furniture (headings, standing copy) as
+real text and shimmer only the parts that wait on the database, so the loading
+state and the loaded page share a silhouette and nothing jumps when the data
+lands. `learn/loading.tsx` sits above `[topicId]/layout.tsx` so it also covers
+that layout's own topic-tree read; `learn/[topicId]/loading.tsx` sits inside
+it, so moving between topics keeps the rail on screen and swaps only the
+reader column.
+
+### D-117
+
+Topic reads share one request-scoped snapshot of the taxonomy.
+
+Four callers each read the topic table separately, and the ancestor walk in
+`getTopicPathNodes` issued one `findUnique` PER LEVEL, awaited in turn. The
+taxonomy is tens of rows: against a pooled remote database the round trip, not
+the row count, is the cost, so the whole table is cheaper to hold once than to
+ask for repeatedly. `allTopicRows` is that read, wrapped in React `cache` so a
+layout and its page share it.
+
+Consequences: the ancestor walk is now in-memory; `getTopicDetail` knows the
+root before it queries, so its detail, count and root-glyph reads run as one
+`Promise.all` instead of a three-stage ladder; `getTopicTree` is `cache`d, so
+the topic layout and its page no longer read it twice; the verified-problem
+count is shared between the tree and the descendant roll-up, which were
+issuing the identical `groupBy`; and the Learn index derives root seed order
+from the cached rows instead of its own ordered query.
+
+Verified equivalent, not just faster: the new and old implementations were run
+side by side over all 31 topics and produced identical path nodes, glyphs,
+counts and roll-ups.
+
+### D-118
+
+Password hashing moves from bcrypt cost 12 to cost 10, and the cost lives in
+one place.
+
+`bcryptjs` is a pure-JS implementation, so each step up the cost curve is felt
+harder than it would be with a native binding, and it is paid on the critical
+path of every sign-in. Measured on a fast laptop: 272ms per compare at cost 12,
+68ms at cost 10. Vercel's shared vCPU is slower than that laptop, so the
+absolute saving in production is larger than the 200ms here.
+
+10 is bcryptjs's own default and meets current OWASP guidance for bcrypt. The
+online guessing this parameter defends against is already bounded by
+LOGIN_MAX_FAILURES (ten failures per quarter hour per address, D-111), and
+there is no public signup, so the attack surface is one known username.
+
+Three sites hardcoded 12 and could drift apart, so the value is now
+`BCRYPT_COST` in `src/lib/auth/hashCost.ts`. That module holds nothing but the
+constant, and imports neither "server-only" nor Prisma, because
+`scripts/seed-admin.ts` is a plain tsx script and has to hash at the same cost
+`credentials.ts` verifies at.
+
+Two consequences worth stating plainly:
+
+`PHANTOM_HASH` was regenerated at cost 10. It is compared against when the
+username does not exist, so that both failure paths cost one bcrypt compare. A
+phantom left at cost 12 while real hashes moved to 10 would take measurably
+longer than a real compare, which is precisely the "does this username exist"
+timing signal the phantom exists to hide. A test now asserts the two costs
+match, so they cannot drift.
+
+A stored hash carries its own cost, so lowering this constant does nothing for
+an account already hashed at 12: `bcrypt.compare` reads the cost out of the
+hash. `verifyCredentials` therefore re-hashes after a successful sign-in when
+the stored cost differs from `BCRYPT_COST`. It runs only once the password has
+been verified, which is the only moment the plaintext is available to hash
+again, and it is best-effort: the sign-in has already succeeded, so a failed
+write is logged and swallowed rather than turned into a failed login. This also
+makes raising the cost later safe, with no password reset.

@@ -6,7 +6,9 @@
  *   ADMIN_USERNAME=you ADMIN_PASSWORD='your-password' npx tsx scripts/seed-admin.ts
  *
  * Idempotent: re-running with the same username replaces the password hash.
- * The password is bcrypt-hashed (cost 12) and never printed or stored raw.
+ * The password is bcrypt-hashed at BCRYPT_COST and never printed or stored
+ * raw. The cost is imported rather than repeated so this script and the
+ * sign-in path can never drift apart (DECISIONS.md D-118).
  */
 
 import { readFileSync } from "node:fs";
@@ -14,6 +16,8 @@ import path from "node:path";
 
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+
+import { BCRYPT_COST } from "../src/lib/auth/hashCost";
 
 /**
  * tsx does not load .env on its own (the Prisma CLI does, this script is not
@@ -55,7 +59,7 @@ async function main(): Promise<void> {
 
   const prisma = new PrismaClient();
   try {
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
     await prisma.user.upsert({
       where: { username },
       update: { passwordHash },

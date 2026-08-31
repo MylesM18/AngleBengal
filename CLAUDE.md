@@ -80,7 +80,7 @@ record; do not run them again.
 
 ```
 OPENAI_API_KEY=      # required, server-side only
-DATABASE_URL=        # Supabase pooler, :6543, ?pgbouncer=true&connection_limit=1
+DATABASE_URL=        # Supabase pooler, :6543, ?pgbouncer=true&connection_limit=8
 DIRECT_URL=          # Supabase direct, :5432, migrate and introspect only
 ```
 
