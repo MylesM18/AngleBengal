@@ -93,7 +93,8 @@ export function createRateLimiter({
 /**
  * Ten failures per quarter hour per address. Generous for anyone who mistypes
  * a password (and a success wipes the count anyway), while cutting an online
- * guessing run to a rate bcrypt at cost 12 already makes pointless.
+ * guessing run to a rate bcrypt already makes pointless (the work factor
+ * itself is BCRYPT_COST in hashCost.ts).
  */
 export const LOGIN_MAX_FAILURES = 10;
 export const LOGIN_WINDOW_MS = 15 * 60 * 1000;

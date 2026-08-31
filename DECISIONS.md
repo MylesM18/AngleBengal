@@ -2036,3 +2036,42 @@ Verified equivalent, not just faster: the new and old implementations were run
 side by side over all 31 topics and produced identical path nodes, glyphs,
 counts and roll-ups.
 
+### D-118
+
+Password hashing moves from bcrypt cost 12 to cost 10, and the cost lives in
+one place.
+
+`bcryptjs` is a pure-JS implementation, so each step up the cost curve is felt
+harder than it would be with a native binding, and it is paid on the critical
+path of every sign-in. Measured on a fast laptop: 272ms per compare at cost 12,
+68ms at cost 10. Vercel's shared vCPU is slower than that laptop, so the
+absolute saving in production is larger than the 200ms here.
+
+10 is bcryptjs's own default and meets current OWASP guidance for bcrypt. The
+online guessing this parameter defends against is already bounded by
+LOGIN_MAX_FAILURES (ten failures per quarter hour per address, D-111), and
+there is no public signup, so the attack surface is one known username.
+
+Three sites hardcoded 12 and could drift apart, so the value is now
+`BCRYPT_COST` in `src/lib/auth/hashCost.ts`. That module holds nothing but the
+constant, and imports neither "server-only" nor Prisma, because
+`scripts/seed-admin.ts` is a plain tsx script and has to hash at the same cost
+`credentials.ts` verifies at.
+
+Two consequences worth stating plainly:
+
+`PHANTOM_HASH` was regenerated at cost 10. It is compared against when the
+username does not exist, so that both failure paths cost one bcrypt compare. A
+phantom left at cost 12 while real hashes moved to 10 would take measurably
+longer than a real compare, which is precisely the "does this username exist"
+timing signal the phantom exists to hide. A test now asserts the two costs
+match, so they cannot drift.
+
+A stored hash carries its own cost, so lowering this constant does nothing for
+an account already hashed at 12: `bcrypt.compare` reads the cost out of the
+hash. `verifyCredentials` therefore re-hashes after a successful sign-in when
+the stored cost differs from `BCRYPT_COST`. It runs only once the password has
+been verified, which is the only moment the plaintext is available to hash
+again, and it is best-effort: the sign-in has already succeeded, so a failed
+write is logged and swallowed rather than turned into a failed login. This also
+makes raising the cost later safe, with no password reset.
