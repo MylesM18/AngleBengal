@@ -2075,3 +2075,41 @@ been verified, which is the only moment the plaintext is available to hash
 again, and it is best-effort: the sign-in has already succeeded, so a failed
 write is logged and swallowed rather than turned into a failed login. This also
 makes raising the cost later safe, with no password reset.
+
+### D-119
+
+Vercel functions run in `pdx1`, pinned in `vercel.json`.
+
+The project had no `vercel.json`, so functions took Vercel's default region,
+`iad1` (Virginia). The Supabase pooler is `aws-0-us-west-2`, in Oregon. Every
+database round trip was therefore crossing the continent, roughly 3,700km each
+way, on a path where round-trip COUNT had already been driven down about as
+far as it goes (D-115, D-117).
+
+Measured in production after those two landed, from a signed-in browser:
+
+| Route                | DB stages | Best   |
+|----------------------|-----------|--------|
+| /api/topics          | 1         | 533ms  |
+| /practice            | 1         | 567ms  |
+| /learn               | 1 to 2    | 580ms  |
+| /settings            | 1         | 734ms  |
+| /practice/[topicId]  | 2         | 1122ms |
+| /learn/[topicId]     | 2         | 2463ms |
+
+The tell is that `/learn` fires about six queries and lands 47ms behind
+`/api/topics`, which fires two: the pool fix works, the queries do overlap, and
+what is left is a per-round-trip floor rather than a per-query one. `/settings`
+makes a single query and still costs 734ms, which no amount of query work can
+explain.
+
+`pdx1` is us-west-2, the same region as the database, so a round trip drops
+from cross-country to intra-region. It is also nearer this app's only user
+than Virginia was, so the request leg improves too.
+
+Route-segment `preferredRegion` was not used: it is deprecated in current
+Next.js. Hobby plans allow exactly one region, so the array holds one entry;
+adding a second would fail the build.
+
+This does not touch static assets, which stay on the global edge, or the proxy,
+which runs at the edge regardless.
