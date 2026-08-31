@@ -39,13 +39,44 @@ type TopicRow = {
  * Prisma's `_count`, because `_count` cannot filter on `verified: true` and
  * the UI must never surface unverified problems (non-negotiable 2).
  */
-async function verifiedCountsByTopic(): Promise<Map<string, number>> {
+const verifiedCountsByTopic = cache(async (): Promise<Map<string, number>> => {
   const grouped = await prisma.problem.groupBy({
     by: ["topicId"],
     where: { verified: true },
     _count: { _all: true },
   });
   return new Map(grouped.map((row) => [row.topicId, row._count._all]));
+});
+
+/**
+ * Every topic's id, name and parent, once per request (D-117).
+ *
+ * The taxonomy is small (tens of rows) and four callers used to read it
+ * separately: the tree, the descendant roll-up, the root-name map, and the
+ * ancestor walk, which issued one query PER LEVEL. Against a pooled remote
+ * database the round trip, not the row count, is the cost, so the whole table
+ * is cheaper to hold once than to ask for repeatedly. React `cache` scopes it
+ * to a single request, so a layout and its page share one read.
+ */
+export const allTopicRows = cache(
+  async (): Promise<
+    { id: string; name: string; parentId: string | null; createdAt: Date }[]
+  > =>
+    prisma.topic.findMany({
+      select: { id: true, name: true, parentId: true, createdAt: true },
+    }),
+);
+
+/**
+ * Root topic ids in seed (creation) order, which is the order the Learn index
+ * shelves them in: the taxonomy reads Arithmetic before Algebra on purpose.
+ * Derived from the cached rows rather than its own ordered query (D-117).
+ */
+export async function getRootIdsInSeedOrder(): Promise<string[]> {
+  return (await allTopicRows())
+    .filter((row) => row.parentId === null)
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .map((row) => row.id);
 }
 
 function buildTree(rows: TopicRow[], verified: Map<string, number>): TopicNode[] {
@@ -90,7 +121,7 @@ function buildTree(rows: TopicRow[], verified: Map<string, number>): TopicNode[]
   return roots;
 }
 
-export async function getTopicTree(): Promise<TopicNode[]> {
+export const getTopicTree = cache(async (): Promise<TopicNode[]> => {
   const [rows, verified] = await Promise.all([
     prisma.topic.findMany({
       select: {
@@ -106,7 +137,7 @@ export async function getTopicTree(): Promise<TopicNode[]> {
     verifiedCountsByTopic(),
   ]);
   return buildTree(rows, verified);
-}
+});
 
 export type TopicDetail = {
   id: string;
@@ -144,17 +175,18 @@ export type TopicPathNode = { id: string; name: string };
 
 /** Root-to-leaf node path (id + name), used by breadcrumbs and the generation progress row. */
 export async function getTopicPathNodes(topicId: string): Promise<TopicPathNode[]> {
+  // One read of the whole taxonomy, then walk it in memory (D-117). This used
+  // to issue a findUnique per level, so a three-deep topic paid three
+  // sequential round trips before the page could render.
+  const byId = new Map((await allTopicRows()).map((row) => [row.id, row]));
+
   const pathNodes: TopicPathNode[] = [];
   let currentId: string | null = topicId;
 
   // The taxonomy is at most a handful of levels deep; the guard is only to
   // make a cyclic parent chain fail loudly instead of hanging.
   for (let depth = 0; currentId && depth < 12; depth += 1) {
-    const topic: { id: string; name: string; parentId: string | null } | null =
-      await prisma.topic.findUnique({
-        where: { id: currentId },
-        select: { id: true, name: true, parentId: true },
-      });
+    const topic = byId.get(currentId);
     if (!topic) break;
     pathNodes.unshift({ id: topic.id, name: topic.name });
     currentId = topic.parentId;
@@ -170,44 +202,47 @@ export async function getTopicPath(topicId: string): Promise<string[]> {
 }
 
 export async function getTopicDetail(topicId: string): Promise<TopicDetail | null> {
-  const topic = await prisma.topic.findUnique({
-    where: { id: topicId },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      parentId: true,
-      description: true,
-      wordProblemsOnly: true,
-      perspectiveDoc: { select: { id: true, contentMd: true, createdAt: true } },
-      modelDocs: {
-        select: {
-          id: true,
-          title: true,
-          isExemplar: true,
-          modelIndexJson: true,
-          depth: true,
-          createdAt: true,
+  // The ancestor walk now resolves from cached rows, so the root is known
+  // before any of the three reads below. That lets all three run at once
+  // instead of the old detail -> count -> root-glyph ladder (D-117).
+  const pathNodes = await getTopicPathNodes(topicId);
+  const rootId = pathNodes[0]?.id ?? topicId;
+
+  const [topic, verifiedProblemCount, root] = await Promise.all([
+    prisma.topic.findUnique({
+      where: { id: topicId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        parentId: true,
+        description: true,
+        wordProblemsOnly: true,
+        perspectiveDoc: { select: { id: true, contentMd: true, createdAt: true } },
+        modelDocs: {
+          select: {
+            id: true,
+            title: true,
+            isExemplar: true,
+            modelIndexJson: true,
+            depth: true,
+            createdAt: true,
+          },
+          orderBy: { depth: "asc" },
         },
-        orderBy: { depth: "asc" },
+        children: { select: { id: true, name: true }, orderBy: { name: "asc" } },
       },
-      children: { select: { id: true, name: true }, orderBy: { name: "asc" } },
-    },
-  });
+    }),
+    prisma.problem.count({ where: { topicId, verified: true } }),
+    // The root owns the glyph; a leaf inherits it. pathNodes[0] IS the root.
+    prisma.topic.findUnique({
+      where: { id: rootId },
+      select: { symbol: { select: { glyph: true } } },
+    }),
+  ]);
   if (!topic) return null;
 
-  const [verifiedProblemCount, pathNodes] = await Promise.all([
-    prisma.problem.count({ where: { topicId, verified: true } }),
-    getTopicPathNodes(topicId),
-  ]);
   const path = pathNodes.map((node) => node.name);
-
-  // The root owns the glyph; a leaf inherits it. pathNodes[0] IS the root.
-  const rootId = pathNodes[0]?.id ?? topic.id;
-  const root = await prisma.topic.findUnique({
-    where: { id: rootId },
-    select: { symbol: { select: { glyph: true } } },
-  });
 
   return {
     id: topic.id,
@@ -240,7 +275,7 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
  * its own leaf name (docs/08: accents are owned by root topics).
  */
 export async function getRootNameByTopicId(): Promise<Map<string, string>> {
-  const rows = await prisma.topic.findMany({ select: { id: true, name: true, parentId: true } });
+  const rows = await allTopicRows();
   const byId = new Map(rows.map((row) => [row.id, row]));
 
   const rootNames = new Map<string, string>();
@@ -295,24 +330,22 @@ export function rollUpCounts(
  */
 export const getDescendantCounts = cache(
   async (): Promise<Map<string, DescendantCounts>> => {
+    // `verifiedCountsByTopic` is the same read the tree does, and both run on
+    // the Learn index. Sharing the cached call drops one round trip (D-117).
     const [topics, docs, problems] = await Promise.all([
-      prisma.topic.findMany({ select: { id: true, parentId: true } }),
+      allTopicRows(),
       prisma.mentalModelDoc.groupBy({ by: ["topicId"], _count: { _all: true } }),
-      prisma.problem.groupBy({
-        by: ["topicId"],
-        where: { verified: true },
-        _count: { _all: true },
-      }),
+      verifiedCountsByTopic(),
     ]);
 
     const own = new Map<string, DescendantCounts>();
     for (const row of docs) {
       own.set(row.topicId, { docs: row._count._all, verifiedProblems: 0 });
     }
-    for (const row of problems) {
-      const bucket = own.get(row.topicId) ?? { docs: 0, verifiedProblems: 0 };
-      bucket.verifiedProblems = row._count._all;
-      own.set(row.topicId, bucket);
+    for (const [topicId, count] of problems) {
+      const bucket = own.get(topicId) ?? { docs: 0, verifiedProblems: 0 };
+      bucket.verifiedProblems = count;
+      own.set(topicId, bucket);
     }
     return rollUpCounts(topics, own);
   },

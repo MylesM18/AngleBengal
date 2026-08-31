@@ -8,7 +8,12 @@ import { Sheet } from "@/components/ui/Sheet";
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
 import { accentForRoot } from "@/lib/topicColors";
-import { getDescendantCounts, getTopicTree, type DescendantCounts } from "@/lib/topics";
+import {
+  getDescendantCounts,
+  getRootIdsInSeedOrder,
+  getTopicTree,
+  type DescendantCounts,
+} from "@/lib/topics";
 
 /** Reads the database on every request: the topic tree and doc list change
  *  whenever a document is generated, so this must not be prerendered. */
@@ -34,12 +39,9 @@ export default async function LearnIndexPage() {
     getTopicTree(),
     getDescendantCounts(),
     // Seed order (creation order), not the tree's alphabetical order: the
-    // taxonomy reads Arithmetic before Algebra on purpose.
-    prisma.topic.findMany({
-      where: { parentId: null },
-      select: { id: true },
-      orderBy: { createdAt: "asc" },
-    }),
+    // taxonomy reads Arithmetic before Algebra on purpose. Derived from the
+    // request-cached topic rows, so it costs no extra round trip (D-117).
+    getRootIdsInSeedOrder(),
     prisma.mentalModelDoc.findMany({
       select: {
         id: true,
@@ -55,8 +57,8 @@ export default async function LearnIndexPage() {
   ]);
 
   const rootById = new Map(tree.map((root) => [root.id, root]));
-  const roots = rootOrder.flatMap((row) => {
-    const root = rootById.get(row.id);
+  const roots = rootOrder.flatMap((id) => {
+    const root = rootById.get(id);
     return root ? [root] : [];
   });
 
