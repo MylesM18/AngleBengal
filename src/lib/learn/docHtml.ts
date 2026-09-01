@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -35,4 +36,45 @@ export function buildDocHtml(contentMd: string, models: ModelIndexEntry[]): Rend
       bodyHtml: section.body ? renderMarkdownBodyHtml(section.body) : null,
     })),
   };
+}
+
+/**
+ * Bump when the markdown or KaTeX pipeline changes.
+ *
+ * Data Cache entries persist across deployments, so without this a change to
+ * the MarkdownMath internals would serve stale HTML forever. The stringified
+ * wrapper below is part of the default key, but the pipeline it calls into is
+ * not.
+ */
+const RENDER_VERSION = "1";
+
+/**
+ * The rendered document, cached indefinitely in the Vercel Data Cache.
+ *
+ * `docId` alone identifies the content: `contentMd` is immutable and rows are
+ * never updated, so the id determines the markdown. unstable_cache does not
+ * include closed-over values in the key, which is why `docId` is listed
+ * explicitly.
+ *
+ * `accent` is deliberately not in the key. It only affects the CornerNumeral
+ * inside ModelHeading, which renders live on every request; only the markdown
+ * body is cached. `revalidate` is omitted, which caches indefinitely, correct
+ * for immutable content. The tag lets a future change invalidate a single
+ * document.
+ *
+ * unstable_cache is marked "replaced by use cache" in the Next 16 docs. It is
+ * still shipped and its documented behaviour, persisting across requests and
+ * deployments, is exactly what is needed here. The migration target if it is
+ * ever removed is `'use cache: remote'`.
+ */
+export function getRenderedDoc(
+  docId: string,
+  contentMd: string,
+  models: ModelIndexEntry[],
+): Promise<RenderedDoc> {
+  return unstable_cache(
+    async () => buildDocHtml(contentMd, models),
+    ["learn-doc-html", RENDER_VERSION, docId],
+    { tags: [`doc-html:${docId}`] },
+  )();
 }
