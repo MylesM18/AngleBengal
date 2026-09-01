@@ -35,9 +35,10 @@ export function gridOrigin(cssWidth: number, cssHeight: number): { x: number; y:
 }
 
 /** Tick label spacing in world units: every unit once a unit spans at least
- *  40px, else every 5 (DECISIONS.md D-126). */
+ *  30px, else every 5 (DECISIONS.md D-126, threshold revised by D-127 so the
+ *  half-unit zoom labels every unit). */
 export function axisLabelInterval(step: number): number {
-  return GRID_PX / step >= 40 ? 1 : 5;
+  return GRID_PX / step >= 30 ? 1 : 5;
 }
 
 /** Set by GraphLayer while mounted, so the composite can read the live board

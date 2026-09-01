@@ -47,11 +47,13 @@ describe("coordinate model (spec §7.1)", () => {
   });
 });
 
-describe("axisLabelInterval (D-126)", () => {
+describe("axisLabelInterval (D-126, threshold revised by D-127)", () => {
   it("labels every 5 units when a unit is narrow, every 1 when wide", () => {
     expect(axisLabelInterval(1)).toBe(5);
-    expect(axisLabelInterval(0.5)).toBe(5);
+    expect(axisLabelInterval(0.5)).toBe(1);
     expect(axisLabelInterval(0.25)).toBe(1);
+    expect(axisLabelInterval(2)).toBe(5);
+    expect(axisLabelInterval(5)).toBe(5);
   });
 });
 

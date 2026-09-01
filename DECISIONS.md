@@ -2301,3 +2301,18 @@ units, whichever stays legible"). The rule: label every unit once one world
 unit spans at least 40px (GRID_PX / step >= 40), otherwise label every 5
 units. At the default step 1 a unit spans 19px, so labels land on multiples
 of 5. Encoded as axisLabelInterval in src/lib/sketch/render.ts.
+
+### D-127. User-adjustable units per grid square; label threshold 30px
+
+Owner request after PR #13 shipped: axis numbers need to be visible and the
+student needs control over which numbers show for more accuracy. Two changes:
+
+1. The Graph rail gains a "1 sq =" selector (1/4, 1/2, 1, 2, 5) driving the
+   existing graphStep. A finer step zooms in: snap granularity, click-to-place,
+   the JSXGraph board, shading, axis labels, and the composite all follow the
+   same store value, so nothing can disagree. The served problem's graphStep
+   still seeds the value on every load.
+2. The D-126 label rule keeps its 1-or-5 shape but the every-unit threshold
+   drops from 40px to 30px per world unit, so the 1/2-unit zoom (38px per
+   unit) labels every unit instead of every 5. Default step 1 (19px) still
+   labels multiples of 5.
