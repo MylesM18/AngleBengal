@@ -225,11 +225,17 @@ For each problem:
   the same station". Null when isWordProblem is false.
 - wolframQuery: the computable core of the problem as one short Wolfram Alpha
   query, following the WOLFRAM QUERY RULES below.
+- palette: the input symbols the student needs to type this problem's answer
+  and work, chosen only from the PALETTE VOCABULARY below. Use null when plain
+  digits and the four operators suffice. At most 16, fewer is better.
 - Recompute all arithmetic before finalizing. An arithmetic slip makes the
   problem worthless.
 
 Vary surface features across the batch (contexts, number ranges, which
 quantity is unknown) so no two problems are template-identical. No em-dashes.
+
+PALETTE VOCABULARY (the only legal palette values):
+frac, exponent, sqrt, nthroot, abs, pi, e, theta, infinity, degree, plusminus, percent, neq, leq, geq, lt, gt, approx, times, divide, sin, cos, tan, log, ln, derivative, integral, lim, prime, factorial, ncr, npr, xbar, mu, sigma, angle, parallel, perp, union, intersect
 
 WOLFRAM QUERY RULES:
 - English keywords plus linear math syntax: "solve 3x - 7 = 11",
@@ -257,9 +263,11 @@ word problems beats five where one is symbolic.
 
 and the user message gains the line "Every problem must be a word problem."
 
-JSON schema: `{ problems: [{ statementMd, answerJson, solutionMd, modelTags: number[], difficulty, isWordProblem: boolean, scenario: string | null, wolframQuery: string }] }`
+JSON schema: `{ problems: [{ statementMd, answerJson, solutionMd, modelTags: number[], difficulty, isWordProblem: boolean, scenario: string | null, wolframQuery: string, palette: string[] | null }] }`
 
 `isWordProblem` and `scenario` are always requested, so the generator classifies what it wrote whether or not the topic demands word problems. On a `wordProblemsOnly` topic, `problemIsWordProblem` in `schemas.ts` requires both (true, and a non-blank scenario), the way `classifierResultIsCoherent` enforces what a JSON Schema cannot say. A problem that fails it is discarded before the verifier is called: that is a saving, not a relaxation, since a problem clearing the gate still has to pass §4.2 in full before it is saved. The setting gates generation only. `Problem` carries no word-problem column, so existing problems are neither relabelled nor filtered out of a session.
+
+Each problem also declares `palette`, an array from the palette vocabulary or null; unknown ids are dropped and the result capped at 16 at save (`sanitizePalette`), stored on `Problem.palette` as JSON.
 
 ### 4.2 Verifier system prompt
 

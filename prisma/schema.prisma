@@ -118,6 +118,10 @@ model Problem {
   wolframQuery String?
   // "wolfram" or "llm" (spec section 9). Null for legacy rows.
   verifiedBy   String?
+  // Validated palette symbol ids the generator declared for this problem
+  // (practice tools spec, D-123). SQL NULL means "use the root default".
+  // Json, not a native array, per the no-native-arrays rule.
+  palette     Json?
   createdAt   DateTime @default(now())
 
   modelTags ProblemModelTag[]

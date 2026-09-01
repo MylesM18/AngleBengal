@@ -24,6 +24,7 @@ import {
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
 import { compareAnswers, compareToAnswer } from "@/lib/math/compare";
+import { sanitizePalette } from "@/lib/practice/tools";
 import { getTopicPath } from "@/lib/topics";
 import { numericAgreement, solutionsAgreement } from "@/lib/wolfram/agreement";
 import { computeAnswer } from "@/lib/wolfram/compute";
@@ -141,6 +142,9 @@ export async function generateProblems(
         verified: true,
         wolframQuery: problem.wolframQuery,
         verifiedBy: outcome.verifiedBy,
+        // Unknown ids are dropped; empty means SQL NULL, resolved to the root
+        // default at serve time (spec §4). undefined leaves the column NULL.
+        palette: sanitizePalette(problem.palette) ?? undefined,
         modelTags: {
           create: tags.map((modelNumber) => ({ docId: doc.id, modelNumber })),
         },

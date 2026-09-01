@@ -3,6 +3,7 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { PALETTE_SYMBOL_IDS } from "@/lib/practice/tools";
 import type { TopicNode } from "@/lib/topics";
 
 /**
@@ -501,6 +502,9 @@ For each problem:
   the same station". Null when isWordProblem is false.
 - wolframQuery: the computable core of the problem as one short Wolfram Alpha
   query, following the WOLFRAM QUERY RULES below.
+- palette: the input symbols the student needs to type this problem's answer
+  and work, chosen only from the PALETTE VOCABULARY below. Use null when plain
+  digits and the four operators suffice. At most 16, fewer is better.
 - Recompute all arithmetic before finalizing. An arithmetic slip makes the
   problem worthless.
 
@@ -525,6 +529,9 @@ ANSWER FIELD RULES:
 - For "multi", every part needs name (machine name, camelCase), label (shown
   to the student), value, unit, tolerance.
 - The answer is a single final value, not a restatement of the question.
+
+PALETTE VOCABULARY (the only legal palette values):
+${PALETTE_SYMBOL_IDS.join(", ")}
 
 WOLFRAM QUERY RULES:
 - English keywords plus linear math syntax: "solve 3x - 7 = 11",
