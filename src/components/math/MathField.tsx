@@ -1,9 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { MathfieldElement } from "mathlive";
+import type { MathfieldElement, VirtualKeyboardLayout } from "mathlive";
 
 import { cx } from "@/lib/cx";
+
+/**
+ * App-tailored virtual keyboard layout (D-128). MathLive's default math
+ * layout crams composed keys (the bounded integral, root-of-box) into
+ * phone-width caps where they overflow and read as misaligned; measurement
+ * showed the geometry was correct but the optics were not. This layer keeps
+ * only what the grader accepts, with simple single-glyph keys that center
+ * cleanly; the built-in alphabetic and greek layers stay as extra tabs.
+ * Insert strings use the same #@/#? placeholder semantics as the palette.
+ */
+const APP_MATH_LAYOUT: VirtualKeyboardLayout = {
+  label: "123",
+  tooltip: "Numbers and symbols",
+  rows: [
+    ["7", "8", "9", "\\div", "(", ")", { latex: "\\sqrt{#@}", label: "&radic;" }, { latex: "#@^{#?}", label: "x&#8319;" }],
+    ["4", "5", "6", "\\times", "x", "n", { latex: "\\frac{#@}{#?}", label: "a/b" }, "="],
+    ["1", "2", "3", "-", "<", ">", ",", { label: "[backspace]", width: 1 }],
+    [{ label: "0", width: 1 }, ".", "+", { label: "[left]", width: 1.5 }, { label: "[right]", width: 1.5 }, { label: "[return]", width: 2 }],
+  ],
+};
 
 /**
  * The one MathLive wrapper both typing surfaces use (spec §5). MathLive is a
@@ -30,6 +50,7 @@ export function loadMathLive(): Promise<boolean> {
       .then((mathlive) => {
         mathlive.MathfieldElement.fontsDirectory = "/mathlive-fonts";
         mathlive.MathfieldElement.soundsDirectory = null;
+        window.mathVirtualKeyboard.layouts = [APP_MATH_LAYOUT, "alphabetic", "greek"];
         loadStatus = "ready";
         notify();
         return true;

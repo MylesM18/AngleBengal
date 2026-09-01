@@ -137,6 +137,10 @@ body {
   /* Chips and cards have their own pressed states (spec §7); the gray iOS
    * tap flash fights them, so it is suppressed at the body level. */
   -webkit-tap-highlight-color: transparent;
+  /* MathLive virtual keyboard: larger keycap glyphs so the caps read as
+   * filled and centered on phones (D-128). Documented MathLive variable;
+   * the keyboard renders in the page DOM, so it inherits from body. */
+  --keycap-font-size: 18px;
 }
 
 /*
