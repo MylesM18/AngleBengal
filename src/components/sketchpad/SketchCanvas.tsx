@@ -47,6 +47,8 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
   const tool = useSketchStore((state) => state.tool);
   const width = useSketchStore((state) => state.width);
   const color = useSketchStore((state) => state.color);
+  const mode = useSketchStore((state) => state.mode);
+  const graphStep = useSketchStore((state) => state.graphStep);
   const addStroke = useSketchStore((state) => state.addStroke);
   const eraseStrokes = useSketchStore((state) => state.eraseStrokes);
 
@@ -132,8 +134,16 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
     const canvas = backgroundRef.current;
     if (!canvas || size.width === 0) return;
     const context = prepareCanvas(canvas, size.width, size.height);
-    if (context) paintBackground(context, background, size.width, size.height);
-  }, [background, size]);
+    if (context) {
+      paintBackground(
+        context,
+        background,
+        size.width,
+        size.height,
+        mode === "graph" ? { step: graphStep } : null,
+      );
+    }
+  }, [background, size, mode, graphStep]);
 
   useEffect(() => {
     const canvas = inkRef.current;

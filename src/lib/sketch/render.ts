@@ -40,6 +40,12 @@ export function axisLabelInterval(step: number): number {
   return GRID_PX / step >= 40 ? 1 : 5;
 }
 
+/** Set by GraphLayer while mounted, so the composite can read the live board
+ *  SVG and the shading canvas without a dependency cycle. */
+export const graphLayerSource: {
+  current: { svg: () => string | null; shadeCanvas: () => HTMLCanvasElement | null } | null;
+} = { current: null };
+
 /** Sets up a devicePixelRatio-aware backing store and returns the context. */
 export function prepareCanvas(
   canvas: HTMLCanvasElement,
@@ -64,6 +70,7 @@ export function paintBackground(
   background: Background,
   width: number,
   height: number,
+  axisLabels: { step: number } | null = null,
 ): void {
   context.clearRect(0, 0, width, height);
   context.fillStyle = "#F9F5EC"; // --paper-0
@@ -87,17 +94,42 @@ export function paintBackground(
   context.stroke();
 
   if (background === "graph") {
-    // Axes through the centre, no numeric labels (docs/06 §4).
+    // Axes through the origin the graph tools use, not the raw midpoint
+    // (spec §7.1).
     context.globalAlpha = 0.45;
     context.lineWidth = 1.5;
     context.beginPath();
-    const midX = Math.round(width / 2) + 0.5;
-    const midY = Math.round(height / 2) + 0.5;
+    const axesOrigin = gridOrigin(width, height);
+    const midX = axesOrigin.x + 0.5;
+    const midY = axesOrigin.y + 0.5;
     context.moveTo(midX, 0);
     context.lineTo(midX, height);
     context.moveTo(0, midY);
     context.lineTo(width, midY);
     context.stroke();
+
+    if (axisLabels) {
+      const origin = gridOrigin(width, height);
+      const interval = axisLabelInterval(axisLabels.step);
+      const pxPerUnit = GRID_PX / axisLabels.step;
+      context.globalAlpha = 0.7;
+      context.fillStyle = "#3D66A8";
+      context.font = '10px "IBM Plex Mono", ui-monospace, monospace';
+      context.textAlign = "center";
+      for (let unit = interval; origin.x + unit * pxPerUnit < width || origin.x - unit * pxPerUnit > 0; unit += interval) {
+        for (const sign of [1, -1]) {
+          const x = origin.x + sign * unit * pxPerUnit;
+          if (x > 0 && x < width) context.fillText(String(sign * unit), x, origin.y + 12);
+        }
+      }
+      context.textAlign = "right";
+      for (let unit = interval; origin.y + unit * pxPerUnit < height || origin.y - unit * pxPerUnit > 0; unit += interval) {
+        for (const sign of [1, -1]) {
+          const y = origin.y - sign * unit * pxPerUnit;
+          if (y > 0 && y < height) context.fillText(String(sign * unit), origin.x - 4, y + 3);
+        }
+      }
+    }
   }
 
   context.restore();

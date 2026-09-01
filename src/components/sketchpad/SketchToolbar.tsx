@@ -36,6 +36,7 @@ import {
 const MODES: { value: SketchMode; label: string }[] = [
   { value: "draw", label: "Draw" },
   { value: "type", label: "Type" },
+  { value: "graph", label: "Graph" },
 ];
 
 const TOOLS: { value: Tool; label: string; icon: IconName }[] = [
@@ -75,6 +76,7 @@ export function SketchToolbar({
   const color = useSketchStore((state) => state.color);
   const background = useSketchStore((state) => state.background);
   const strokeCount = useSketchStore((state) => state.strokes.length);
+  const toolset = useSketchStore((state) => state.toolset);
 
   const setMode = useSketchStore((state) => state.setMode);
   const setTool = useSketchStore((state) => state.setTool);
@@ -84,6 +86,10 @@ export function SketchToolbar({
   const undo = useSketchStore((state) => state.undo);
   const clear = useSketchStore((state) => state.clear);
   const mathLive = useMathLive();
+
+  // Graph mode is level-gated: the button only shows once the served
+  // problem's toolset declares at least one graph tool.
+  const graphToolsAvailable = (toolset?.graphTools.length ?? 0) > 0;
 
   const stripRef = useRef<HTMLDivElement | null>(null);
   const clearWrapRef = useRef<HTMLDivElement | null>(null);
@@ -198,23 +204,30 @@ export function SketchToolbar({
       className="stock-textured flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft px-3 py-2 max-lg:relative max-lg:gap-5"
     >
       <div className="flex gap-1 max-lg:gap-3" role="group" aria-label="Mode">
-        {MODES.map(({ value, label }) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setMode(value)}
-            aria-pressed={mode === value}
-            disabled={value === "type" && mathLive.status === "failed"}
-            title={
-              value === "type" && mathLive.status === "failed"
-                ? "Typed input failed to load"
-                : label
-            }
-            className={chipClasses({ variant: "toggle", active: mode === value })}
-          >
-            {label}
-          </button>
-        ))}
+        {MODES.filter((item) => item.value !== "graph" || graphToolsAvailable).map(
+          ({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => {
+                setMode(value);
+                // Entering Graph mode also switches the background so the
+                // axes are visible without a second click.
+                if (value === "graph") setBackground("graph");
+              }}
+              aria-pressed={mode === value}
+              disabled={value === "type" && mathLive.status === "failed"}
+              title={
+                value === "type" && mathLive.status === "failed"
+                  ? "Typed input failed to load"
+                  : label
+              }
+              className={chipClasses({ variant: "toggle", active: mode === value })}
+            >
+              {label}
+            </button>
+          ),
+        )}
         {mathLive.status === "failed" && (
           <button
             type="button"

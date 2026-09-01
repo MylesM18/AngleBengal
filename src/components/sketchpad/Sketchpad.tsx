@@ -9,6 +9,8 @@ import { compositeToPng } from "@/lib/sketch/render";
 import { useSketchStore, type OcrBlock } from "@/lib/sketch/store";
 
 import { CleanCopyPanel } from "./CleanCopyPanel";
+import { GraphLayer } from "./GraphLayer";
+import { GraphRail } from "./GraphRail";
 import { SketchCanvas } from "./SketchCanvas";
 import { SketchToolbar } from "./SketchToolbar";
 import { TypedLinesLayer } from "./TypedLinesLayer";
@@ -25,6 +27,7 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
   const [toast, setToast] = useState<{ kind: NoticeKind; message: string } | null>(null);
 
   const blocks = useSketchStore((state) => state.ocrBlocks);
+  const mode = useSketchStore((state) => state.mode);
   const setOcrBlocks = useSketchStore((state) => state.setOcrBlocks);
   const setCanvasSize = useSketchStore((state) => state.setCanvasSize);
 
@@ -90,10 +93,12 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
       className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0 outline-none"
     >
       <SketchToolbar cleaning={cleaning} onCleanUp={() => void cleanUp()} />
+      {mode === "graph" && <GraphRail />}
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <SketchCanvas onSizeChange={setCanvasSize} />
         <TypedLinesLayer />
+        <GraphLayer />
       </div>
 
       {blocks && blocks.length > 0 && (
