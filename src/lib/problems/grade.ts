@@ -44,6 +44,7 @@ export async function submitAttempt(input: {
   submittedAnswer: string;
   sketchPngBase64?: string | null;
   ocrBlocks?: unknown;
+  typedLines?: { latex: string; plain: string }[] | null;
 }): Promise<AttemptResult> {
   const problem = await prisma.problem.findUnique({
     where: { id: input.problemId },
@@ -88,6 +89,7 @@ export async function submitAttempt(input: {
         submittedAnswer: input.submittedAnswer,
         topicId: problem.topicId,
         ocrText,
+        typedLines: input.typedLines ?? null,
       });
 
   await prisma.attempt.create({
@@ -97,6 +99,7 @@ export async function submitAttempt(input: {
       correct,
       sketchPng: decodeSketch(input.sketchPngBase64),
       ocrTextJson: input.ocrBlocks ? JSON.stringify(input.ocrBlocks) : null,
+      typedLines: input.typedLines && input.typedLines.length > 0 ? input.typedLines : undefined,
       diagnosedDocId: diagnosis?.docId ?? null,
       diagnosedModelNum: diagnosis?.modelNumber ?? null,
       diagnosisSymptom: diagnosis?.symptom ?? null,
@@ -125,6 +128,7 @@ async function diagnose(input: {
   submittedAnswer: string;
   topicId: string;
   ocrText: string | null;
+  typedLines: { latex: string; plain: string }[] | null;
 }): Promise<Diagnosis | null> {
   const doc = await prisma.mentalModelDoc.findFirst({
     where: { topicId: input.topicId },
@@ -144,6 +148,7 @@ async function diagnose(input: {
         solutionMd: input.solutionMd,
         submittedAnswer: input.submittedAnswer,
         ocrText: input.ocrText,
+        typedLines: input.typedLines,
         doc: { title: doc.title, contentMd: doc.contentMd },
       }),
       schema: diagnosticSchema,

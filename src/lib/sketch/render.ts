@@ -22,6 +22,9 @@ import {
  */
 export const GRID_PX = 19;
 
+/** Stacked typed-line pitch: 2 grid squares (DECISIONS.md D-125). */
+export const TYPED_LINE_HEIGHT = 38;
+
 /** Sets up a devicePixelRatio-aware backing store and returns the context. */
 export function prepareCanvas(
   canvas: HTMLCanvasElement,
@@ -181,17 +184,40 @@ function distanceToSegmentSquared(
 }
 
 /**
- * Flattens background and ink into one PNG for OCR (docs/02 flow D).
- * Capped at 1600px wide, which is plenty for handwriting and keeps the
- * base64 payload reasonable.
+ * Typed lines composite as clean numbered monospace text (owner ruling, spec
+ * §5): rasterizing MathLive/KaTeX markup needs web fonts inside SVG
+ * foreignObjects or a new dependency, and the verbatim LaTeX already travels
+ * in the attempt payload, so the PNG stays a faithful dependency-free record.
+ */
+export function paintTypedLines(
+  context: CanvasRenderingContext2D,
+  lines: string[],
+): void {
+  context.save();
+  context.font = '15px "IBM Plex Mono", ui-monospace, monospace';
+  context.fillStyle = "#322921"; // --ink
+  context.textBaseline = "middle";
+  lines.forEach((line, index) => {
+    context.fillText(`${index + 1}. ${line}`, GRID_PX, GRID_PX + (index + 0.5) * TYPED_LINE_HEIGHT);
+  });
+  context.restore();
+}
+
+/**
+ * Flattens background, ink, and (optionally) typed lines into one PNG
+ * (docs/02 flow D). Capped at 1600px wide, which is plenty for handwriting
+ * and keeps the base64 payload reasonable. Each ink/typed layer is isolated
+ * in its own try/catch (spec §8): a failed layer logs and is skipped, and
+ * submission is never blocked by presentation machinery.
  */
 export function compositeToPng(
   strokes: Stroke[],
   background: Background,
   cssWidth: number,
   cssHeight: number,
-  maxWidth = 1600,
+  options: { typedPlainLines?: string[]; maxWidth?: number } = {},
 ): string | null {
+  const { typedPlainLines = [], maxWidth = 1600 } = options;
   if (cssWidth <= 0 || cssHeight <= 0) return null;
 
   const scale = Math.min(1, maxWidth / cssWidth) * (window.devicePixelRatio || 1);
@@ -204,7 +230,16 @@ export function compositeToPng(
   context.setTransform(scale, 0, 0, scale, 0, 0);
 
   paintBackground(context, background, cssWidth, cssHeight);
-  for (const stroke of strokes) paintStroke(context, stroke);
+  try {
+    for (const stroke of strokes) paintStroke(context, stroke);
+  } catch (error) {
+    console.error("composite: ink layer failed, continuing without it:", error);
+  }
+  try {
+    if (typedPlainLines.length > 0) paintTypedLines(context, typedPlainLines);
+  } catch (error) {
+    console.error("composite: typed layer failed, continuing without it:", error);
+  }
 
   return canvas.toDataURL("image/png");
 }

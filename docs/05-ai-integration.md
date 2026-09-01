@@ -321,6 +321,48 @@ so: use failedModelNumber 0, failedModelTitle "Arithmetic slip".
 
 JSON schema: `{ failedModelNumber, failedModelTitle, symptom, explanationMd, confidence }`
 
+### User message
+
+Assembled in `diagnosticUser()`, parts joined with a blank line:
+
+```
+PROBLEM:
+{statementMd}
+
+CORRECT SOLUTION:
+{solutionMd}
+
+STUDENT'S SUBMITTED ANSWER:
+{submittedAnswer}
+
+{if typedLines is non-empty}
+THEIR TYPED SOLUTION LINES (ordered, verbatim):
+1. {plain}
+2. {plain}
+{...one line per stacked Type-mode line}
+{/if}
+
+{if ocrText}
+TRANSCRIPTION OF THEIR HANDWRITTEN WORK:
+{ocrText}
+{/if}
+
+{if doc}
+THE TOPIC'S MENTAL MODEL DOCUMENT:
+
+--- {doc.title} ---
+{doc.contentMd}
+{else}
+No mental model document is available for this topic. If you cannot attribute
+the error to a specific named model, return confidence below 0.4.
+{/if}
+```
+
+Typed lines and the OCR transcription are two independent, optional pieces of
+evidence carrying their own label, so both can be present on the same attempt
+(a student who typed some lines and also cleaned up handwritten scratch work)
+without the model conflating one source with the other.
+
 ## §6 Tutor chat (GENERATOR model, streaming)
 
 System prompt template:

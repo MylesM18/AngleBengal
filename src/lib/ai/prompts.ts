@@ -672,6 +672,7 @@ export function diagnosticUser(input: {
   solutionMd: string;
   submittedAnswer: string;
   ocrText: string | null;
+  typedLines: { latex: string; plain: string }[] | null;
   doc: { title: string; contentMd: string } | null;
 }): string {
   const parts = [
@@ -679,6 +680,14 @@ export function diagnosticUser(input: {
     `CORRECT SOLUTION:\n${input.solutionMd}`,
     `STUDENT'S SUBMITTED ANSWER:\n${input.submittedAnswer}`,
   ];
+
+  if (input.typedLines && input.typedLines.length > 0) {
+    parts.push(
+      `THEIR TYPED SOLUTION LINES (ordered, verbatim):\n${input.typedLines
+        .map((line, index) => `${index + 1}. ${line.plain}`)
+        .join("\n")}`,
+    );
+  }
 
   if (input.ocrText) {
     parts.push(`TRANSCRIPTION OF THEIR HANDWRITTEN WORK:\n${input.ocrText}`);

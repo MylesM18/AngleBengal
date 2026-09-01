@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { perspectiveUser, problemGeneratorSystem } from "./prompts";
+import { diagnosticUser, perspectiveUser, problemGeneratorSystem } from "./prompts";
 
 describe("perspectiveUser", () => {
   it("lists level-1 models by number and title", () => {
@@ -39,5 +39,33 @@ describe("problemGeneratorSystem palette contract", () => {
     expect(system).toContain("PALETTE VOCABULARY");
     expect(system).toContain("frac, exponent, sqrt");
     expect(system).toContain("union, intersect");
+  });
+});
+
+describe("diagnosticUser typed lines", () => {
+  const base = {
+    statementMd: "Solve $3x = 9$.",
+    solutionMd: "x = 3",
+    submittedAnswer: "4",
+    ocrText: null,
+    doc: null,
+  };
+
+  it("labels typed lines separately and in order", () => {
+    const message = diagnosticUser({
+      ...base,
+      typedLines: [
+        { latex: "3x = 9", plain: "3x = 9" },
+        { latex: "x = 4", plain: "x = 4" },
+      ],
+    });
+    expect(message).toContain("THEIR TYPED SOLUTION LINES");
+    expect(message).toContain("1. 3x = 9");
+    expect(message).toContain("2. x = 4");
+  });
+
+  it("omits the block when there are none", () => {
+    const message = diagnosticUser({ ...base, typedLines: null });
+    expect(message).not.toContain("TYPED SOLUTION LINES");
   });
 });

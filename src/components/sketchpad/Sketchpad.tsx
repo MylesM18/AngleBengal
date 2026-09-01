@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 
 import type { NoticeKind } from "@/components/ui/Notice";
 import { Toast } from "@/components/ui/Toast";
+import { latexToPlain } from "@/lib/sketch/latexToPlain";
 import { compositeToPng } from "@/lib/sketch/render";
 import { useSketchStore, type OcrBlock } from "@/lib/sketch/store";
 
@@ -118,11 +119,17 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
 
 /**
  * Snapshot helper for the attempt submitter (docs/06 §4: "On submit: silently
- * composite and attach"). Returns null for an empty canvas so an untouched
- * sketchpad does not attach a blank image to every attempt.
+ * composite and attach... skip if canvas is empty"). Empty now means no ink
+ * AND no typed lines, so a typed-only attempt still gets a composite while a
+ * genuinely untouched sketchpad still attaches nothing.
  */
 export function snapshotSketch(): string | null {
-  const { strokes, background, canvasSize } = useSketchStore.getState();
-  if (strokes.length === 0) return null;
-  return compositeToPng(strokes, background, canvasSize.width, canvasSize.height);
+  const { strokes, background, canvasSize, typedLines } = useSketchStore.getState();
+  const typedPlainLines = typedLines
+    .filter((line) => line.latex.trim().length > 0)
+    .map((line) => latexToPlain(line.latex));
+  if (strokes.length === 0 && typedPlainLines.length === 0) return null;
+  return compositeToPng(strokes, background, canvasSize.width, canvasSize.height, {
+    typedPlainLines,
+  });
 }

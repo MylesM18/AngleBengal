@@ -7,9 +7,8 @@ import { MathField, useMathLive } from "@/components/math/MathField";
 import { SymbolPalette } from "@/components/math/SymbolPalette";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { cx } from "@/lib/cx";
+import { TYPED_LINE_HEIGHT } from "@/lib/sketch/render";
 import { useSketchStore } from "@/lib/sketch/store";
-
-const TYPED_LINE_HEIGHT = 38; // 2 * GRID_PX (D-125); moves to render.ts in the compositing task
 
 /**
  * The stacked typed-solution layer (spec Q2). Only the active line is a live

@@ -19,6 +19,7 @@ import {
   setActiveProblem,
 } from "@/lib/practiceSession";
 import type { ProblemToolset } from "@/lib/practice/tools";
+import { latexToPlain } from "@/lib/sketch/latexToPlain";
 import { useSketchStore } from "@/lib/sketch/store";
 import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
 
@@ -201,6 +202,9 @@ export function PracticePanel({
     setSubmitting(true);
     setError(null);
     try {
+      const typedLinesState = useSketchStore.getState().typedLines
+        .filter((line) => line.latex.trim().length > 0)
+        .map((line) => ({ latex: line.latex, plain: latexToPlain(line.latex) }));
       const response = await fetch(`/api/problems/${problem.id}/attempt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -211,6 +215,7 @@ export function PracticePanel({
           // diagnostic can see the student's written work.
           sketchPngBase64: snapshotSketch(),
           ocrBlocks: useSketchStore.getState().ocrBlocks,
+          typedLines: typedLinesState.length > 0 ? typedLinesState : null,
         }),
       });
       const payload = await response.json();

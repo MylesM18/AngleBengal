@@ -84,15 +84,19 @@ Returns one verified problem not yet answered correctly (random among eligible),
 ```json
 { "id": "...", "statementMd": "...", "difficulty": 2,
   "answerType": "numeric", "unit": "miles",
-  "modelTags": [{ "docId": "...", "modelNumber": 3, "title": "Freeze the clock" }] }
+  "modelTags": [{ "docId": "...", "modelNumber": 3, "title": "Freeze the clock" }],
+  "toolset": { "calculator": "scientific", "angleMode": "DEG", "graphTools": [],
+    "palette": ["frac", "exponent", "sqrt"] } }
 ```
+`toolset` (`ProblemToolset`, `src/lib/practice/tools.ts`) is resolved server-side: `calculator`, `angleMode`, and `graphTools` come from the topic root's fixed configuration; `palette` is the problem's own declared symbol list, or the root's default when the problem declared none. The client never computes it.
 `404 POOL_EMPTY` when none available (client offers to generate).
 
 ### POST /api/problems/[id]/attempt
 ```json
-{ "submittedAnswer": "6", "sketchPngBase64": "...", "ocrBlocks": [...] }
+{ "submittedAnswer": "6", "sketchPngBase64": "...", "ocrBlocks": [...],
+  "typedLines": [{ "latex": "d = 6", "plain": "d = 6" }] }
 ```
-`sketchPngBase64` and `ocrBlocks` optional (included if the sketchpad was used / cleaned).
+`sketchPngBase64`, `ocrBlocks`, and `typedLines` are all optional (included if the sketchpad, Clean up, or Type mode was used). `typedLines` is the student's ordered stacked solution lines; it is stored on the attempt and threaded into the diagnostic prompt when the answer is wrong.
 Correct:
 ```json
 { "correct": true, "solutionMd": "..." }
