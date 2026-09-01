@@ -70,7 +70,7 @@ function TableHeader(props: ComponentPropsWithoutRef<"th">) {
 
 export type MarkdownMathVariant = "reading" | "ui" | "chat";
 
-const VARIANT_CLASS: Record<MarkdownMathVariant, string> = {
+export const MARKDOWN_VARIANT_CLASS: Record<MarkdownMathVariant, string> = {
   /** 17px Source Serif, the long-form voice: model docs, problem statements, solutions. */
   reading: "doc-prose",
   /** 14px Archivo, tight margins: history rows, answer preview, clean copy, diagnosis explanation. */
@@ -87,17 +87,33 @@ export type MarkdownMathProps = {
   className?: string;
 };
 
+/**
+ * The markdown pipeline with no wrapper element.
+ *
+ * Split out of MarkdownMath so the server renderer in
+ * src/lib/learn/docHtml.ts can produce exactly the inner HTML MarkdownMath
+ * would have produced. Injecting a full MarkdownMath render would nest a
+ * second `doc-prose` div inside the first. The seam is pinned by
+ * src/lib/learn/docHtml.test.ts, which asserts the two paths emit identical
+ * markup, so changing one without the other fails the suite.
+ */
+export function MarkdownBody({ children }: { children: string }) {
+  return (
+    <Markdown
+      remarkPlugins={[remarkGfm, remarkMath]}
+      rehypePlugins={[[rehypeKatex, REHYPE_KATEX_OPTIONS]]}
+      components={{ h2: Heading2, th: TableHeader }}
+    >
+      {normalizeMathDelimiters(children)}
+    </Markdown>
+  );
+}
+
 export function MarkdownMath({ children, variant = "reading", className }: MarkdownMathProps) {
-  const base = VARIANT_CLASS[variant];
+  const base = MARKDOWN_VARIANT_CLASS[variant];
   return (
     <div className={className ? `${base} ${className}` : base}>
-      <Markdown
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[[rehypeKatex, REHYPE_KATEX_OPTIONS]]}
-        components={{ h2: Heading2, th: TableHeader }}
-      >
-        {normalizeMathDelimiters(children)}
-      </Markdown>
+      <MarkdownBody>{children}</MarkdownBody>
     </div>
   );
 }
