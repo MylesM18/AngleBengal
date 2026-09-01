@@ -32,6 +32,12 @@ export type OcrBlock =
   | { kind: "math"; latex: string }
   | { kind: "text"; text: string };
 
+export type SketchMode = "draw" | "type";
+
+/** One stacked solution line (spec Q2). Latex only; plain text derives at
+ *  submit and composite time via latexToPlain. */
+export type TypedLine = { id: string; latex: string };
+
 /** docs/06 §4 requires an undo depth of at least 50. */
 const UNDO_DEPTH = 80;
 
@@ -47,6 +53,9 @@ export const INK_COLORS: Record<InkColor, string> = {
 
 type SketchState = {
   strokes: Stroke[];
+  mode: SketchMode;
+  typedLines: TypedLine[];
+  activeLineId: string | null;
   tool: Tool;
   background: Background;
   width: StrokeWidth;
@@ -60,6 +69,16 @@ type SketchState = {
    * store is the sanctioned practice-session channel. Null between problems.
    */
   toolset: ProblemToolset | null;
+
+  setMode: (mode: SketchMode) => void;
+  /** Inserts an empty line after afterId (null appends at the end), activates
+   *  it, and returns the new id. */
+  addTypedLineAfter: (afterId: string | null) => string;
+  /** Ordered append used by the handwriting conversion (spec §5). */
+  appendTypedLines: (latexes: string[]) => void;
+  updateTypedLine: (id: string, latex: string) => void;
+  removeTypedLine: (id: string) => void;
+  setActiveLine: (id: string | null) => void;
 
   addStroke: (points: StrokePoint[]) => void;
   eraseStrokes: (ids: string[]) => void;
@@ -77,9 +96,13 @@ type SketchState = {
 };
 
 let strokeCounter = 0;
+let typedLineCounter = 0;
 
 export const useSketchStore = create<SketchState>((set) => ({
   strokes: [],
+  mode: "draw",
+  typedLines: [],
+  activeLineId: null,
   tool: "pen",
   background: "graph",
   width: "M",
@@ -87,6 +110,51 @@ export const useSketchStore = create<SketchState>((set) => ({
   ocrBlocks: null,
   canvasSize: { width: 0, height: 0 },
   toolset: null,
+
+  setMode: (mode) => set({ mode }),
+
+  addTypedLineAfter: (afterId) => {
+    typedLineCounter += 1;
+    const id = `t${typedLineCounter}`;
+    set((state) => {
+      const index = afterId
+        ? state.typedLines.findIndex((line) => line.id === afterId)
+        : state.typedLines.length - 1;
+      const typedLines = [...state.typedLines];
+      typedLines.splice(index + 1, 0, { id, latex: "" });
+      return { typedLines, activeLineId: id };
+    });
+    return id;
+  },
+
+  appendTypedLines: (latexes) =>
+    set((state) => {
+      if (latexes.length === 0) return state;
+      const appended = latexes.map((latex) => {
+        typedLineCounter += 1;
+        return { id: `t${typedLineCounter}`, latex };
+      });
+      return { typedLines: [...state.typedLines, ...appended] };
+    }),
+
+  updateTypedLine: (id, latex) =>
+    set((state) => ({
+      typedLines: state.typedLines.map((line) => (line.id === id ? { ...line, latex } : line)),
+    })),
+
+  removeTypedLine: (id) =>
+    set((state) => {
+      const index = state.typedLines.findIndex((line) => line.id === id);
+      if (index === -1) return state;
+      const typedLines = state.typedLines.filter((line) => line.id !== id);
+      const fallback = typedLines[index - 1] ?? typedLines[0] ?? null;
+      return {
+        typedLines,
+        activeLineId: state.activeLineId === id ? (fallback ? fallback.id : null) : state.activeLineId,
+      };
+    }),
+
+  setActiveLine: (activeLineId) => set({ activeLineId }),
 
   addStroke: (points) =>
     set((state) => {
@@ -114,7 +182,7 @@ export const useSketchStore = create<SketchState>((set) => ({
 
   undo: () => set((state) => ({ strokes: state.strokes.slice(0, -1) })),
 
-  clear: () => set({ strokes: [], ocrBlocks: null }),
+  clear: () => set({ strokes: [], ocrBlocks: null, typedLines: [], activeLineId: null }),
 
   setTool: (tool) => set({ tool }),
   // Background changes must not touch strokes: they are separate canvases.
@@ -131,5 +199,6 @@ export const useSketchStore = create<SketchState>((set) => ({
     ),
   setToolset: (toolset) => set({ toolset }),
 
-  resetForNewProblem: () => set({ strokes: [], ocrBlocks: null }),
+  resetForNewProblem: () =>
+    set({ strokes: [], ocrBlocks: null, typedLines: [], activeLineId: null, mode: "draw" }),
 }));

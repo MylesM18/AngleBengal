@@ -10,6 +10,7 @@ import { useSketchStore, type OcrBlock } from "@/lib/sketch/store";
 import { CleanCopyPanel } from "./CleanCopyPanel";
 import { SketchCanvas } from "./SketchCanvas";
 import { SketchToolbar } from "./SketchToolbar";
+import { TypedLinesLayer } from "./TypedLinesLayer";
 
 /**
  * The sketchpad panel: toolbar, canvas stack, and the clean-copy slip
@@ -67,7 +68,13 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
         return;
       }
 
-      setOcrBlocks((payload as { blocks: OcrBlock[] }).blocks);
+      const blocks = (payload as { blocks: OcrBlock[] }).blocks;
+      setOcrBlocks(blocks);
+      const mathLatexes = blocks
+        .filter((block): block is Extract<OcrBlock, { kind: "math" }> => block.kind === "math")
+        .map((block) => block.latex)
+        .filter((latex) => latex.trim().length > 0);
+      useSketchStore.getState().appendTypedLines(mathLatexes);
     } catch {
       flash("Could not reach the reader. Try again in a moment.", "error");
     } finally {
@@ -83,7 +90,10 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     >
       <SketchToolbar cleaning={cleaning} onCleanUp={() => void cleanUp()} />
 
-      <SketchCanvas onSizeChange={setCanvasSize} />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <SketchCanvas onSizeChange={setCanvasSize} />
+        <TypedLinesLayer />
+      </div>
 
       {blocks && blocks.length > 0 && (
         <CleanCopyPanel

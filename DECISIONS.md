@@ -2285,3 +2285,11 @@ root resolves to a fallback (scientific calculator, DEG, Algebra's default
 palette, no graph tools) rather than crashing or hiding every tool. The spec
 keys the map over the seeded roots and leaves the miss case open; this is the
 smallest choice that keeps every surface functional.
+
+### D-125. Typed solution lines sit on a 38px pitch
+
+The spec left the stacked-line height to implementation ("a multiple of
+GRID_PX, near 40px"). 2 x GRID_PX = 38px keeps typed baselines locked to the
+5mm grid in every mode, so the composited PNG and the live layer agree by
+construction. The constant is TYPED_LINE_HEIGHT, exported from
+src/lib/sketch/render.ts.
