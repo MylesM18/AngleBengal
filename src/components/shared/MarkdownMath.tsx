@@ -96,6 +96,12 @@ export type MarkdownMathProps = {
  * second `doc-prose` div inside the first. The seam is pinned by
  * src/lib/learn/docHtml.test.ts, which asserts the two paths emit identical
  * markup, so changing one without the other fails the suite.
+ *
+ * Changing this pipeline means bumping RENDER_VERSION in
+ * src/lib/learn/docHtml.ts. The reading sheet caches this output as HTML
+ * indefinitely and Data Cache entries survive deploys, so without a bump the
+ * old markup is served forever. The seam test cannot catch that: it moves
+ * both paths together while the cache still holds the previous bytes.
  */
 export function MarkdownBody({ children }: { children: string }) {
   return (

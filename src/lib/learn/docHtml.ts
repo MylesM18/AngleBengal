@@ -58,8 +58,14 @@ const RENDER_VERSION = "1";
 /**
  * The rendered document, cached indefinitely in the Vercel Data Cache.
  *
- * `docId` alone identifies the content: `contentMd` is immutable and rows are
- * never updated, so the id determines the markdown. unstable_cache does not
+ * `docId` alone identifies the content, because both inputs to buildDocHtml
+ * are immutable: `contentMd` and the `modelIndexJson` that `models` is
+ * deserialized from are written only at create, and there is no
+ * mentalModelDoc.update, updateMany or upsert anywhere. Note that `models` is
+ * the second of those, and it is not derived from `contentMd`: it drives the
+ * section split and supplies the titles and anchors ModelHeading renders. A
+ * future script that re-indexed existing rows would therefore have to bump
+ * RENDER_VERSION or fold the index into this key. unstable_cache does not
  * include closed-over values in the key, which is why `docId` is listed
  * explicitly.
  *

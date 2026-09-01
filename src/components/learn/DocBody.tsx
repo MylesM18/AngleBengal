@@ -6,7 +6,7 @@ import type { ModelIndexEntry } from "@/lib/modelIndex";
 import type { AccentName } from "@/lib/topicColors";
 
 /** Either the cached HTML string or the raw markdown, per the fallback below. */
-type Body = { html: string } | { md: string } | null;
+export type Body = { html: string } | { md: string } | null;
 
 export type DocBodyProps = {
   docId: string;
@@ -51,17 +51,29 @@ export async function DocBody({ docId, contentMd, models, accent }: DocBodyProps
   );
 }
 
-function toBodies(
+/**
+ * Exported for src/components/learn/DocBody.test.ts, which asserts the cached
+ * and fallback branches agree. They must: `flush` and the presence of the
+ * `doc-prose` wrapper are both derived from whether a body is null here, so a
+ * disagreement would move the first heading and change the DOM depending on
+ * whether the cache happened to be warm.
+ *
+ * The null tests are `!== null` and not truthiness on purpose. buildDocHtml
+ * keys its null on the markdown being empty, but a non-empty block can still
+ * render to an empty string (a lone link definition does), and treating that
+ * `""` as absent would drop a wrapper the fallback path emits.
+ */
+export function toBodies(
   rendered: RenderedDoc | null,
   contentMd: string,
   models: ModelIndexEntry[],
 ): { preamble: Body; sections: { entry: ModelIndexEntry; body: Body }[] } {
   if (rendered) {
     return {
-      preamble: rendered.preambleHtml ? { html: rendered.preambleHtml } : null,
+      preamble: rendered.preambleHtml !== null ? { html: rendered.preambleHtml } : null,
       sections: rendered.sections.map((section) => ({
         entry: section.entry,
-        body: section.bodyHtml ? { html: section.bodyHtml } : null,
+        body: section.bodyHtml !== null ? { html: section.bodyHtml } : null,
       })),
     };
   }

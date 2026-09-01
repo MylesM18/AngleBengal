@@ -2148,7 +2148,14 @@ Cache Components route either: the Server Component restructure is identical
 in all three, so swapping `unstable_cache` for `'use cache: remote'` later is
 a local change.
 
-`docId` alone is the cache key, because it determines `contentMd`.
+`docId` alone is the cache key, because it determines both inputs to the
+render. `contentMd` is one. The other is `models`, deserialized from
+`modelIndexJson`, which is not derived from `contentMd`: it drives the section
+split and carries the titles and anchors `ModelHeading` renders. Both columns
+are written only at create, and there is no `mentalModelDoc.update`,
+`updateMany` or `upsert` anywhere in the repo, so both are immutable. A future
+script that re-indexed existing rows would break that assumption and would
+have to bump `RENDER_VERSION` or fold the index into the key.
 `unstable_cache` does not include closed-over values in the key, so it is
 listed explicitly. `RENDER_VERSION` is in the key because Data Cache entries
 survive deployments, so a change to the MarkdownMath internals would
@@ -2164,6 +2171,12 @@ client child, so the clipboard result reports through React context instead,
 which is what lets `ModelHeading` drop `"use client"`. The toast still portals
 to `document.body`, which D-059 requires.
 
+Deleting a document drops its entry: `DELETE /api/models/[id]` calls
+`revalidateTag("doc-html:<id>", { expire: 0 })` after the transaction. Without
+that the entry would outlive the row forever, since `revalidate` is omitted.
+Ids are cuids and are never reused, so this was a storage leak rather than a
+correctness bug, but the tag exists precisely so it can be dropped.
+
 `unstable_cache` is marked "replaced by `use cache`" in the Next 16 docs. It
 is still shipped, and its documented behaviour, persisting across requests and
 deployments, is exactly what is needed. If it is removed, the migration target
@@ -2174,6 +2187,17 @@ The client bundle for this route is unchanged: `PerspectivePane` is
 in this route's client graph regardless. The client-side win is main-thread
 work, not bytes: the browser no longer re-parses 25KB of markdown or re-runs
 267 KaTeX formulas during hydration.
+
+The bytes on the wire do go up, though, and the spec did not cost this. It
+analysed the JS chunk graph and concluded the route's bundle is unchanged,
+which is true, but `DocBody` is a Server Component, so its output is also
+inlined into the document as a Flight payload for client navigation. That
+output now holds the roughly 357KB rendered HTML as a
+`dangerouslySetInnerHTML` prop, on top of the same HTML in the DOM, where
+before it held a client reference plus 25KB of raw markdown. Compression
+recovers much of it and the CPU saving should still dominate, but the
+production measurement records transfer size alongside latency, because a
+disappointing number could otherwise be misread as a Data Cache miss.
 
 ### D-121
 
