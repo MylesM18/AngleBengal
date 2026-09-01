@@ -19,6 +19,17 @@ const TOOL_LABELS: Record<GraphRailTool, string> = {
   eraser: "Eraser",
 };
 
+/** Units per grid square (D-127). A finer step zooms in: snap, click-to-place,
+ *  and axis labels all follow, which is the owner's post-launch request for
+ *  adjustable coordinate accuracy. */
+const GRAPH_STEPS: { value: number; label: string }[] = [
+  { value: 0.25, label: "1/4" },
+  { value: 0.5, label: "1/2" },
+  { value: 1, label: "1" },
+  { value: 2, label: "2" },
+  { value: 5, label: "5" },
+];
+
 /**
  * The Graph-mode second row (spec Q4): the owner's explicit, scoped bend of
  * the one-strip rule, recorded in docs/06. Renders only in Graph mode, below
@@ -28,6 +39,8 @@ export function GraphRail() {
   const toolset = useSketchStore((state) => state.toolset);
   const graphTool = useSketchStore((state) => state.graphTool);
   const setGraphTool = useSketchStore((state) => state.setGraphTool);
+  const graphStep = useSketchStore((state) => state.graphStep);
+  const setGraphStep = useSketchStore((state) => state.setGraphStep);
   const pendingCount = useSketchStore((state) => state.pendingGraphPoints.length);
   const undo = useSketchStore((state) => state.undo);
   const { status, retry } = useJsxGraph();
@@ -85,6 +98,23 @@ export function GraphRail() {
       >
         Undo
       </button>
+      <div className="flex items-center gap-1" role="group" aria-label="Units per grid square">
+        <span className="select-none font-mono text-meta text-ink-soft">1 sq =</span>
+        {GRAPH_STEPS.map(({ value, label }) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={graphStep === value}
+            onClick={() => setGraphStep(value)}
+            className={cx(
+              "rounded-chip border px-2 py-1 font-mono text-meta",
+              graphStep === value ? "border-ink bg-paper-0 text-ink" : "border-ink-faint text-ink",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       {pendingCount > 0 && (
         <span className="text-meta text-ink-soft" role="status">
           First point set, pick the second.

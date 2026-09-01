@@ -75,7 +75,7 @@ Split view, resizable divider, default 45/55.
 
 **On submit:** silently composite and attach `sketchPngBase64` to the attempt (skip if canvas is empty).
 
-Graph mode adds a second contextual tool row below the kraft strip, an owner-approved scoped exception to the one-strip rule (practice tools spec Q4). The strip itself keeps only ink tools.
+Graph mode adds a second contextual tool row below the kraft strip, an owner-approved scoped exception to the one-strip rule (practice tools spec Q4). The strip itself keeps only ink tools. The rail includes a "1 sq =" units-per-square selector (D-127) that zooms snap, labels, and the board together.
 
 ## §5 Tutor chat drawer
 

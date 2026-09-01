@@ -68,6 +68,7 @@ export function MathField({
   onEmptyBackspace,
   readOnly = false,
   compact = false,
+  autoFocus = false,
   ariaLabel,
   mathfieldRef,
 }: {
@@ -78,6 +79,11 @@ export function MathField({
   onEmptyBackspace?: () => void;
   readOnly?: boolean;
   compact?: boolean;
+  /** Focus the field as soon as it mounts. Only for fields the user just
+   *  summoned (an activated typed line), so focus is never stolen on load.
+   *  With the auto keyboard policy this is what raises the math keyboard on
+   *  touch devices. */
+  autoFocus?: boolean;
   ariaLabel: string;
   mathfieldRef?: React.MutableRefObject<MathfieldElement | null>;
 }) {
@@ -106,7 +112,11 @@ export function MathField({
       if (!ok || disposed || !hostRef.current || fieldRef.current) return;
       const mathlive = await import("mathlive");
       const field = new mathlive.MathfieldElement();
-      field.mathVirtualKeyboardPolicy = "manual";
+      // "auto" raises MathLive's own math keyboard when the field gains focus
+      // on a touch device and stays out of the way when a hardware keyboard
+      // exists. The earlier "manual" policy suppressed every keyboard, which
+      // left typed input unusable on phones (owner report after PR #13).
+      field.mathVirtualKeyboardPolicy = "auto";
       field.value = value;
       field.setAttribute("aria-label", ariaLabel);
       field.style.display = "block";
@@ -131,6 +141,7 @@ export function MathField({
       hostRef.current.appendChild(field);
       fieldRef.current = field;
       if (mathfieldRef) mathfieldRef.current = field;
+      if (autoFocus) field.focus();
       setMounted(true);
     });
     return () => {
