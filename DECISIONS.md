@@ -2332,3 +2332,16 @@ center cleanly, and keycap glyphs are enlarged via the documented
 --keycap-font-size variable (18px on body). The built-in alphabetic and
 greek layers remain as tabs. Set once in loadMathLive
 (src/components/math/MathField.tsx).
+
+### D-129. Explicit "+ line" key on the typed-lines keyboard
+
+Owner request after PR #15: an on-keyboard way to start the next solution
+line. The commit gesture already does this (it reaches onEnter through the
+mathfield's insertLineBreak input event, verified against mathlive 0.110),
+but its return glyph does not say so. The keyboard's math layer now comes in
+two variants differing only in the bottom-right key: the answer box keeps
+the standard return glyph (there commit means submit), and the typed-lines
+surface shows a "+ line" action key running the same commit command. The
+variant swaps on field focus, guarded so same-surface refocus does not
+re-render the keyboard. A "+ line" label in the answer box would read as
+"add a line" but submit the attempt, so the split is deliberate.
