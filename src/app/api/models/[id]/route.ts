@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 
 import { ApiError, errorBody } from "@/lib/ai/errors";
@@ -75,6 +76,13 @@ export async function DELETE(
       }),
       prisma.mentalModelDoc.delete({ where: { id } }),
     ]);
+
+    // The rendered HTML is cached with no revalidate (D-120), so without this
+    // the entry outlives the row it was rendered from. Ids are cuids and are
+    // never reused, so this is a leak rather than a correctness bug, but the
+    // tag exists precisely so it can be dropped. `expire: 0` because a deleted
+    // document has no stale value worth serving.
+    revalidateTag(`doc-html:${id}`, { expire: 0 });
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {

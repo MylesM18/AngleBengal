@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 
 import { Breadcrumb } from "@/components/learn/Breadcrumb";
+import { CopyLinkToaster } from "@/components/learn/CopyLinkToaster";
+import { DocBody } from "@/components/learn/DocBody";
 import { DocCard } from "@/components/learn/DocCard";
 import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
-import { DocReader } from "@/components/learn/DocReader";
 import { DocTabStrip } from "@/components/learn/DocTabStrip";
 import { GenerateMoreStudy } from "@/components/learn/GenerateMoreStudy";
 import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
@@ -132,7 +133,14 @@ export default async function TopicPage({
 
               <div className="px-4 py-6 sm:px-8 sm:py-8">
                 <ModelMissList misses={misses} />
-                <DocReader contentMd={doc.contentMd} models={index} accent={accent} />
+                <CopyLinkToaster>
+                  <DocBody
+                    docId={doc.id}
+                    contentMd={doc.contentMd}
+                    models={index}
+                    accent={accent}
+                  />
+                </CopyLinkToaster>
               </div>
             </PerspectiveTabs>
           </Sheet>
