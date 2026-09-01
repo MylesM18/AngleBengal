@@ -146,6 +146,14 @@ export function PracticePanel({
     setReloadKey((key) => key + 1);
   }, [onAnswerChange]);
 
+  // Tracks the id of the problem the canvas was last reset for. The sketch
+  // store is module-scoped and survives client-side navigation, so a remount
+  // (e.g. leaving practice and coming back) must not leave a new problem
+  // sitting over the previous visit's stale strokes, typed lines, or graph
+  // objects: `loadProblem` and the difficulty switch already reset for their
+  // own request, but the initial mount fetch never did.
+  const prevProblemIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -159,10 +167,15 @@ export function PracticePanel({
         if (cancelled) return;
         setLoaded({ key: requestKey, problem: next });
         if (next) {
+          if (next.id !== prevProblemIdRef.current) {
+            useSketchStore.getState().resetForNewProblem();
+          }
+          prevProblemIdRef.current = next.id;
           setActiveProblem(next.id, next.answerType);
           useSketchStore.getState().setToolset(next.toolset);
           useSketchStore.getState().setGraphStep(next.graphStep ?? 1);
         } else {
+          prevProblemIdRef.current = null;
           clearActiveProblem();
           useSketchStore.getState().setToolset(null);
         }
@@ -170,7 +183,9 @@ export function PracticePanel({
       .catch((loadError: unknown) => {
         if (cancelled) return;
         setLoaded({ key: requestKey, problem: null });
+        prevProblemIdRef.current = null;
         clearActiveProblem();
+        useSketchStore.getState().setToolset(null);
         setError(loadError instanceof Error ? loadError.message : "Could not load a problem.");
       });
 

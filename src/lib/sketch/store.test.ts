@@ -88,6 +88,21 @@ describe("graph objects and unified undo", () => {
     expect(useSketchStore.getState().strokes).toHaveLength(0);
   });
 
+  it("addGraphShade replaces rather than appends, leaving exactly one shade", () => {
+    useSketchStore.getState().addGraphShade([0.5, 0.5]);
+    const secondId = useSketchStore.getState().addGraphShade([1.5, 1.5]);
+    const shades = useSketchStore.getState().graphShades;
+    expect(shades).toHaveLength(1);
+    expect(shades[0]).toEqual({ id: secondId, testPoint: [1.5, 1.5] });
+  });
+
+  it("undo after two shade placements empties the shades, not a resurrected first shade", () => {
+    useSketchStore.getState().addGraphShade([0.5, 0.5]);
+    useSketchStore.getState().addGraphShade([1.5, 1.5]);
+    useSketchStore.getState().undo();
+    expect(useSketchStore.getState().graphShades).toEqual([]);
+  });
+
   it("erasing an object prunes it from the history", () => {
     const id = useSketchStore.getState().addGraphObject("segment", [[0, 0], [1, 1]], false);
     useSketchStore.getState().removeGraphObject(id);

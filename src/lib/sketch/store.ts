@@ -191,8 +191,20 @@ export const useSketchStore = create<SketchState>((set) => ({
     graphCounter += 1;
     const id = `h${graphCounter}`;
     set((state) => ({
-      graphShades: [...state.graphShades, { id, testPoint }],
-      opLog: pushOp(state.opLog, { kind: "graphShade", id }),
+      // Submission takes a single shadedPoint (graphShades[0] in
+      // PracticePanel), so at most one shade may exist at a time: placing a
+      // new one replaces rather than appends. That keeps the display (which
+      // unions every entry in graphShades) and grading (which reads only the
+      // first) from disagreeing once a second shade is placed. Under that
+      // same one-shade invariant the opLog holds at most one "graphShade"
+      // entry, so dropping any prior one before pushing this one means undo
+      // removes the shade actually on screen instead of resurrecting a
+      // replaced shade that the display and grader can no longer see.
+      graphShades: [{ id, testPoint }],
+      opLog: pushOp(
+        state.opLog.filter((op) => op.kind !== "graphShade"),
+        { kind: "graphShade", id },
+      ),
     }));
     return id;
   },

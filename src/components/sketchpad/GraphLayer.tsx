@@ -108,10 +108,13 @@ export function GraphLayer() {
   }, []);
 
   // Rebuild the board whenever the drawn objects change. n is small, and a
-  // full rebuild through freeBoard cannot leak stale elements.
+  // full rebuild through freeBoard cannot leak stale elements. `active` is a
+  // dependency (not just a guard) so re-entering Graph mode rebuilds
+  // directly, rather than relying on GraphRail's mount incidentally changing
+  // canvasSize through the ResizeObserver.
   useEffect(() => {
     const host = boardHostRef.current;
-    if (!host || status !== "ready" || canvasSize.width === 0) return;
+    if (!active || !host || status !== "ready" || canvasSize.width === 0) return;
     const [xmin, ymax] = pxToWorld(0, 0, canvasSize.width, canvasSize.height, graphStep);
     const [xmax, ymin] = pxToWorld(
       canvasSize.width,
@@ -164,13 +167,14 @@ export function GraphLayer() {
     return () => {
       JXG.JSXGraph.freeBoard(board);
     };
-  }, [status, graphObjects, pendingGraphPoints, graphStep, canvasSize]);
+  }, [active, status, graphObjects, pendingGraphPoints, graphStep, canvasSize]);
 
   // Shading: coarse cells classified with the SAME side tests the scorer
   // uses, so the filled region and the graded region agree by construction.
+  // `active` is a dependency for the same reason as the board effect above.
   useEffect(() => {
     const canvas = shadeCanvasRef.current;
-    if (!canvas || canvasSize.width === 0) return;
+    if (!active || !canvas || canvasSize.width === 0) return;
     canvas.width = canvasSize.width;
     canvas.height = canvasSize.height;
     const context = canvas.getContext("2d");
@@ -188,7 +192,7 @@ export function GraphLayer() {
         }
       }
     }
-  }, [graphShades, graphObjects, graphStep, canvasSize]);
+  }, [active, graphShades, graphObjects, graphStep, canvasSize]);
 
   function onPlacementClick(event: React.MouseEvent<HTMLDivElement>): void {
     if (!active || !graphTool || status !== "ready") return;

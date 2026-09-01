@@ -112,6 +112,33 @@ describe("validateGraphAnswer", () => {
   it("accepts a sound Algebra answer", () => {
     expect(validateGraphAnswer(expected([line([[0, -3], [1, -1]])], [0, 0]), algebra)).toBe(true);
   });
+
+  it("rejects a shaded answer whose only object is a parabola (no side-testable boundary)", () => {
+    const parabolaOnly = expected(
+      [{ kind: "parabola", dashed: false, points: [[1, 2], [3, 10]] }],
+      [0, 0],
+    );
+    expect(validateGraphAnswer(parabolaOnly, algebra)).toBe(false);
+  });
+
+  it("allows the same parabola-only objects when nothing is shaded", () => {
+    const parabolaOnlyUnshaded = expected(
+      [{ kind: "parabola", dashed: false, points: [[1, 2], [3, 10]] }],
+      null,
+    );
+    expect(validateGraphAnswer(parabolaOnlyUnshaded, algebra)).toBe(true);
+  });
+
+  it("allows a shaded answer once a line supplies a testable boundary", () => {
+    const lineAndParabola = expected(
+      [
+        line([[0, -3], [1, -1]]),
+        { kind: "parabola", dashed: false, points: [[1, 2], [3, 10]] },
+      ],
+      [0, 0],
+    );
+    expect(validateGraphAnswer(lineAndParabola, algebra)).toBe(true);
+  });
 });
 
 describe("grading and verification share one comparator", () => {

@@ -220,6 +220,19 @@ export function validateGraphAnswer(graph: GraphSpec, allowedTools: GraphToolId[
     if (!allowed.has("shade")) return false;
     const shade = asPair(graph.shadedPoint);
     if (!shade || Math.abs(shade[0]) > 50 || Math.abs(shade[1]) > 50) return false;
+    // boundariesOfSpec only turns line, ray, segment, and circle objects into
+    // side tests; parabola shading is deferred (spec section 10). Without a
+    // testable boundary the shade check in graphCompare is vacuous (sameRegion
+    // sees zero boundaries and calls every pair of points a match), so a spec
+    // with only untestable objects must not reach verified = true.
+    const hasTestableBoundary = graph.objects.some(
+      (object) =>
+        object.kind === "line" ||
+        object.kind === "ray" ||
+        object.kind === "segment" ||
+        object.kind === "circle",
+    );
+    if (!hasTestableBoundary) return false;
   }
   return true;
 }
