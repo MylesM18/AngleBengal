@@ -2113,3 +2113,117 @@ adding a second would fail the build.
 
 This does not touch static assets, which stay on the global edge, or the proxy,
 which runs at the edge regardless.
+
+### D-120
+
+The `/learn/[topicId]` model-document render moved to Server Components and
+its HTML is cached per document id.
+
+`mentalModelDoc.contentMd` is immutable: there is no `mentalModelDoc.update`
+anywhere, and "Generate more study" creates a new row at another depth, unique
+on `[topicId, depth]`. The route nonetheless re-ran the whole markdown to
+KaTeX pipeline on every view and produced byte-identical HTML each time.
+
+Measured locally against the largest real document (25,837 chars, 802 `$`
+delimiters, about 267 formulas):
+
+| Measurement                                        | Median   |
+|----------------------------------------------------|----------|
+| parse + KaTeX + element creation + SSR to HTML      | 123.7ms  |
+| SSR to HTML of a prebuilt element tree              | 15.8ms   |
+| parse + KaTeX portion                               | 107.9ms  |
+
+So 87% of the render was removable, but not by caching alone: `DocReader` was
+`"use client"`, so a cached RSC payload still handed SSR the raw markdown
+string, and the same pipeline ran a third time in the browser at hydration.
+Moving the render to Server Components was the prerequisite, not an extra.
+
+Caching the rendered HTML string was chosen over `'use cache: remote'` and
+over a `contentHtml` column. It is the fastest of the three, because a hit
+pays neither the parse nor the 13% serialization cost that caching an element
+tree still pays. It is confined to one route, where Cache Components would
+change caching, PPR and client-navigation semantics across a live app. And it
+needs no migration against the production database. It does not close off the
+Cache Components route either: the Server Component restructure is identical
+in all three, so swapping `unstable_cache` for `'use cache: remote'` later is
+a local change.
+
+`docId` alone is the cache key, because it determines `contentMd`.
+`unstable_cache` does not include closed-over values in the key, so it is
+listed explicitly. `RENDER_VERSION` is in the key because Data Cache entries
+survive deployments, so a change to the MarkdownMath internals would
+otherwise serve stale HTML forever. `accent` is deliberately not in the key:
+it only affects the CornerNumeral inside ModelHeading, which renders live on
+every request, so leaving it out gives a better hit rate. `revalidate` is
+omitted, which caches indefinitely, correct for immutable content.
+
+The copy-link toast moved from `DocReader` into a `CopyLinkToaster` client
+provider taking `children` as a pass-through slot, the same pattern
+`PerspectiveTabs` uses. A prop callback cannot cross from a server parent to a
+client child, so the clipboard result reports through React context instead,
+which is what lets `ModelHeading` drop `"use client"`. The toast still portals
+to `document.body`, which D-059 requires.
+
+`unstable_cache` is marked "replaced by `use cache`" in the Next 16 docs. It
+is still shipped, and its documented behaviour, persisting across requests and
+deployments, is exactly what is needed. If it is removed, the migration target
+is `'use cache: remote'`.
+
+The client bundle for this route is unchanged: `PerspectivePane` is
+`"use client"` and imports `MarkdownMath`, so `react-markdown` and KaTeX stay
+in this route's client graph regardless. The client-side win is main-thread
+work, not bytes: the browser no longer re-parses 25KB of markdown or re-runs
+267 KaTeX formulas during hydration.
+
+### D-121
+
+`DocBody` injects the cached document body with `dangerouslySetInnerHTML`.
+
+The injected markup is produced by `renderToStaticMarkup` over the same
+`MarkdownBody` pipeline the element path uses, and `react-markdown` passes no
+raw HTML through without `rehype-raw`, which this app does not use. So the
+string is exactly what React would have rendered from the same source, and the
+attack surface is unchanged from before D-120.
+
+`src/lib/learn/docHtml.test.ts` pins this: it asserts full string equality
+between `renderToStaticMarkup` of `MarkdownMath` and `renderToStaticMarkup` of
+the injected-HTML div, for a fixture holding inline math, display math, a GFM
+table and a fenced block. It fails if anyone later changes one path and not
+the other. That test is the reason the injection is safe to keep, so it must
+not be weakened to a substring check.
+
+`MarkdownMath` was split to make this possible: `MarkdownBody` is the pipeline
+with no wrapper element, and `MarkdownMath` is the wrapper div around it.
+Rendering a full `MarkdownMath` to a string and injecting it would have nested
+a second `doc-prose` div inside the first. The public props and output of
+`MarkdownMath` are unchanged, and all eight other call sites are untouched.
+
+### D-122
+
+`docHtml.ts` imports `renderToStaticMarkup` from `react-dom/server.edge`, not
+from `react-dom/server`.
+
+The bare `react-dom/server` specifier fails the build outright once anything
+in a Server Component graph imports it. Turbopack raises "You're importing a
+component that imports react-dom/server. To fix it, render or return the
+content directly as a Server Component instead for perf and security." That
+guard is aimed at the common mistake of calling `renderToString` inside a
+Server Component when the component could simply have returned its JSX. It
+does not describe this case: an HTML *string* is the artifact being cached, so
+returning elements instead would remove the thing D-120 exists to store.
+
+`react-dom/server.edge` is a public export of react-dom 19.2.8 and exports the
+same `renderToStaticMarkup`. That function is synchronous and touches no
+streaming API, which is the only place the edge and node builds differ, so the
+two cannot diverge on it.
+
+That claim is pinned rather than asserted. `src/lib/learn/docHtml.test.ts`
+renders its element path with plain `react-dom/server` while
+`renderMarkdownBodyHtml` uses `react-dom/server.edge`, and the byte-equality
+assertion of D-121 sits between them. The suite therefore fails if the two
+builds ever emit different markup for the same tree.
+
+This was not in the original plan for the change. The build error surfaced at
+the `npm run build` gate of the Server Component swap, after the four earlier
+commits had already passed every gate, because it is the only gate that
+compiles the server graph.
