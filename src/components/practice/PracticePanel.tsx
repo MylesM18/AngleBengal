@@ -31,6 +31,7 @@ import {
   type AnswerShape,
   type AnswerValue,
 } from "./AnswerInput";
+import { CalculatorChip } from "./calculator/CalculatorChip";
 import { DiagnosisCard } from "./DiagnosisCard";
 import { DifficultySelector } from "./DifficultySelector";
 
@@ -70,6 +71,8 @@ export function PracticePanel({
   answer,
   onAnswerChange,
   onProblemChange,
+  calculatorOpen,
+  onToggleCalculator,
 }: {
   topicId: string;
   topicPath: string[];
@@ -89,6 +92,10 @@ export function PracticePanel({
    * needs the statement for its ribbon (mobile spec §4).
    */
   onProblemChange?: (statementMd: string | null) => void;
+  /** Whether the session-level calculator window is open (spec §6). */
+  calculatorOpen: boolean;
+  /** Toggles the calculator; also lazily mounts it on first open. */
+  onToggleCalculator: () => void;
 }) {
   const [difficulty, setDifficulty] = useState(2);
   const [counts, setCounts] = useState(initialCounts);
@@ -319,6 +326,11 @@ export function PracticePanel({
             Word problems only
           </span>
         )}
+        <CalculatorChip
+          active={calculatorOpen}
+          disabled={problem === null}
+          onToggle={onToggleCalculator}
+        />
         <DifficultySelector
           value={difficulty}
           counts={counts}

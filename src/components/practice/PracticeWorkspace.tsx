@@ -9,9 +9,11 @@ import { Sheet } from "@/components/ui/Sheet";
 import { SPLIT_DEFAULT } from "@/lib/practice/splitRatio";
 import { usePracticeSession } from "@/lib/practiceSession";
 import { insertionValue } from "@/lib/sketch/latexToPlain";
+import { useSketchStore } from "@/lib/sketch/store";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 
 import { emptyAnswer, type AnswerValue } from "./AnswerInput";
+import { CalculatorWindow } from "./calculator/CalculatorWindow";
 import { PracticePanel } from "./PracticePanel";
 import { ProblemRibbon } from "./ProblemRibbon";
 import { SplitHandle } from "./SplitHandle";
@@ -56,6 +58,16 @@ export function PracticeWorkspace({
   const sketchButtonRef = useRef<HTMLButtonElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const returnFocusToSketch = useRef(false);
+
+  /**
+   * The calculator window mounts lazily on first open and then only ever
+   * hides with CSS (spec §6), so its expression, Ans, position, and DEG/RAD
+   * override survive problem changes and close/reopen, resetting only when
+   * this session unmounts.
+   */
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
+  const [calculatorMounted, setCalculatorMounted] = useState(false);
+  const toolset = useSketchStore((state) => state.toolset);
 
   /** The one exit. All three ways out route through it so focus return is
    *  written once: Done, Escape, and Use as answer. */
@@ -148,6 +160,11 @@ export function PracticeWorkspace({
           // stable identity, so the panel's reporting effect does not refire
           // every render the way an inline arrow would.
           onProblemChange={setStatementMd}
+          calculatorOpen={calculatorOpen}
+          onToggleCalculator={() => {
+            setCalculatorMounted(true);
+            setCalculatorOpen((current) => !current);
+          }}
         />
       </Sheet>
 
@@ -213,6 +230,15 @@ export function PracticeWorkspace({
           {statementMd && <ProblemRibbon statementMd={statementMd} />}
           <Sketchpad onInsertAnswer={insertAnswer} />
         </div>
+      )}
+
+      {calculatorMounted && (
+        <CalculatorWindow
+          open={calculatorOpen}
+          variant={toolset?.calculator ?? "scientific"}
+          initialAngleMode={toolset?.angleMode ?? "DEG"}
+          onClose={() => setCalculatorOpen(false)}
+        />
       )}
     </div>
   );
