@@ -62,5 +62,6 @@ describe("latexToPlain targeted mappings", () => {
     expect(latexToPlain("\\sin(30)")).toBe("sin(30)");
     expect(latexToPlain("\\log(100)")).toBe("log(100)");
     expect(latexToPlain("\\frac{5}{2}")).toBe("(5)/(2)");
+    expect(latexToPlain("50\\%")).toBe("50%");
   });
 });

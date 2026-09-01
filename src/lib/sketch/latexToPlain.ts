@@ -29,6 +29,7 @@ export function latexToPlain(latex: string): string {
     .replace(/\\(sin|cos|tan|log|ln)/g, "$1")
     .replace(/\\degree/g, " deg")
     .replace(/\\pm/g, " +/- ")
+    .replace(/\\%/g, "%")
     .replace(/\\neq?(?![a-zA-Z])/g, " != ")
     .replace(/\\leq?(?![a-zA-Z])/g, " <= ")
     .replace(/\\geq?(?![a-zA-Z])/g, " >= ")
