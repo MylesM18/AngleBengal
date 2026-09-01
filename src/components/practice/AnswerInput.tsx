@@ -6,6 +6,7 @@ import type { MathfieldElement } from "mathlive";
 import { MathField, useMathLive } from "@/components/math/MathField";
 import { SymbolPalette } from "@/components/math/SymbolPalette";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { useJsxGraph } from "@/components/sketchpad/GraphLayer";
 import { cx } from "@/lib/cx";
 import { PALETTE_SYMBOLS } from "@/lib/practice/palette";
 import type { ProblemToolset } from "@/lib/practice/tools";
@@ -147,6 +148,10 @@ export function AnswerInput({
     );
   }
 
+  if (shape.answerType === "graph") {
+    return <GraphAnswerCard />;
+  }
+
   return (
     <div className="flex items-center gap-2">
       <label htmlFor="answer-single" className="sr-only">
@@ -164,6 +169,29 @@ export function AnswerInput({
         className="w-[180px] rounded-input border border-ink-faint bg-paper-0 px-3 py-2 text-ui text-ink placeholder:text-ink-faint disabled:opacity-60 max-lg:py-3"
       />
       {shape.unit && <span className="text-meta text-ink-soft">{shape.unit}</span>}
+    </div>
+  );
+}
+
+/** For graph problems the sketchpad IS the input (spec §7.4); this card only
+ *  instructs, and surfaces the JSXGraph retry state so a failed chunk never
+ *  leaves a blank answer area (non-negotiable 4). */
+function GraphAnswerCard() {
+  const { status, retry } = useJsxGraph();
+  if (status === "failed") {
+    return (
+      <div className="rounded-input bg-paper-0 px-3 py-2 text-ui text-ink">
+        Graph tools could not load.{" "}
+        <button type="button" onClick={retry} className="text-cobalt hover:underline">
+          Retry
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-input bg-paper-0 px-3 py-2 text-ui text-ink">
+      Draw your answer on the graph paper: switch the sketchpad to Graph mode,
+      place your objects, then submit.
     </div>
   );
 }

@@ -251,20 +251,26 @@ export function paintTypedLines(
 }
 
 /**
- * Flattens background, ink, and (optionally) typed lines into one PNG
- * (docs/02 flow D). Capped at 1600px wide, which is plenty for handwriting
- * and keeps the base64 payload reasonable. Each ink/typed layer is isolated
- * in its own try/catch (spec §8): a failed layer logs and is skipped, and
- * submission is never blocked by presentation machinery.
+ * Flattens background, the graph layer, ink, and (optionally) typed lines
+ * into one PNG (docs/02 flow D). Capped at 1600px wide, which is plenty for
+ * handwriting and keeps the base64 payload reasonable. Each layer (shade
+ * canvas, graph SVG, ink, typed) is isolated in its own try/catch (spec §8):
+ * a failed layer logs and is skipped, and submission is never blocked by
+ * presentation machinery. Async because the graph layer's SVG rasterizes
+ * through an `Image`, which only resolves via a load/error/timeout callback.
  */
-export function compositeToPng(
+export async function compositeToPng(
   strokes: Stroke[],
   background: Background,
   cssWidth: number,
   cssHeight: number,
-  options: { typedPlainLines?: string[]; maxWidth?: number } = {},
-): string | null {
-  const { typedPlainLines = [], maxWidth = 1600 } = options;
+  options: {
+    typedPlainLines?: string[];
+    maxWidth?: number;
+    axisLabels?: { step: number } | null;
+  } = {},
+): Promise<string | null> {
+  const { typedPlainLines = [], maxWidth = 1600, axisLabels = null } = options;
   if (cssWidth <= 0 || cssHeight <= 0) return null;
 
   const scale = Math.min(1, maxWidth / cssWidth) * (window.devicePixelRatio || 1);
@@ -276,7 +282,27 @@ export function compositeToPng(
   if (!context) return null;
   context.setTransform(scale, 0, 0, scale, 0, 0);
 
-  paintBackground(context, background, cssWidth, cssHeight);
+  paintBackground(context, background, cssWidth, cssHeight, axisLabels);
+
+  // Graph mode's shading and drawn objects sit between the background and
+  // the ink, so a student's pen marks always sit on top (registered by
+  // GraphLayer while mounted; null outside Graph mode or before it mounts).
+  const graphSource = graphLayerSource.current;
+  if (graphSource) {
+    try {
+      const shadeCanvas = graphSource.shadeCanvas();
+      if (shadeCanvas) context.drawImage(shadeCanvas, 0, 0, cssWidth, cssHeight);
+    } catch (error) {
+      console.error("composite: shade layer failed, continuing without it:", error);
+    }
+    try {
+      const svg = graphSource.svg();
+      if (svg) await drawSvgMarkup(context, svg, cssWidth, cssHeight);
+    } catch (error) {
+      console.error("composite: graph layer failed, continuing without it:", error);
+    }
+  }
+
   try {
     for (const stroke of strokes) paintStroke(context, stroke);
   } catch (error) {
@@ -289,4 +315,34 @@ export function compositeToPng(
   }
 
   return canvas.toDataURL("image/png");
+}
+
+/**
+ * Rasterizes JSXGraph's board SVG (shapes and plain text only, so no
+ * web-font issue, spec §7.4) into the composite canvas via a data-URI Image.
+ * Always resolves, never rejects: a malformed SVG's `onerror`, or a load that
+ * never fires, both resolve through the 1500ms timeout rather than hanging or
+ * throwing, so a bad graph layer can never block submission (spec §8).
+ */
+function drawSvgMarkup(
+  context: CanvasRenderingContext2D,
+  markup: string,
+  width: number,
+  height: number,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+    const done = window.setTimeout(() => resolve(), 1500);
+    image.onload = () => {
+      window.clearTimeout(done);
+      context.drawImage(image, 0, 0, width, height);
+      resolve();
+    };
+    image.onerror = () => {
+      window.clearTimeout(done);
+      resolve();
+    };
+    image.src = url;
+  });
 }

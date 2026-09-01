@@ -161,6 +161,7 @@ export function PracticePanel({
         if (next) {
           setActiveProblem(next.id, next.answerType);
           useSketchStore.getState().setToolset(next.toolset);
+          useSketchStore.getState().setGraphStep(next.graphStep ?? 1);
         } else {
           clearActiveProblem();
           useSketchStore.getState().setToolset(null);
@@ -201,7 +202,13 @@ export function PracticePanel({
   async function submit() {
     if (!problem || submitting || outcome?.correct) return;
     const shape = problem;
-    if (answerIsEmpty(shape, answer)) {
+    // Graph problems have no answer input: the sketchpad's graph layer IS
+    // the answer, so "empty" means no objects were placed on it (spec §7.4).
+    const empty =
+      shape.answerType === "graph"
+        ? useSketchStore.getState().graphObjects.length === 0
+        : answerIsEmpty(shape, answer);
+    if (empty) {
       setError("Enter an answer first.");
       return;
     }
@@ -209,6 +216,14 @@ export function PracticePanel({
     setSubmitting(true);
     setError(null);
     try {
+      const sketchState = useSketchStore.getState();
+      const submittedAnswer =
+        problem.answerType === "graph"
+          ? JSON.stringify({
+              objects: sketchState.graphObjects.map(({ kind, dashed, points }) => ({ kind, dashed, points })),
+              shadedPoint: sketchState.graphShades[0]?.testPoint ?? null,
+            })
+          : serializeAnswer(shape, answer);
       const typedLinesState = useSketchStore.getState().typedLines
         .filter((line) => line.latex.trim().length > 0)
         .map((line) => ({ latex: line.latex, plain: latexToPlain(line.latex) }));
@@ -216,11 +231,11 @@ export function PracticePanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          submittedAnswer: serializeAnswer(shape, answer),
+          submittedAnswer,
           // Silently composited at submit time, skipped when the canvas is
           // untouched (docs/06 §4). The OCR blocks ride along so the
           // diagnostic can see the student's written work.
-          sketchPngBase64: snapshotSketch(),
+          sketchPngBase64: await snapshotSketch(),
           ocrBlocks: useSketchStore.getState().ocrBlocks,
           typedLines: typedLinesState.length > 0 ? typedLinesState : null,
         }),

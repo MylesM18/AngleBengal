@@ -49,7 +49,7 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     }
 
     const { canvasSize } = useSketchStore.getState();
-    const png = compositeToPng(strokes, background, canvasSize.width, canvasSize.height);
+    const png = await compositeToPng(strokes, background, canvasSize.width, canvasSize.height);
     if (!png) {
       flash("Could not capture the canvas.");
       return;
@@ -124,17 +124,26 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
 
 /**
  * Snapshot helper for the attempt submitter (docs/06 §4: "On submit: silently
- * composite and attach... skip if canvas is empty"). Empty now means no ink
- * AND no typed lines, so a typed-only attempt still gets a composite while a
- * genuinely untouched sketchpad still attaches nothing.
+ * composite and attach... skip if canvas is empty"). Empty now means no ink,
+ * no typed lines, AND no graph objects or shading, so a typed-only or
+ * graph-only attempt still gets a composite while a genuinely untouched
+ * sketchpad still attaches nothing. Async because `compositeToPng` rasterizes
+ * the graph layer's SVG through an `Image` load callback.
  */
-export function snapshotSketch(): string | null {
-  const { strokes, background, canvasSize, typedLines } = useSketchStore.getState();
+export async function snapshotSketch(): Promise<string | null> {
+  const { strokes, background, canvasSize, typedLines, mode, graphStep, graphObjects, graphShades } =
+    useSketchStore.getState();
   const typedPlainLines = typedLines
     .filter((line) => line.latex.trim().length > 0)
     .map((line) => latexToPlain(line.latex));
-  if (strokes.length === 0 && typedPlainLines.length === 0) return null;
+  const empty =
+    strokes.length === 0 &&
+    typedPlainLines.length === 0 &&
+    graphObjects.length === 0 &&
+    graphShades.length === 0;
+  if (empty) return null;
   return compositeToPng(strokes, background, canvasSize.width, canvasSize.height, {
     typedPlainLines,
+    axisLabels: mode === "graph" || background === "graph" ? { step: graphStep } : null,
   });
 }

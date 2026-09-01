@@ -228,6 +228,13 @@ For each problem:
 - palette: the input symbols the student needs to type this problem's answer
   and work, chosen only from the PALETTE VOCABULARY below. Use null when plain
   digits and the four operators suffice. At most 16, fewer is better.
+- Graph answers: when the problem asks the student to DRAW the answer, use
+  {type: "graph", graph: {step, objects, shadedPoint}}. Every object's points
+  are [x, y] pairs with coordinates within -50 to 50. point takes 1 point;
+  line, ray (endpoint then through-point), segment, circle (center then a
+  point on it), and parabola (vertex then a point on the curve, never
+  directly above the vertex) take 2. step is the world units per grid
+  square, 1 unless the numbers demand otherwise.
 - Recompute all arithmetic before finalizing. An arithmetic slip makes the
   problem worthless.
 
@@ -247,6 +254,8 @@ WOLFRAM QUERY RULES:
   computation, never the prose.
 - Plain ASCII, a single line.
 ```
+
+The graph-answers bullet's middle sentence depends on the topic root's graph toolset (`graphTools`, `TOOLS_BY_ROOT` in `src/lib/practice/tools.ts`, Appendix C of the practice tools spec). When the root allows no graph kinds, it reads `This topic does not allow graph answers; never emit type "graph".` Otherwise it reads `Allowed kinds for this topic: {kinds}.` (the root's placeable kinds, comma-separated, dashed and shade excluded from that list), followed by `dashed: true is allowed for boundary style.` when `dashed` is in the toolset or `Never set dashed: true.` when it is not, and `Use shadedPoint (a point inside the correct region) only when the answer is a region; otherwise null.` when `shade` is in the toolset or `shadedPoint must be null.` when it is not.
 
 When the topic has `wordProblemsOnly` set, this block is appended:
 
@@ -277,6 +286,11 @@ problem statement. Solve it completely, showing your reasoning, then state
 your final answer in the requested JSON shape. If the problem is ambiguous,
 under-specified, or has no consistent answer, set solvable to false and
 explain why in one sentence.
+
+If the problem asks the student to draw on a coordinate grid, answer with
+type "graph": objects as {kind, dashed, points} with [x, y] pairs (point 1
+point; line, ray, segment, circle, parabola 2), coordinates within -50 to 50,
+and shadedPoint inside the correct region or null.
 ```
 
 JSON schema: `{ solvable: boolean, reasonIfNot: string | null, answer: <same answerJson shape> }`
