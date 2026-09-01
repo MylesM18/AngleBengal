@@ -112,17 +112,22 @@ export function MathField({
       field.style.display = "block";
       field.style.width = "100%";
       field.addEventListener("input", () => onChangeRef.current(field.value));
-      field.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          event.stopPropagation();
-          onEnterRef.current?.();
-        }
-        if (event.key === "Backspace" && field.value === "") {
-          event.preventDefault();
-          onEmptyBackspaceRef.current?.();
-        }
-      });
+      field.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.stopPropagation();
+            onEnterRef.current?.();
+          }
+          if (event.key === "Backspace" && field.value === "") {
+            event.preventDefault();
+            event.stopPropagation();
+            onEmptyBackspaceRef.current?.();
+          }
+        },
+        { capture: true },
+      );
       hostRef.current.appendChild(field);
       fieldRef.current = field;
       if (mathfieldRef) mathfieldRef.current = field;
