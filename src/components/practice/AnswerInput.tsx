@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { cx } from "@/lib/cx";
+import type { ProblemToolset } from "@/lib/practice/tools";
 
 /**
  * The answer row, which adapts to the problem's answer type (docs/06 §3):
@@ -57,6 +58,8 @@ export function AnswerInput({
   disabled: boolean;
   /** Set after a wrong multi attempt so each part shows its own outcome. */
   partResults: { name: string; match: boolean }[] | null;
+  /** Resolved tools contract; consumed by the phase 2 MathLive upgrade. */
+  toolset?: ProblemToolset | null;
   onChange: (value: AnswerValue) => void;
   onSubmit: () => void;
 }) {

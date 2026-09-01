@@ -18,6 +18,7 @@ import {
   markRevealed,
   setActiveProblem,
 } from "@/lib/practiceSession";
+import type { ProblemToolset } from "@/lib/practice/tools";
 import { useSketchStore } from "@/lib/sketch/store";
 import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
 
@@ -42,6 +43,7 @@ type ServedProblem = AnswerShape & {
   statementMd: string;
   difficulty: number;
   modelTags: { docId: string; modelNumber: number; title: string; topicId: string }[];
+  toolset: ProblemToolset;
 };
 
 type Diagnosis = {
@@ -148,8 +150,13 @@ export function PracticePanel({
       .then((next) => {
         if (cancelled) return;
         setLoaded({ key: requestKey, problem: next });
-        if (next) setActiveProblem(next.id, next.answerType);
-        else clearActiveProblem();
+        if (next) {
+          setActiveProblem(next.id, next.answerType);
+          useSketchStore.getState().setToolset(next.toolset);
+        } else {
+          clearActiveProblem();
+          useSketchStore.getState().setToolset(null);
+        }
       })
       .catch((loadError: unknown) => {
         if (cancelled) return;
@@ -165,6 +172,13 @@ export function PracticePanel({
 
   // The tutor must not keep seeing a problem after the panel is gone.
   useEffect(() => clearActiveProblem, []);
+
+  // Leaving practice must not leave a stale toolset for whatever mounts next.
+  useEffect(() => {
+    return () => {
+      useSketchStore.getState().setToolset(null);
+    };
+  }, []);
 
   /**
    * `problem` is derived, not state, so this fires on both edges: a loaded
@@ -415,6 +429,7 @@ export function PracticePanel({
                 value={answer}
                 disabled={submitting || locked}
                 partResults={outcome && !outcome.correct ? outcome.parts : null}
+                toolset={problem.toolset}
                 onChange={onAnswerChange}
                 onSubmit={() => void submit()}
               />

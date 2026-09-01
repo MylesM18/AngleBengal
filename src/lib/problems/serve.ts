@@ -2,6 +2,8 @@ import "server-only";
 
 import { prisma } from "@/lib/db";
 import { answerShapeFor, parseAnswer } from "@/lib/math/answer";
+import { resolveToolset, sanitizePalette, type ProblemToolset } from "@/lib/practice/tools";
+import { getTopicPath } from "@/lib/topics";
 
 /**
  * Serving problems to the practice panel (docs/04).
@@ -19,6 +21,8 @@ export type ServedProblem = {
   unit: string | null;
   parts: { name: string; label: string; unit: string | null }[] | null;
   modelTags: { docId: string; modelNumber: number; title: string; topicId: string }[];
+  /** Resolved per problem, server-side (spec §3). */
+  toolset: ProblemToolset;
 };
 
 /**
@@ -50,6 +54,7 @@ export async function nextProblem(
       statementMd: true,
       difficulty: true,
       answerJson: true,
+      palette: true,
       modelTags: {
         select: {
           docId: true,
@@ -68,6 +73,9 @@ export async function nextProblem(
 
   const shape = answerShapeFor(answer);
 
+  const topicPath = await getTopicPath(topicId);
+  const rootName = topicPath[0] ?? "";
+
   return {
     id: chosen.id,
     statementMd: chosen.statementMd,
@@ -81,6 +89,7 @@ export async function nextProblem(
       topicId: tag.doc.topicId,
       title: titleFor(tag.doc.modelIndexJson, tag.modelNumber),
     })),
+    toolset: resolveToolset(rootName, sanitizePalette(chosen.palette)),
   };
 }
 

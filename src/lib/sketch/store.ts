@@ -2,6 +2,8 @@
 
 import { create } from "zustand";
 
+import type { ProblemToolset } from "@/lib/practice/tools";
+
 /**
  * The practice-session sketchpad store (docs/06 §4).
  *
@@ -52,6 +54,12 @@ type SketchState = {
   ocrBlocks: OcrBlock[] | null;
   /** CSS pixel size of the canvas, needed to composite it identically. */
   canvasSize: { width: number; height: number };
+  /**
+   * The served problem's resolved toolset (spec §3). Lives here because the
+   * sketchpad and the calculator sit outside PracticePanel's subtree, and this
+   * store is the sanctioned practice-session channel. Null between problems.
+   */
+  toolset: ProblemToolset | null;
 
   addStroke: (points: StrokePoint[]) => void;
   eraseStrokes: (ids: string[]) => void;
@@ -63,6 +71,7 @@ type SketchState = {
   setColor: (color: InkColor) => void;
   setOcrBlocks: (blocks: OcrBlock[] | null) => void;
   setCanvasSize: (size: { width: number; height: number }) => void;
+  setToolset: (toolset: ProblemToolset | null) => void;
   /** Called on problem change, after the snapshot has been taken. */
   resetForNewProblem: () => void;
 };
@@ -77,6 +86,7 @@ export const useSketchStore = create<SketchState>((set) => ({
   color: "ink",
   ocrBlocks: null,
   canvasSize: { width: 0, height: 0 },
+  toolset: null,
 
   addStroke: (points) =>
     set((state) => {
@@ -119,6 +129,7 @@ export const useSketchStore = create<SketchState>((set) => ({
         ? state
         : { canvasSize },
     ),
+  setToolset: (toolset) => set({ toolset }),
 
   resetForNewProblem: () => set({ strokes: [], ocrBlocks: null }),
 }));
