@@ -14,6 +14,32 @@ const WIDTH_BY_VARIANT: Record<CalculatorVariant, number> = {
 };
 
 /**
+ * The one clamp the drag and the resize/variant guard both call, so the two
+ * cannot drift (module scope, like `WIDTH_BY_VARIANT`, so neither needs a
+ * dependency array to stay current). Width is still the variant's fixed
+ * layout width; height is passed in by each caller from the rendered
+ * window's real height rather than a guessed constant, since the keypad's
+ * real height varies by variant and a wrong guess strands the bottom of the
+ * keypad off-screen (spec §6, QA: "desktop drag stays inside the viewport").
+ * Callers fall back to the old 120px guess with `||`, not `??`: a
+ * `display:none` root (the window is mounted but closed) measures
+ * `offsetHeight` as a real `0`, not `null`, so the fallback has to catch
+ * that zero too or a resize while closed would clamp against no height at
+ * all.
+ */
+function clampPosition(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  return {
+    x: Math.min(Math.max(0, x), window.innerWidth - width),
+    y: Math.min(Math.max(0, y), window.innerHeight - height),
+  };
+}
+
+/**
  * The floating calculator (spec §6). Mounted once at the practice-session
  * level and hidden with CSS when closed, so expression, Ans, position, and the
  * DEG/RAD override survive from problem to problem and reset only when the
@@ -41,6 +67,7 @@ export function CalculatorWindow({
   const [position, setPosition] = useState({ x: 80, y: 120 });
   const inputRef = useRef<HTMLInputElement | null>(null);
   const dragOrigin = useRef<{ pointerX: number; pointerY: number; x: number; y: number } | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   const scientific = variant !== "basic";
 
@@ -116,16 +143,42 @@ export function CalculatorWindow({
   function onDragMove(event: React.PointerEvent): void {
     const origin = dragOrigin.current;
     if (!origin) return;
-    const width = WIDTH_BY_VARIANT[variant];
-    setPosition({
-      x: Math.min(Math.max(0, origin.x + event.clientX - origin.pointerX), window.innerWidth - width),
-      y: Math.min(Math.max(0, origin.y + event.clientY - origin.pointerY), window.innerHeight - 120),
-    });
+    setPosition(
+      clampPosition(
+        origin.x + event.clientX - origin.pointerX,
+        origin.y + event.clientY - origin.pointerY,
+        WIDTH_BY_VARIANT[variant],
+        rootRef.current?.offsetHeight || 120,
+      ),
+    );
   }
 
   function onDragEnd(): void {
     dragOrigin.current = null;
   }
+
+  /**
+   * Re-clamps on mount, on a variant switch (the keypad's real height just
+   * changed), and on every window resize, so neither a browser resize nor a
+   * taller keypad after a variant change can strand the whole window (drag
+   * handle included) outside the viewport for the rest of the session:
+   * position persists across close/reopen by design, so an unclamped window
+   * would otherwise stay unreachable until the session unmounts. Desktop
+   * only; the mobile sheet ignores `position` entirely. `clampPosition` is
+   * module scope and reads no reactive value itself, so `variant` (used
+   * directly below) and `isDesktop` are the effect's only real dependencies.
+   */
+  useEffect(() => {
+    if (isDesktop !== true) return;
+    function reclamp() {
+      setPosition((current) =>
+        clampPosition(current.x, current.y, WIDTH_BY_VARIANT[variant], rootRef.current?.offsetHeight || 120),
+      );
+    }
+    reclamp();
+    window.addEventListener("resize", reclamp);
+    return () => window.removeEventListener("resize", reclamp);
+  }, [isDesktop, variant]);
 
   // The contract's angle mode seeds the toggle once; a manual toggle wins for
   // the rest of the session (spec §6), so this only follows the contract
@@ -137,6 +190,7 @@ export function CalculatorWindow({
 
   return (
     <div
+      ref={rootRef}
       role="dialog"
       aria-label="Calculator"
       onKeyDown={(event) => {
