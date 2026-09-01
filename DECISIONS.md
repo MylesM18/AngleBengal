@@ -2316,3 +2316,19 @@ student needs control over which numbers show for more accuracy. Two changes:
    drops from 40px to 30px per world unit, so the 1/2-unit zoom (38px per
    unit) labels every unit instead of every 5. Default step 1 (19px) still
    labels multiples of 5.
+
+### D-128. App-tailored math virtual keyboard layout
+
+After PR #14 the owner reported the mobile math keyboard's key faces looked
+off center. Pixel measurement of the device screenshot against a clean
+WebKit render showed the geometry was MathLive's intended one (typeset
+boxes centered, baselines aligned); the impression came from small glyphs
+in large caps and from the default layout's composed keys (the bounded
+integral, root-of-box) overflowing phone-width caps, which no supported
+variable can fix. Two changes: the default math layer is replaced by an app
+layer holding only what the grader accepts (digits, operators, parens,
+comparison, comma, x, n, sqrt, exponent, fraction) as simple keys that
+center cleanly, and keycap glyphs are enlarged via the documented
+--keycap-font-size variable (18px on body). The built-in alphabetic and
+greek layers remain as tabs. Set once in loadMathLive
+(src/components/math/MathField.tsx).
