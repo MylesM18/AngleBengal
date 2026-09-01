@@ -2251,3 +2251,29 @@ This was not in the original plan for the change. The build error surfaced at
 the `npm run build` gate of the Server Component swap, after the four earlier
 commits had already passed every gate, because it is the only gate that
 compiles the server graph.
+
+### D-123
+
+The practice tools configuration is a hybrid: a TOOLS_BY_ROOT code map fixes
+the calculator variant and the graph toolset per root topic, and the problem
+generator declares the symbol palette per problem.
+
+The map lives in code following the pattern of `src/lib/learn/topicColors.ts`,
+keyed over the six seeded roots. Calculator variants and graph toolsets are
+coarse and stable per root, and the Q3/Q4 owner rulings already assigned them
+per root, so a deterministic map is the honest home for them. The symbol
+palette genuinely varies problem to problem (a linear equation wants different
+symbols than a quadratic), which is where the ALEKS principle "the problem
+owns its tools" earns per-problem metadata: the generator emits a palette
+field, it is validated against the JSON schema, and it falls back to a
+root-level default when missing or invalid.
+
+Alternatives rejected: a pure code map (the palette becomes root-coarse), Topic
+table columns following the wordProblemsOnly precedent (the taxonomy grows by
+auto-classification, so new topics need code-side defaults anyway, leaving
+per-topic rows as hand-maintained overhead), and pure per-problem AI metadata
+for everything (calculator and graph availability flickering between sibling
+problems of the same topic reads as a bug, and every consumer would need its
+own fallback path).
+
+Owner ruling 2026-08-31, practice input tools brainstorm, Q5.
