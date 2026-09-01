@@ -57,7 +57,7 @@ export function latexToPlain(latex: string): string {
  */
 export function insertionValue(
   latex: string,
-  answerType: "numeric" | "expression" | "multi" | null,
+  answerType: "numeric" | "expression" | "multi" | "graph" | null,
 ): string {
   if (answerType === "expression") return latex.replace(/\$+/g, "").trim();
 

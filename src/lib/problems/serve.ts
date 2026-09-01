@@ -17,9 +17,10 @@ export type ServedProblem = {
   id: string;
   statementMd: string;
   difficulty: number;
-  answerType: "numeric" | "expression" | "multi";
+  answerType: "numeric" | "expression" | "multi" | "graph";
   unit: string | null;
   parts: { name: string; label: string; unit: string | null }[] | null;
+  graphStep: number | null;
   modelTags: { docId: string; modelNumber: number; title: string; topicId: string }[];
   /** Resolved per problem, server-side (spec §3). */
   toolset: ProblemToolset;
@@ -83,6 +84,7 @@ export async function nextProblem(
     answerType: shape.answerType,
     unit: shape.unit,
     parts: shape.parts,
+    graphStep: shape.graphStep,
     modelTags: chosen.modelTags.map((tag) => ({
       docId: tag.docId,
       modelNumber: tag.modelNumber,

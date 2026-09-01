@@ -3,7 +3,7 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { PALETTE_SYMBOL_IDS } from "@/lib/practice/tools";
+import { PALETTE_SYMBOL_IDS, type GraphToolId } from "@/lib/practice/tools";
 import type { TopicNode } from "@/lib/topics";
 
 /**
@@ -472,6 +472,7 @@ export function problemGeneratorSystem(
   count: number,
   difficulty: number,
   wordProblemsOnly: boolean,
+  graphKinds: readonly GraphToolId[],
 ): string {
   return `You are writing practice problems for a specific mathematics topic, targeted
 at specific mental models the student is training. You will receive the
@@ -505,6 +506,17 @@ For each problem:
 - palette: the input symbols the student needs to type this problem's answer
   and work, chosen only from the PALETTE VOCABULARY below. Use null when plain
   digits and the four operators suffice. At most 16, fewer is better.
+- Graph answers: when the problem asks the student to DRAW the answer, use
+  {type: "graph", graph: {step, objects, shadedPoint}}. ${graphKinds.length > 0
+    ? `Allowed kinds for this topic: ${graphKinds.filter((kind) => kind !== "dashed" && kind !== "shade").join(", ")}.
+  ${graphKinds.includes("dashed") ? "dashed: true is allowed for boundary style." : "Never set dashed: true."}
+  ${graphKinds.includes("shade") ? "Use shadedPoint (a point inside the correct region) only when the answer is a region; otherwise null." : "shadedPoint must be null."}`
+    : "This topic does not allow graph answers; never emit type \"graph\"."}
+  Every object's points are [x, y] pairs with coordinates within -50 to 50.
+  point takes 1 point; line, ray (endpoint then through-point), segment,
+  circle (center then a point on it), and parabola (vertex then a point on
+  the curve, never directly above the vertex) take 2. step is the world units
+  per grid square, 1 unless the numbers demand otherwise.
 - Recompute all arithmetic before finalizing. An arithmetic slip makes the
   problem worthless.
 
@@ -585,7 +597,12 @@ Answer shape rules:
 - Use {type:"multi", parts:[{name,label,value,unit,tolerance}]} when the
   problem asks for two or more named values.
 - "unit" and "tolerance" must always be present; use null when not applicable.
-- When solvable is false, set answer to null.`;
+- When solvable is false, set answer to null.
+
+If the problem asks the student to draw on a coordinate grid, answer with
+type "graph": objects as {kind, dashed, points} with [x, y] pairs (point 1
+point; line, ray, segment, circle, parabola 2), coordinates within -50 to 50,
+and shadedPoint inside the correct region or null.`;
 
 export function verifierUser(statementMd: string): string {
   return `Problem:\n\n${statementMd}`;

@@ -34,11 +34,19 @@ describe("problemGeneratorSystem palette contract", () => {
       5,
       2,
       false,
+      [],
     );
     expect(system).toContain("palette");
     expect(system).toContain("PALETTE VOCABULARY");
     expect(system).toContain("frac, exponent, sqrt");
     expect(system).toContain("union, intersect");
+  });
+
+  it("names the allowed graph kinds and forbids graph answers when empty", () => {
+    const withGraph = problemGeneratorSystem({ title: "T", contentMd: "## Model 1" }, 5, 2, false, ["point", "line", "dashed", "shade"]);
+    expect(withGraph).toContain("Allowed kinds for this topic: point, line");
+    const withoutGraph = problemGeneratorSystem({ title: "T", contentMd: "## Model 1" }, 5, 2, false, []);
+    expect(withoutGraph).toContain("never emit type \"graph\"");
   });
 });
 

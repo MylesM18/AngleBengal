@@ -24,7 +24,8 @@ import {
 import { prisma } from "@/lib/db";
 import { deserializeModelIndex } from "@/lib/modelIndex";
 import { compareAnswers, compareToAnswer } from "@/lib/math/compare";
-import { sanitizePalette } from "@/lib/practice/tools";
+import { validateGraphAnswer } from "@/lib/math/graphCompare";
+import { resolveToolset, sanitizePalette } from "@/lib/practice/tools";
 import { getTopicPath } from "@/lib/topics";
 import { numericAgreement, solutionsAgreement } from "@/lib/wolfram/agreement";
 import { computeAnswer } from "@/lib/wolfram/compute";
@@ -82,11 +83,12 @@ export async function generateProblems(
   }
 
   const topicPath = await getTopicPath(topicId);
+  const rootToolset = resolveToolset(topicPath[0] ?? "", null);
 
   const batch = await callStructured({
     promptName: "generator",
     model: AI_MODELS.GENERATOR,
-    system: problemGeneratorSystem(doc, count, difficulty, topic.wordProblemsOnly),
+    system: problemGeneratorSystem(doc, count, difficulty, topic.wordProblemsOnly, rootToolset.graphTools),
     user: problemGeneratorUser(topicPath, count, difficulty, topic.wordProblemsOnly),
     schema: problemBatchSchema,
     schemaName: "problem_batch",
@@ -106,13 +108,19 @@ export async function generateProblems(
   // problem this topic would discard either way.
   const outcomes = await Promise.all(
     batch.problems.map((problem) =>
-      topic.wordProblemsOnly && !problemIsWordProblem(problem)
+      problem.answer.type === "graph" && !validateGraphAnswer(problem.answer.graph, rootToolset.graphTools)
         ? Promise.resolve<VerifyOutcome>({
             verified: false,
-            reason: "not a word problem, and this topic is set to word problems only",
+            reason: "graph answer failed spec validation (kind, bounds, or degenerate object)",
             verifiedBy: null,
           })
-        : verifyProblem(problem),
+        : topic.wordProblemsOnly && !problemIsWordProblem(problem)
+          ? Promise.resolve<VerifyOutcome>({
+              verified: false,
+              reason: "not a word problem, and this topic is set to word problems only",
+              verifiedBy: null,
+            })
+          : verifyProblem(problem),
     ),
   );
 
@@ -172,9 +180,14 @@ type VerifyOutcome = {
 async function verifyProblem(
   problem: ProblemBatch["problems"][number],
 ): Promise<VerifyOutcome> {
+  // Spec §7.4: Wolfram has no representation for drawn answers. Graph
+  // problems verify purely by generator-verifier agreement through
+  // compareAnswers, which dispatches to the same graphCompare grading uses.
+  const isGraph = problem.answer.type === "graph";
+
   // Multi answers go straight to the LLM path: a single Wolfram query cannot
   // confirm named parts (DECISIONS entry recorded in this change).
-  if (problem.answer.type !== "multi") {
+  if (problem.answer.type !== "multi" && !isGraph) {
     const outcome = await verifyWithWolfram(problem);
     if (outcome) return outcome;
   }

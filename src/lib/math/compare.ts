@@ -8,6 +8,7 @@ import {
   type MultiAnswer,
   type NumericAnswer,
 } from "./answer";
+import { graphCompare, graphSubmissionSchema, type GraphSubmission } from "./graphCompare";
 
 /**
  * Answer comparison (docs/05 §4.3), shared by two callers that must agree:
@@ -234,6 +235,15 @@ export function compareToAnswer(expected: Answer, submitted: string): CompareOut
       return compareExpressions(expected.value, submitted);
     case "multi":
       return compareMulti(expected, submitted);
+    case "graph": {
+      let parsed: GraphSubmission;
+      try {
+        parsed = graphSubmissionSchema.parse(JSON.parse(submitted));
+      } catch {
+        return { match: false, reason: "Could not read the drawn answer." };
+      }
+      return graphCompare(expected.graph, parsed);
+    }
   }
 }
 
@@ -272,6 +282,13 @@ export function compareAnswers(expected: Answer, actual: Answer): CompareOutcome
       };
     });
     return { match: parts.every((part) => part.match), parts };
+  }
+
+  if (expected.type === "graph" && actual.type === "graph") {
+    return graphCompare(expected.graph, {
+      objects: actual.graph.objects,
+      shadedPoint: actual.graph.shadedPoint,
+    });
   }
 
   return { match: false, reason: "Unhandled answer type." };

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { GRAPH_KINDS } from "@/lib/practice/tools";
+
 /**
  * The shapes stored in `Problem.answerJson` (docs/03).
  *
@@ -37,15 +39,38 @@ export const multiAnswerSchema = z.object({
   ),
 });
 
+/**
+ * The graph answer (spec §7.4). points stays a loose number[][] because
+ * OpenAI strict mode rejects prefixItems and min/maxItems; validateGraphAnswer
+ * (src/lib/math/graphCompare.ts) enforces pair shape, bounds, and per-root
+ * kinds after parsing, before a problem can be saved.
+ */
+export const graphObjectAnswerSchema = z.object({
+  kind: z.enum(GRAPH_KINDS),
+  dashed: z.boolean(),
+  points: z.array(z.array(z.number())),
+});
+
+export const graphAnswerSchema = z.object({
+  type: z.literal("graph"),
+  graph: z.object({
+    step: z.number().gt(0).lte(10),
+    objects: z.array(graphObjectAnswerSchema),
+    shadedPoint: z.array(z.number()).nullable(),
+  }),
+});
+
 export const answerSchema = z.discriminatedUnion("type", [
   numericAnswerSchema,
   expressionAnswerSchema,
   multiAnswerSchema,
+  graphAnswerSchema,
 ]);
 
 export type Answer = z.infer<typeof answerSchema>;
 export type NumericAnswer = z.infer<typeof numericAnswerSchema>;
 export type MultiAnswer = z.infer<typeof multiAnswerSchema>;
+export type GraphAnswer = z.infer<typeof graphAnswerSchema>;
 
 export const DEFAULT_TOLERANCE = 0.01;
 
@@ -88,9 +113,13 @@ export function answerShapeFor(answer: Answer): {
   answerType: Answer["type"];
   unit: string | null;
   parts: { name: string; label: string; unit: string | null }[] | null;
+  graphStep: number | null;
 } {
+  if (answer.type === "graph") {
+    return { answerType: "graph", unit: null, parts: null, graphStep: answer.graph.step };
+  }
   if (answer.type === "numeric") {
-    return { answerType: "numeric", unit: answer.unit, parts: null };
+    return { answerType: "numeric", unit: answer.unit, parts: null, graphStep: null };
   }
   if (answer.type === "multi") {
     return {
@@ -101,7 +130,8 @@ export function answerShapeFor(answer: Answer): {
         label: part.label,
         unit: part.unit,
       })),
+      graphStep: null,
     };
   }
-  return { answerType: "expression", unit: null, parts: null };
+  return { answerType: "expression", unit: null, parts: null, graphStep: null };
 }

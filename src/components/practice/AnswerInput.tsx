@@ -29,9 +29,10 @@ import { latexToPlain } from "@/lib/sketch/latexToPlain";
  */
 
 export type AnswerShape = {
-  answerType: "numeric" | "expression" | "multi";
+  answerType: "numeric" | "expression" | "multi" | "graph";
   unit: string | null;
   parts: { name: string; label: string; unit: string | null }[] | null;
+  graphStep: number | null;
 };
 
 export type AnswerValue = { single: string; parts: Record<string, string> };
