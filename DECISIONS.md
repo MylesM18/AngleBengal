@@ -2277,3 +2277,11 @@ problems of the same topic reads as a bug, and every consumer would need its
 own fallback path).
 
 Owner ruling 2026-08-31, practice input tools brainstorm, Q5.
+
+### D-124. Unseeded roots resolve to a generic toolset
+
+`TOOLS_BY_ROOT` covers the six seeded roots. A problem under a user-created
+root resolves to a fallback (scientific calculator, DEG, Algebra's default
+palette, no graph tools) rather than crashing or hiding every tool. The spec
+keys the map over the seeded roots and leaves the miss case open; this is the
+smallest choice that keeps every surface functional.
