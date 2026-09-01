@@ -55,3 +55,6 @@ yarn-error.log*
 
 # graphify knowledge graph (regenerable from the tree; holds graph.json, viz, caches)
 /graphify-out/
+
+# worktree scratch
+.worktrees/
