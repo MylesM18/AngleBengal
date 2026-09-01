@@ -9,6 +9,12 @@ function reset(): void {
     activeLineId: null,
     mode: "draw",
     ocrBlocks: null,
+    graphObjects: [],
+    graphShades: [],
+    pendingGraphPoints: [],
+    opLog: [],
+    graphTool: null,
+    graphStep: 1,
   });
 }
 
@@ -62,5 +68,47 @@ describe("typed solution lines", () => {
     useSketchStore.getState().addTypedLineAfter(null);
     useSketchStore.getState().clear();
     expect(useSketchStore.getState().typedLines).toEqual([]);
+  });
+});
+
+describe("graph objects and unified undo", () => {
+  beforeEach(reset);
+
+  it("undoes ink and graph ops as one stack, newest first", () => {
+    useSketchStore.getState().addStroke([[0, 0, 0.5], [5, 5, 0.5]]);
+    const objectId = useSketchStore.getState().addGraphObject("point", [[1, 1]], false);
+    useSketchStore.getState().addGraphShade([0.5, 0.5]);
+    useSketchStore.getState().undo();
+    expect(useSketchStore.getState().graphShades).toHaveLength(0);
+    expect(useSketchStore.getState().graphObjects.map((object) => object.id)).toEqual([objectId]);
+    useSketchStore.getState().undo();
+    expect(useSketchStore.getState().graphObjects).toHaveLength(0);
+    expect(useSketchStore.getState().strokes).toHaveLength(1);
+    useSketchStore.getState().undo();
+    expect(useSketchStore.getState().strokes).toHaveLength(0);
+  });
+
+  it("erasing an object prunes it from the history", () => {
+    const id = useSketchStore.getState().addGraphObject("segment", [[0, 0], [1, 1]], false);
+    useSketchStore.getState().removeGraphObject(id);
+    useSketchStore.getState().undo();
+    expect(useSketchStore.getState().graphObjects).toHaveLength(0);
+  });
+
+  it("toggles dashed in place", () => {
+    const id = useSketchStore.getState().addGraphObject("line", [[0, 0], [1, 2]], false);
+    useSketchStore.getState().toggleGraphObjectDashed(id);
+    expect(useSketchStore.getState().graphObjects[0].dashed).toBe(true);
+  });
+
+  it("resetForNewProblem clears graph state and returns step to 1", () => {
+    useSketchStore.getState().setGraphStep(0.5);
+    useSketchStore.getState().addGraphObject("point", [[1, 1]], false);
+    useSketchStore.getState().resetForNewProblem();
+    const state = useSketchStore.getState();
+    expect(state.graphObjects).toEqual([]);
+    expect(state.graphShades).toEqual([]);
+    expect(state.graphStep).toBe(1);
+    expect(state.opLog).toEqual([]);
   });
 });

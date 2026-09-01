@@ -2293,3 +2293,11 @@ GRID_PX, near 40px"). 2 x GRID_PX = 38px keeps typed baselines locked to the
 5mm grid in every mode, so the composited PNG and the live layer agree by
 construction. The constant is TYPED_LINE_HEIGHT, exported from
 src/lib/sketch/render.ts.
+
+### D-126. Axis tick labels every 1 or 5 units by pixel density
+
+The spec left tick label density to implementation ("every 1 or every 5
+units, whichever stays legible"). The rule: label every unit once one world
+unit spans at least 40px (GRID_PX / step >= 40), otherwise label every 5
+units. At the default step 1 a unit spans 19px, so labels land on multiples
+of 5. Encoded as axisLabelInterval in src/lib/sketch/render.ts.

@@ -80,4 +80,14 @@ describe("resolveToolset", () => {
     expect(toolset.angleMode).toBe("DEG");
     expect(toolset.palette).toEqual([...TOOLS_BY_ROOT.Algebra.defaultPalette]);
   });
+
+  it("matches the Appendix C graph toolsets", () => {
+    expect(TOOLS_BY_ROOT.Algebra.graphTools).toEqual(["point", "line", "parabola", "dashed", "shade"]);
+    expect(TOOLS_BY_ROOT.Geometry.graphTools).toEqual(["point", "line", "ray", "segment", "circle"]);
+    expect(TOOLS_BY_ROOT.Trigonometry.graphTools).toEqual(["point", "line", "segment", "circle"]);
+    expect(TOOLS_BY_ROOT.Precalculus.graphTools).toEqual(["point", "line", "segment", "circle", "parabola", "dashed", "shade"]);
+    expect(TOOLS_BY_ROOT.Calculus.graphTools).toEqual(["point", "line", "segment", "parabola"]);
+    expect(TOOLS_BY_ROOT["Statistics & Probability"].graphTools).toEqual(["point", "line", "segment"]);
+    expect(resolveToolset("Number Theory", null).graphTools).toEqual([]);
+  });
 });

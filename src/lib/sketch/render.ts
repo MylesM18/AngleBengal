@@ -25,6 +25,21 @@ export const GRID_PX = 19;
 /** Stacked typed-line pitch: 2 grid squares (DECISIONS.md D-125). */
 export const TYPED_LINE_HEIGHT = 38;
 
+/** Origin of the real coordinate system: the paper's center snapped to the
+ *  nearest grid intersection (spec §7.1). */
+export function gridOrigin(cssWidth: number, cssHeight: number): { x: number; y: number } {
+  return {
+    x: Math.round(cssWidth / 2 / GRID_PX) * GRID_PX,
+    y: Math.round(cssHeight / 2 / GRID_PX) * GRID_PX,
+  };
+}
+
+/** Tick label spacing in world units: every unit once a unit spans at least
+ *  40px, else every 5 (DECISIONS.md D-126). */
+export function axisLabelInterval(step: number): number {
+  return GRID_PX / step >= 40 ? 1 : 5;
+}
+
 /** Sets up a devicePixelRatio-aware backing store and returns the context. */
 export function prepareCanvas(
   canvas: HTMLCanvasElement,

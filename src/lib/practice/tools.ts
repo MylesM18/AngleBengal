@@ -23,7 +23,7 @@ export type CalculatorVariant = "basic" | "scientific" | "stats";
 export interface RootToolset {
   calculator: CalculatorVariant;
   angleMode: "DEG" | "RAD";
-  /** Per root (spec Appendix C). Stays empty until phase 4 wires the rail. */
+  /** Per root (spec Appendix C). */
   graphTools: GraphToolId[];
   /** Fallback when a problem declares no palette (spec Appendix B). */
   defaultPalette: PaletteSymbolId[];
@@ -40,7 +40,7 @@ export const TOOLS_BY_ROOT: Record<string, RootToolset> = {
   Algebra: {
     calculator: "basic",
     angleMode: "DEG",
-    graphTools: [],
+    graphTools: ["point", "line", "parabola", "dashed", "shade"],
     defaultPalette: [
       "frac", "exponent", "sqrt", "abs", "plusminus", "neq", "leq", "geq",
       "pi", "times", "divide",
@@ -49,7 +49,7 @@ export const TOOLS_BY_ROOT: Record<string, RootToolset> = {
   Geometry: {
     calculator: "basic",
     angleMode: "DEG",
-    graphTools: [],
+    graphTools: ["point", "line", "ray", "segment", "circle"],
     defaultPalette: [
       "angle", "degree", "parallel", "perp", "pi", "sqrt", "frac", "exponent",
       "times", "divide", "plusminus", "approx",
@@ -58,7 +58,7 @@ export const TOOLS_BY_ROOT: Record<string, RootToolset> = {
   Trigonometry: {
     calculator: "scientific",
     angleMode: "DEG",
-    graphTools: [],
+    graphTools: ["point", "line", "segment", "circle"],
     defaultPalette: [
       "sin", "cos", "tan", "theta", "degree", "pi", "frac", "sqrt", "exponent",
       "plusminus", "leq", "geq", "approx",
@@ -67,7 +67,7 @@ export const TOOLS_BY_ROOT: Record<string, RootToolset> = {
   Precalculus: {
     calculator: "scientific",
     angleMode: "DEG",
-    graphTools: [],
+    graphTools: ["point", "line", "segment", "circle", "parabola", "dashed", "shade"],
     defaultPalette: [
       "frac", "exponent", "sqrt", "nthroot", "abs", "log", "ln", "e", "pi",
       "infinity", "leq", "geq", "neq", "union", "intersect",
@@ -76,7 +76,7 @@ export const TOOLS_BY_ROOT: Record<string, RootToolset> = {
   Calculus: {
     calculator: "scientific",
     angleMode: "RAD",
-    graphTools: [],
+    graphTools: ["point", "line", "segment", "parabola"],
     defaultPalette: [
       "derivative", "integral", "lim", "prime", "infinity", "frac", "exponent",
       "sqrt", "e", "ln", "pi", "theta",
@@ -85,7 +85,7 @@ export const TOOLS_BY_ROOT: Record<string, RootToolset> = {
   "Statistics & Probability": {
     calculator: "stats",
     angleMode: "DEG",
-    graphTools: [],
+    graphTools: ["point", "line", "segment"],
     defaultPalette: [
       "factorial", "ncr", "npr", "xbar", "mu", "sigma", "frac", "exponent",
       "sqrt", "percent", "leq", "geq", "approx", "times",
