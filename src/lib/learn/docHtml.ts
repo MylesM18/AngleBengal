@@ -1,6 +1,13 @@
 import { unstable_cache } from "next/cache";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+// `react-dom/server.edge`, not `react-dom/server`: Next blocks the bare
+// specifier anywhere in a Server Component graph, telling you to return the
+// content as a Server Component instead. That advice does not apply here,
+// because an HTML *string* is the thing being cached. The `.edge` build is a
+// public react-dom export and `renderToStaticMarkup` is synchronous, so the
+// edge and node builds cannot diverge on it. docHtml.test.ts compares this
+// output against `react-dom/server` directly, which pins that.
+import { renderToStaticMarkup } from "react-dom/server.edge";
 
 import { MarkdownBody } from "@/components/shared/MarkdownMath";
 import { splitModelSections } from "@/lib/learn/splitModelSections";
