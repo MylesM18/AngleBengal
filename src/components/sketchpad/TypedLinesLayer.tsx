@@ -76,6 +76,7 @@ export function TypedLinesLayer() {
                   onEmptyBackspace={() => removeTypedLine(line.id)}
                   compact
                   autoFocus
+                  keyboardVariant="lines"
                   ariaLabel={`Solution line ${index + 1}`}
                   mathfieldRef={fieldRef}
                 />
