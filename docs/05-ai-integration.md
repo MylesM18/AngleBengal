@@ -225,11 +225,24 @@ For each problem:
   the same station". Null when isWordProblem is false.
 - wolframQuery: the computable core of the problem as one short Wolfram Alpha
   query, following the WOLFRAM QUERY RULES below.
+- palette: the input symbols the student needs to type this problem's answer
+  and work, chosen only from the PALETTE VOCABULARY below. Use null when plain
+  digits and the four operators suffice. At most 16, fewer is better.
+- Graph answers: when the problem asks the student to DRAW the answer, use
+  {type: "graph", graph: {step, objects, shadedPoint}}. Every object's points
+  are [x, y] pairs with coordinates within -50 to 50. point takes 1 point;
+  line, ray (endpoint then through-point), segment, circle (center then a
+  point on it), and parabola (vertex then a point on the curve, never
+  directly above the vertex) take 2. step is the world units per grid
+  square, 1 unless the numbers demand otherwise.
 - Recompute all arithmetic before finalizing. An arithmetic slip makes the
   problem worthless.
 
 Vary surface features across the batch (contexts, number ranges, which
 quantity is unknown) so no two problems are template-identical. No em-dashes.
+
+PALETTE VOCABULARY (the only legal palette values):
+frac, exponent, sqrt, nthroot, abs, pi, e, theta, infinity, degree, plusminus, percent, neq, leq, geq, lt, gt, approx, times, divide, sin, cos, tan, log, ln, derivative, integral, lim, prime, factorial, ncr, npr, xbar, mu, sigma, angle, parallel, perp, union, intersect
 
 WOLFRAM QUERY RULES:
 - English keywords plus linear math syntax: "solve 3x - 7 = 11",
@@ -241,6 +254,8 @@ WOLFRAM QUERY RULES:
   computation, never the prose.
 - Plain ASCII, a single line.
 ```
+
+The graph-answers bullet's middle sentence depends on the topic root's graph toolset (`graphTools`, `TOOLS_BY_ROOT` in `src/lib/practice/tools.ts`, Appendix C of the practice tools spec). When the root allows no graph kinds, it reads `This topic does not allow graph answers; never emit type "graph".` Otherwise it reads `Allowed kinds for this topic: {kinds}.` (the root's placeable kinds, comma-separated, dashed and shade excluded from that list), followed by `dashed: true is allowed for boundary style.` when `dashed` is in the toolset or `Never set dashed: true.` when it is not, and `Use shadedPoint (a point inside the correct region) only when the answer is a region; otherwise null.` when `shade` is in the toolset or `shadedPoint must be null.` when it is not.
 
 When the topic has `wordProblemsOnly` set, this block is appended:
 
@@ -257,9 +272,11 @@ word problems beats five where one is symbolic.
 
 and the user message gains the line "Every problem must be a word problem."
 
-JSON schema: `{ problems: [{ statementMd, answerJson, solutionMd, modelTags: number[], difficulty, isWordProblem: boolean, scenario: string | null, wolframQuery: string }] }`
+JSON schema: `{ problems: [{ statementMd, answerJson, solutionMd, modelTags: number[], difficulty, isWordProblem: boolean, scenario: string | null, wolframQuery: string, palette: string[] | null }] }`
 
 `isWordProblem` and `scenario` are always requested, so the generator classifies what it wrote whether or not the topic demands word problems. On a `wordProblemsOnly` topic, `problemIsWordProblem` in `schemas.ts` requires both (true, and a non-blank scenario), the way `classifierResultIsCoherent` enforces what a JSON Schema cannot say. A problem that fails it is discarded before the verifier is called: that is a saving, not a relaxation, since a problem clearing the gate still has to pass §4.2 in full before it is saved. The setting gates generation only. `Problem` carries no word-problem column, so existing problems are neither relabelled nor filtered out of a session.
+
+Each problem also declares `palette`, an array from the palette vocabulary or null; unknown ids are dropped and the result capped at 16 at save (`sanitizePalette`), stored on `Problem.palette` as JSON.
 
 ### 4.2 Verifier system prompt
 
@@ -269,6 +286,11 @@ problem statement. Solve it completely, showing your reasoning, then state
 your final answer in the requested JSON shape. If the problem is ambiguous,
 under-specified, or has no consistent answer, set solvable to false and
 explain why in one sentence.
+
+If the problem asks the student to draw on a coordinate grid, answer with
+type "graph": objects as {kind, dashed, points} with [x, y] pairs (point 1
+point; line, ray, segment, circle, parabola 2), coordinates within -50 to 50,
+and shadedPoint inside the correct region or null.
 ```
 
 JSON schema: `{ solvable: boolean, reasonIfNot: string | null, answer: <same answerJson shape> }`
@@ -312,6 +334,48 @@ so: use failedModelNumber 0, failedModelTitle "Arithmetic slip".
 ```
 
 JSON schema: `{ failedModelNumber, failedModelTitle, symptom, explanationMd, confidence }`
+
+### User message
+
+Assembled in `diagnosticUser()`, parts joined with a blank line:
+
+```
+PROBLEM:
+{statementMd}
+
+CORRECT SOLUTION:
+{solutionMd}
+
+STUDENT'S SUBMITTED ANSWER:
+{submittedAnswer}
+
+{if typedLines is non-empty}
+THEIR TYPED SOLUTION LINES (ordered, verbatim):
+1. {plain}
+2. {plain}
+{...one line per stacked Type-mode line}
+{/if}
+
+{if ocrText}
+TRANSCRIPTION OF THEIR HANDWRITTEN WORK:
+{ocrText}
+{/if}
+
+{if doc}
+THE TOPIC'S MENTAL MODEL DOCUMENT:
+
+--- {doc.title} ---
+{doc.contentMd}
+{else}
+No mental model document is available for this topic. If you cannot attribute
+the error to a specific named model, return confidence below 0.4.
+{/if}
+```
+
+Typed lines and the OCR transcription are two independent, optional pieces of
+evidence carrying their own label, so both can be present on the same attempt
+(a student who typed some lines and also cleaned up handwritten scratch work)
+without the model conflating one source with the other.
 
 ## §6 Tutor chat (GENERATOR model, streaming)
 

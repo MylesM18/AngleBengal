@@ -75,6 +75,8 @@ Split view, resizable divider, default 45/55.
 
 **On submit:** silently composite and attach `sketchPngBase64` to the attempt (skip if canvas is empty).
 
+Graph mode adds a second contextual tool row below the kraft strip, an owner-approved scoped exception to the one-strip rule (practice tools spec Q4). The strip itself keeps only ink tools.
+
 ## §5 Tutor chat drawer
 
 - Header: "Tutor" + context chip showing what it can currently see ("Practice · Distance-Rate-Time · current problem"), session switcher menu (recent sessions + New chat).

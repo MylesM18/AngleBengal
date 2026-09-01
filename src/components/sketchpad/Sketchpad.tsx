@@ -4,12 +4,16 @@ import { useCallback, useState } from "react";
 
 import type { NoticeKind } from "@/components/ui/Notice";
 import { Toast } from "@/components/ui/Toast";
+import { latexToPlain } from "@/lib/sketch/latexToPlain";
 import { compositeToPng } from "@/lib/sketch/render";
 import { useSketchStore, type OcrBlock } from "@/lib/sketch/store";
 
 import { CleanCopyPanel } from "./CleanCopyPanel";
+import { GraphLayer } from "./GraphLayer";
+import { GraphRail } from "./GraphRail";
 import { SketchCanvas } from "./SketchCanvas";
 import { SketchToolbar } from "./SketchToolbar";
+import { TypedLinesLayer } from "./TypedLinesLayer";
 
 /**
  * The sketchpad panel: toolbar, canvas stack, and the clean-copy slip
@@ -23,6 +27,7 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
   const [toast, setToast] = useState<{ kind: NoticeKind; message: string } | null>(null);
 
   const blocks = useSketchStore((state) => state.ocrBlocks);
+  const mode = useSketchStore((state) => state.mode);
   const setOcrBlocks = useSketchStore((state) => state.setOcrBlocks);
   const setCanvasSize = useSketchStore((state) => state.setCanvasSize);
 
@@ -44,7 +49,7 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     }
 
     const { canvasSize } = useSketchStore.getState();
-    const png = compositeToPng(strokes, background, canvasSize.width, canvasSize.height);
+    const png = await compositeToPng(strokes, background, canvasSize.width, canvasSize.height);
     if (!png) {
       flash("Could not capture the canvas.");
       return;
@@ -67,7 +72,13 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
         return;
       }
 
-      setOcrBlocks((payload as { blocks: OcrBlock[] }).blocks);
+      const blocks = (payload as { blocks: OcrBlock[] }).blocks;
+      setOcrBlocks(blocks);
+      const mathLatexes = blocks
+        .filter((block): block is Extract<OcrBlock, { kind: "math" }> => block.kind === "math")
+        .map((block) => block.latex)
+        .filter((latex) => latex.trim().length > 0);
+      useSketchStore.getState().appendTypedLines(mathLatexes);
     } catch {
       flash("Could not reach the reader. Try again in a moment.", "error");
     } finally {
@@ -82,8 +93,13 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
       className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0 outline-none"
     >
       <SketchToolbar cleaning={cleaning} onCleanUp={() => void cleanUp()} />
+      {mode === "graph" && <GraphRail />}
 
-      <SketchCanvas onSizeChange={setCanvasSize} />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <SketchCanvas onSizeChange={setCanvasSize} />
+        <TypedLinesLayer />
+        <GraphLayer />
+      </div>
 
       {blocks && blocks.length > 0 && (
         <CleanCopyPanel
@@ -108,11 +124,26 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
 
 /**
  * Snapshot helper for the attempt submitter (docs/06 §4: "On submit: silently
- * composite and attach"). Returns null for an empty canvas so an untouched
- * sketchpad does not attach a blank image to every attempt.
+ * composite and attach... skip if canvas is empty"). Empty now means no ink,
+ * no typed lines, AND no graph objects or shading, so a typed-only or
+ * graph-only attempt still gets a composite while a genuinely untouched
+ * sketchpad still attaches nothing. Async because `compositeToPng` rasterizes
+ * the graph layer's SVG through an `Image` load callback.
  */
-export function snapshotSketch(): string | null {
-  const { strokes, background, canvasSize } = useSketchStore.getState();
-  if (strokes.length === 0) return null;
-  return compositeToPng(strokes, background, canvasSize.width, canvasSize.height);
+export async function snapshotSketch(): Promise<string | null> {
+  const { strokes, background, canvasSize, typedLines, mode, graphStep, graphObjects, graphShades } =
+    useSketchStore.getState();
+  const typedPlainLines = typedLines
+    .filter((line) => line.latex.trim().length > 0)
+    .map((line) => latexToPlain(line.latex));
+  const empty =
+    strokes.length === 0 &&
+    typedPlainLines.length === 0 &&
+    graphObjects.length === 0 &&
+    graphShades.length === 0;
+  if (empty) return null;
+  return compositeToPng(strokes, background, canvasSize.width, canvasSize.height, {
+    typedPlainLines,
+    axisLabels: mode === "graph" || background === "graph" ? { step: graphStep } : null,
+  });
 }

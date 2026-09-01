@@ -8,6 +8,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
+import { useMathLive } from "@/components/math/MathField";
 import { Button } from "@/components/ui/Button";
 import { Chip, chipClasses } from "@/components/ui/Chip";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -19,6 +20,7 @@ import {
   useSketchStore,
   type Background,
   type InkColor,
+  type SketchMode,
   type StrokeWidth,
   type Tool,
 } from "@/lib/sketch/store";
@@ -30,6 +32,12 @@ import {
  * "Clean up" button on the right. Cmd/Ctrl+Z undoes while focus is inside
  * the element marked `data-sketchpad` (the Sketchpad root).
  */
+
+const MODES: { value: SketchMode; label: string }[] = [
+  { value: "draw", label: "Draw" },
+  { value: "type", label: "Type" },
+  { value: "graph", label: "Graph" },
+];
 
 const TOOLS: { value: Tool; label: string; icon: IconName }[] = [
   { value: "pen", label: "Pen", icon: "pen" },
@@ -62,18 +70,26 @@ export function SketchToolbar({
   cleaning: boolean;
   onCleanUp: () => void;
 }) {
+  const mode = useSketchStore((state) => state.mode);
   const tool = useSketchStore((state) => state.tool);
   const width = useSketchStore((state) => state.width);
   const color = useSketchStore((state) => state.color);
   const background = useSketchStore((state) => state.background);
   const strokeCount = useSketchStore((state) => state.strokes.length);
+  const toolset = useSketchStore((state) => state.toolset);
 
+  const setMode = useSketchStore((state) => state.setMode);
   const setTool = useSketchStore((state) => state.setTool);
   const setWidth = useSketchStore((state) => state.setWidth);
   const setColor = useSketchStore((state) => state.setColor);
   const setBackground = useSketchStore((state) => state.setBackground);
   const undo = useSketchStore((state) => state.undo);
   const clear = useSketchStore((state) => state.clear);
+  const mathLive = useMathLive();
+
+  // Graph mode is level-gated: the button only shows once the served
+  // problem's toolset declares at least one graph tool.
+  const graphToolsAvailable = (toolset?.graphTools.length ?? 0) > 0;
 
   const stripRef = useRef<HTMLDivElement | null>(null);
   const clearWrapRef = useRef<HTMLDivElement | null>(null);
@@ -187,6 +203,42 @@ export function SketchToolbar({
       // up too: `clearWrapRef` stays the nearer positioned ancestor there.
       className="stock-textured flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft px-3 py-2 max-lg:relative max-lg:gap-5"
     >
+      <div className="flex gap-1 max-lg:gap-3" role="group" aria-label="Mode">
+        {MODES.filter((item) => item.value !== "graph" || graphToolsAvailable).map(
+          ({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => {
+                setMode(value);
+                // Entering Graph mode also switches the background so the
+                // axes are visible without a second click.
+                if (value === "graph") setBackground("graph");
+              }}
+              aria-pressed={mode === value}
+              disabled={value === "type" && mathLive.status === "failed"}
+              title={
+                value === "type" && mathLive.status === "failed"
+                  ? "Typed input failed to load"
+                  : label
+              }
+              className={chipClasses({ variant: "toggle", active: mode === value })}
+            >
+              {label}
+            </button>
+          ),
+        )}
+        {mathLive.status === "failed" && (
+          <button
+            type="button"
+            onClick={mathLive.retry}
+            className={chipClasses({ variant: "action" })}
+          >
+            Retry
+          </button>
+        )}
+      </div>
+
       {/* 32px icon-only chips: each one's hit area spills (44 - 32) / 2 = 6px
           past its own visible edge, so two neighbors need at least 12px
           between them (gap-3) before their hit areas would otherwise meet. */}
@@ -199,7 +251,12 @@ export function SketchToolbar({
             aria-pressed={tool === value}
             aria-label={label}
             title={label}
-            className={chipClasses({ variant: "toggle", active: tool === value })}
+            disabled={mode !== "draw"}
+            className={chipClasses({
+              variant: "toggle",
+              active: tool === value,
+              className: "disabled:opacity-60",
+            })}
           >
             <Icon name={icon} />
           </button>
@@ -216,6 +273,8 @@ export function SketchToolbar({
             aria-label={`Stroke width ${option}`}
             title={`Stroke width ${option}`}
             onClick={() => setWidth(option)}
+            disabled={mode !== "draw"}
+            className="disabled:opacity-60"
           >
             <span
               aria-hidden="true"
@@ -243,8 +302,9 @@ export function SketchToolbar({
             aria-pressed={color === option}
             aria-label={`${option} ink`}
             title={`${option} ink`}
+            disabled={mode !== "draw"}
             className={cx(
-              "h-6 w-6 rounded-full border-2 max-lg:tap-target",
+              "h-6 w-6 rounded-full border-2 max-lg:tap-target disabled:opacity-60",
               color === option ? "border-ink inset-ring-2 inset-ring-paper-0" : "border-paper-0",
             )}
             style={{ backgroundColor: INK_COLORS[option] }}

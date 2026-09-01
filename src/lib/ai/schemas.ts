@@ -16,6 +16,7 @@
 import { z } from "zod";
 
 import { answerSchema } from "@/lib/math/answer";
+import { PALETTE_SYMBOL_IDS } from "@/lib/practice/tools";
 
 /** docs/05 §3: topic classification. */
 export const classifierSchema = z.object({
@@ -100,6 +101,12 @@ export const problemBatchSchema = z.object({
        * Wolfram Alpha query (spec section 6), e.g. "solve 3x - 7 = 11".
        */
       wolframQuery: z.string(),
+      /**
+       * Input symbols this problem's solution needs, from the palette
+       * vocabulary. Null when digits and operators suffice. No maxItems here:
+       * OpenAI strict mode rejects it, so sanitizePalette caps at 16 at save.
+       */
+      palette: z.array(z.enum(PALETTE_SYMBOL_IDS)).nullable(),
     }),
   ),
 });

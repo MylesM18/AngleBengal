@@ -11,6 +11,7 @@ const bodySchema = z.object({
   submittedAnswer: z.string().min(1, "Enter an answer first."),
   sketchPngBase64: z.string().nullish(),
   ocrBlocks: z.unknown().nullish(),
+  typedLines: z.array(z.object({ latex: z.string(), plain: z.string() })).nullish(),
 });
 
 /** POST /api/problems/[id]/attempt (docs/04): grade, then diagnose if wrong. */
@@ -38,6 +39,7 @@ export async function POST(
       submittedAnswer: body.submittedAnswer,
       sketchPngBase64: body.sketchPngBase64 ?? null,
       ocrBlocks: body.ocrBlocks ?? null,
+      typedLines: body.typedLines ?? null,
     });
     return NextResponse.json(result);
   } catch (error) {

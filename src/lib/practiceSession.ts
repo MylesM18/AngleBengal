@@ -21,7 +21,7 @@ export type PracticeSession = {
   /** True once solved correctly or revealed via Show solution. */
   revealed: boolean;
   /** Shapes how a clean-copy block is inserted into the answer input. */
-  answerType: "numeric" | "expression" | "multi" | null;
+  answerType: "numeric" | "expression" | "multi" | "graph" | null;
 };
 
 const EMPTY: PracticeSession = { problemId: null, revealed: false, answerType: null };

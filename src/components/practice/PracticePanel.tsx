@@ -18,6 +18,8 @@ import {
   markRevealed,
   setActiveProblem,
 } from "@/lib/practiceSession";
+import type { ProblemToolset } from "@/lib/practice/tools";
+import { latexToPlain } from "@/lib/sketch/latexToPlain";
 import { useSketchStore } from "@/lib/sketch/store";
 import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
 
@@ -29,6 +31,7 @@ import {
   type AnswerShape,
   type AnswerValue,
 } from "./AnswerInput";
+import { CalculatorChip } from "./calculator/CalculatorChip";
 import { DiagnosisCard } from "./DiagnosisCard";
 import { DifficultySelector } from "./DifficultySelector";
 
@@ -42,6 +45,7 @@ type ServedProblem = AnswerShape & {
   statementMd: string;
   difficulty: number;
   modelTags: { docId: string; modelNumber: number; title: string; topicId: string }[];
+  toolset: ProblemToolset;
 };
 
 type Diagnosis = {
@@ -67,6 +71,8 @@ export function PracticePanel({
   answer,
   onAnswerChange,
   onProblemChange,
+  calculatorOpen,
+  onToggleCalculator,
 }: {
   topicId: string;
   topicPath: string[];
@@ -86,6 +92,10 @@ export function PracticePanel({
    * needs the statement for its ribbon (mobile spec §4).
    */
   onProblemChange?: (statementMd: string | null) => void;
+  /** Whether the session-level calculator window is open (spec §6). */
+  calculatorOpen: boolean;
+  /** Toggles the calculator; also lazily mounts it on first open. */
+  onToggleCalculator: () => void;
 }) {
   const [difficulty, setDifficulty] = useState(2);
   const [counts, setCounts] = useState(initialCounts);
@@ -136,6 +146,14 @@ export function PracticePanel({
     setReloadKey((key) => key + 1);
   }, [onAnswerChange]);
 
+  // Tracks the id of the problem the canvas was last reset for. The sketch
+  // store is module-scoped and survives client-side navigation, so a remount
+  // (e.g. leaving practice and coming back) must not leave a new problem
+  // sitting over the previous visit's stale strokes, typed lines, or graph
+  // objects: `loadProblem` and the difficulty switch already reset for their
+  // own request, but the initial mount fetch never did.
+  const prevProblemIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -148,13 +166,26 @@ export function PracticePanel({
       .then((next) => {
         if (cancelled) return;
         setLoaded({ key: requestKey, problem: next });
-        if (next) setActiveProblem(next.id, next.answerType);
-        else clearActiveProblem();
+        if (next) {
+          if (next.id !== prevProblemIdRef.current) {
+            useSketchStore.getState().resetForNewProblem();
+          }
+          prevProblemIdRef.current = next.id;
+          setActiveProblem(next.id, next.answerType);
+          useSketchStore.getState().setToolset(next.toolset);
+          useSketchStore.getState().setGraphStep(next.graphStep ?? 1);
+        } else {
+          prevProblemIdRef.current = null;
+          clearActiveProblem();
+          useSketchStore.getState().setToolset(null);
+        }
       })
       .catch((loadError: unknown) => {
         if (cancelled) return;
         setLoaded({ key: requestKey, problem: null });
+        prevProblemIdRef.current = null;
         clearActiveProblem();
+        useSketchStore.getState().setToolset(null);
         setError(loadError instanceof Error ? loadError.message : "Could not load a problem.");
       });
 
@@ -165,6 +196,13 @@ export function PracticePanel({
 
   // The tutor must not keep seeing a problem after the panel is gone.
   useEffect(() => clearActiveProblem, []);
+
+  // Leaving practice must not leave a stale toolset for whatever mounts next.
+  useEffect(() => {
+    return () => {
+      useSketchStore.getState().setToolset(null);
+    };
+  }, []);
 
   /**
    * `problem` is derived, not state, so this fires on both edges: a loaded
@@ -179,7 +217,13 @@ export function PracticePanel({
   async function submit() {
     if (!problem || submitting || outcome?.correct) return;
     const shape = problem;
-    if (answerIsEmpty(shape, answer)) {
+    // Graph problems have no answer input: the sketchpad's graph layer IS
+    // the answer, so "empty" means no objects were placed on it (spec §7.4).
+    const empty =
+      shape.answerType === "graph"
+        ? useSketchStore.getState().graphObjects.length === 0
+        : answerIsEmpty(shape, answer);
+    if (empty) {
       setError("Enter an answer first.");
       return;
     }
@@ -187,16 +231,28 @@ export function PracticePanel({
     setSubmitting(true);
     setError(null);
     try {
+      const sketchState = useSketchStore.getState();
+      const submittedAnswer =
+        problem.answerType === "graph"
+          ? JSON.stringify({
+              objects: sketchState.graphObjects.map(({ kind, dashed, points }) => ({ kind, dashed, points })),
+              shadedPoint: sketchState.graphShades[0]?.testPoint ?? null,
+            })
+          : serializeAnswer(shape, answer);
+      const typedLinesState = useSketchStore.getState().typedLines
+        .filter((line) => line.latex.trim().length > 0)
+        .map((line) => ({ latex: line.latex, plain: latexToPlain(line.latex) }));
       const response = await fetch(`/api/problems/${problem.id}/attempt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          submittedAnswer: serializeAnswer(shape, answer),
+          submittedAnswer,
           // Silently composited at submit time, skipped when the canvas is
           // untouched (docs/06 §4). The OCR blocks ride along so the
           // diagnostic can see the student's written work.
-          sketchPngBase64: snapshotSketch(),
+          sketchPngBase64: await snapshotSketch(),
           ocrBlocks: useSketchStore.getState().ocrBlocks,
+          typedLines: typedLinesState.length > 0 ? typedLinesState : null,
         }),
       });
       const payload = await response.json();
@@ -300,6 +356,11 @@ export function PracticePanel({
             Word problems only
           </span>
         )}
+        <CalculatorChip
+          active={calculatorOpen}
+          disabled={problem === null}
+          onToggle={onToggleCalculator}
+        />
         <DifficultySelector
           value={difficulty}
           counts={counts}
@@ -415,6 +476,7 @@ export function PracticePanel({
                 value={answer}
                 disabled={submitting || locked}
                 partResults={outcome && !outcome.correct ? outcome.parts : null}
+                toolset={problem.toolset}
                 onChange={onAnswerChange}
                 onSubmit={() => void submit()}
               />

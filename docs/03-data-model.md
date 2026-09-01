@@ -84,12 +84,16 @@ model Problem {
   answerJson  String   // {"type":"numeric","value":6,"unit":"miles","tolerance":0.01}
                        // or {"type":"expression","value":"30t = 12(t+1.5)"}
                        // or {"type":"multi","parts":[...]}
+                       // or {"type":"graph","graph":{step,objects,shadedPoint}}
   solutionMd  String
   difficulty  Int      // 1-5
   verified    Boolean  @default(false)
   wolframQuery String? // the computable core the generator emitted (docs/05 §4);
                        // null for legacy rows only
   verifiedBy   String? // "wolfram" or "llm" (docs/05 §4); null for legacy rows
+  palette     Json?    // validated palette symbol ids the generator declared for
+                       // this problem (practice tools spec); null means "use the
+                       // root default" (src/lib/practice/tools.ts)
   createdAt   DateTime @default(now())
 
   modelTags ProblemModelTag[]
@@ -116,6 +120,8 @@ model Attempt {
   correct         Boolean
   sketchPng       Bytes?           // composite snapshot at submit time, optional
   ocrTextJson     String?          // OCR blocks of the sketch if Clean up was used
+  typedLines      Json?            // ordered [{latex, plain}], null when the
+                                    // student typed nothing (practice tools spec §5)
 
   // diagnosis (wrong answers only)
   diagnosedDocId    String?
@@ -198,10 +204,12 @@ model PerspectiveDoc {
 - **`@@unique([topicId, depth])`**: this constraint IS the never-regenerate rule. A topic plus a level can exist exactly once, enforced in the database rather than in a route handler, so two concurrent generations cannot both win. Both generation routes read this as "return the existing document" rather than as an error.
 - **No `parentDocId`**: deliberate. With `@@unique([topicId, depth])` a topic holds exactly one chain, so the parent of level N is level N-1 of the same topic and is fully derivable from the two columns already present. An explicit parent column would be a second source of truth for a fact the constraint already fixes.
 - **`modelIndexJson`**: after saving a generated doc, parse its `## Model N - Title` headings into `[{number, title, anchor}]`. This is what lets diagnosis results deep-link to `#model-3` and lets problems display human-readable model tags without re-parsing markdown on every read.
-- **`answerJson` types**: `numeric` is the common case and is graded in code (mathjs, relative tolerance, default 1%). `expression` answers are normalized (whitespace, mathjs `simplify` where parseable) and fall back to a VERIFIER equivalence judgment. `multi` covers problems asking for two values (e.g., boat speed and current).
+- **`answerJson` types**: `numeric` is the common case and is graded in code (mathjs, relative tolerance, default 1%). `expression` answers are normalized (whitespace, mathjs `simplify` where parseable) and fall back to a VERIFIER equivalence judgment. `multi` covers problems asking for two values (e.g., boat speed and current). `graph` (practice tools spec §7.4) stores `{step, objects, shadedPoint}`: `step` is the world units per grid square, `objects` is `{kind, dashed, points}[]` in world coordinates (`kind` one of point, line, ray, segment, circle, parabola), and `shadedPoint` is a point inside the correct region or null. For a graph problem, `Attempt.submittedAnswer` departs from the plain string the other three types use: it is the student's drawn objects as JSON, `{objects, shadedPoint}` in that same shape, read from the sketch store's `graphObjects`/`graphShades` at submit time and graded by the same `graphCompare` (`src/lib/math/graphCompare.ts`) the verifier uses.
 - **`wolframQuery` / `verifiedBy`**: `wolframQuery` (String?) is the computable core of the problem emitted by the generator (docs/05 §4), used as the verification query. Null for legacy rows only; every new problem carries its best-attempt query even when Wolfram ends up not understanding it. `verifiedBy` (String?) is which engine confirmed the problem, `"wolfram"` or `"llm"`. Null for legacy rows.
+- **`Problem.palette`** (Json?): the validated symbol palette the generator declared for this problem, e.g. `["frac", "exponent", "sqrt"]`. Null means the problem predates the palette field or the generator's declaration failed validation; the client falls back to the served topic root's default palette (`src/lib/practice/tools.ts`). Json rather than a native array, per the no-native-arrays rule.
 - **`ComputationCache`**: successful Wolfram (query, result) pairs, keyed by a sha256 hash of the whitespace-normalized query. Consulted before any network call, so re-verification and repeat grading tiebreaks never spend quota.
 - **`sketchPng` as Bytes**: fine for a single user. If it bloats, move to file storage; the column becomes a path. Not a v1 concern.
+- **`Attempt.typedLines`** (Json?): the student's stacked Type-mode lines at submit time, ordered, shaped `[{latex, plain}]`. Null when the student typed nothing for that attempt (the common case for a purely handwritten or purely calculator/graph attempt). Fed into the diagnostic prompt alongside, and labeled separately from, the OCR transcription (docs/05 §5).
 - **`isExemplar`**: the seeded DRT doc is browsable like any other doc but excluded from deletion in the UI.
 - **No User table**: intentional. Adding one later means adding `userId` columns and backfilling a single user; the shape does not otherwise change.
 

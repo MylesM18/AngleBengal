@@ -22,6 +22,30 @@ import {
  */
 export const GRID_PX = 19;
 
+/** Stacked typed-line pitch: 2 grid squares (DECISIONS.md D-125). */
+export const TYPED_LINE_HEIGHT = 38;
+
+/** Origin of the real coordinate system: the paper's center snapped to the
+ *  nearest grid intersection (spec §7.1). */
+export function gridOrigin(cssWidth: number, cssHeight: number): { x: number; y: number } {
+  return {
+    x: Math.round(cssWidth / 2 / GRID_PX) * GRID_PX,
+    y: Math.round(cssHeight / 2 / GRID_PX) * GRID_PX,
+  };
+}
+
+/** Tick label spacing in world units: every unit once a unit spans at least
+ *  40px, else every 5 (DECISIONS.md D-126). */
+export function axisLabelInterval(step: number): number {
+  return GRID_PX / step >= 40 ? 1 : 5;
+}
+
+/** Set by GraphLayer while mounted, so the composite can read the live board
+ *  SVG and the shading canvas without a dependency cycle. */
+export const graphLayerSource: {
+  current: { svg: () => string | null; shadeCanvas: () => HTMLCanvasElement | null } | null;
+} = { current: null };
+
 /** Sets up a devicePixelRatio-aware backing store and returns the context. */
 export function prepareCanvas(
   canvas: HTMLCanvasElement,
@@ -46,6 +70,7 @@ export function paintBackground(
   background: Background,
   width: number,
   height: number,
+  axisLabels: { step: number } | null = null,
 ): void {
   context.clearRect(0, 0, width, height);
   context.fillStyle = "#F9F5EC"; // --paper-0
@@ -69,17 +94,42 @@ export function paintBackground(
   context.stroke();
 
   if (background === "graph") {
-    // Axes through the centre, no numeric labels (docs/06 §4).
+    // Axes through the origin the graph tools use, not the raw midpoint
+    // (spec §7.1).
     context.globalAlpha = 0.45;
     context.lineWidth = 1.5;
     context.beginPath();
-    const midX = Math.round(width / 2) + 0.5;
-    const midY = Math.round(height / 2) + 0.5;
+    const axesOrigin = gridOrigin(width, height);
+    const midX = axesOrigin.x + 0.5;
+    const midY = axesOrigin.y + 0.5;
     context.moveTo(midX, 0);
     context.lineTo(midX, height);
     context.moveTo(0, midY);
     context.lineTo(width, midY);
     context.stroke();
+
+    if (axisLabels) {
+      const origin = gridOrigin(width, height);
+      const interval = axisLabelInterval(axisLabels.step);
+      const pxPerUnit = GRID_PX / axisLabels.step;
+      context.globalAlpha = 0.7;
+      context.fillStyle = "#3D66A8";
+      context.font = '10px "IBM Plex Mono", ui-monospace, monospace';
+      context.textAlign = "center";
+      for (let unit = interval; origin.x + unit * pxPerUnit < width || origin.x - unit * pxPerUnit > 0; unit += interval) {
+        for (const sign of [1, -1]) {
+          const x = origin.x + sign * unit * pxPerUnit;
+          if (x > 0 && x < width) context.fillText(String(sign * unit), x, origin.y + 12);
+        }
+      }
+      context.textAlign = "right";
+      for (let unit = interval; origin.y + unit * pxPerUnit < height || origin.y - unit * pxPerUnit > 0; unit += interval) {
+        for (const sign of [1, -1]) {
+          const y = origin.y - sign * unit * pxPerUnit;
+          if (y > 0 && y < height) context.fillText(String(sign * unit), origin.x - 4, y + 3);
+        }
+      }
+    }
   }
 
   context.restore();
@@ -181,17 +231,46 @@ function distanceToSegmentSquared(
 }
 
 /**
- * Flattens background and ink into one PNG for OCR (docs/02 flow D).
- * Capped at 1600px wide, which is plenty for handwriting and keeps the
- * base64 payload reasonable.
+ * Typed lines composite as clean numbered monospace text (owner ruling, spec
+ * §5): rasterizing MathLive/KaTeX markup needs web fonts inside SVG
+ * foreignObjects or a new dependency, and the verbatim LaTeX already travels
+ * in the attempt payload, so the PNG stays a faithful dependency-free record.
  */
-export function compositeToPng(
+export function paintTypedLines(
+  context: CanvasRenderingContext2D,
+  lines: string[],
+): void {
+  context.save();
+  context.font = '15px "IBM Plex Mono", ui-monospace, monospace';
+  context.fillStyle = "#322921"; // --ink
+  context.textBaseline = "middle";
+  lines.forEach((line, index) => {
+    context.fillText(`${index + 1}. ${line}`, GRID_PX, GRID_PX + (index + 0.5) * TYPED_LINE_HEIGHT);
+  });
+  context.restore();
+}
+
+/**
+ * Flattens background, the graph layer, ink, and (optionally) typed lines
+ * into one PNG (docs/02 flow D). Capped at 1600px wide, which is plenty for
+ * handwriting and keeps the base64 payload reasonable. Each layer (shade
+ * canvas, graph SVG, ink, typed) is isolated in its own try/catch (spec §8):
+ * a failed layer logs and is skipped, and submission is never blocked by
+ * presentation machinery. Async because the graph layer's SVG rasterizes
+ * through an `Image`, which only resolves via a load/error/timeout callback.
+ */
+export async function compositeToPng(
   strokes: Stroke[],
   background: Background,
   cssWidth: number,
   cssHeight: number,
-  maxWidth = 1600,
-): string | null {
+  options: {
+    typedPlainLines?: string[];
+    maxWidth?: number;
+    axisLabels?: { step: number } | null;
+  } = {},
+): Promise<string | null> {
+  const { typedPlainLines = [], maxWidth = 1600, axisLabels = null } = options;
   if (cssWidth <= 0 || cssHeight <= 0) return null;
 
   const scale = Math.min(1, maxWidth / cssWidth) * (window.devicePixelRatio || 1);
@@ -203,8 +282,67 @@ export function compositeToPng(
   if (!context) return null;
   context.setTransform(scale, 0, 0, scale, 0, 0);
 
-  paintBackground(context, background, cssWidth, cssHeight);
-  for (const stroke of strokes) paintStroke(context, stroke);
+  paintBackground(context, background, cssWidth, cssHeight, axisLabels);
+
+  // Graph mode's shading and drawn objects sit between the background and
+  // the ink, so a student's pen marks always sit on top (registered by
+  // GraphLayer while mounted; null outside Graph mode or before it mounts).
+  const graphSource = graphLayerSource.current;
+  if (graphSource) {
+    try {
+      const shadeCanvas = graphSource.shadeCanvas();
+      if (shadeCanvas) context.drawImage(shadeCanvas, 0, 0, cssWidth, cssHeight);
+    } catch (error) {
+      console.error("composite: shade layer failed, continuing without it:", error);
+    }
+    try {
+      const svg = graphSource.svg();
+      if (svg) await drawSvgMarkup(context, svg, cssWidth, cssHeight);
+    } catch (error) {
+      console.error("composite: graph layer failed, continuing without it:", error);
+    }
+  }
+
+  try {
+    for (const stroke of strokes) paintStroke(context, stroke);
+  } catch (error) {
+    console.error("composite: ink layer failed, continuing without it:", error);
+  }
+  try {
+    if (typedPlainLines.length > 0) paintTypedLines(context, typedPlainLines);
+  } catch (error) {
+    console.error("composite: typed layer failed, continuing without it:", error);
+  }
 
   return canvas.toDataURL("image/png");
+}
+
+/**
+ * Rasterizes JSXGraph's board SVG (shapes and plain text only, so no
+ * web-font issue, spec §7.4) into the composite canvas via a data-URI Image.
+ * Always resolves, never rejects: a malformed SVG's `onerror`, or a load that
+ * never fires, both resolve through the 1500ms timeout rather than hanging or
+ * throwing, so a bad graph layer can never block submission (spec §8).
+ */
+function drawSvgMarkup(
+  context: CanvasRenderingContext2D,
+  markup: string,
+  width: number,
+  height: number,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+    const done = window.setTimeout(() => resolve(), 1500);
+    image.onload = () => {
+      window.clearTimeout(done);
+      context.drawImage(image, 0, 0, width, height);
+      resolve();
+    };
+    image.onerror = () => {
+      window.clearTimeout(done);
+      resolve();
+    };
+    image.src = url;
+  });
 }
