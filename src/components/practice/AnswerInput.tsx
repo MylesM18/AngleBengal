@@ -1,10 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import type { MathfieldElement } from "mathlive";
 
+import { MathField, useMathLive } from "@/components/math/MathField";
+import { SymbolPalette } from "@/components/math/SymbolPalette";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { cx } from "@/lib/cx";
+import { PALETTE_SYMBOLS } from "@/lib/practice/palette";
 import type { ProblemToolset } from "@/lib/practice/tools";
+import { latexToPlain } from "@/lib/sketch/latexToPlain";
 
 /**
  * The answer row, which adapts to the problem's answer type (docs/06 §3):
@@ -33,9 +38,14 @@ export type AnswerValue = { single: string; parts: Record<string, string> };
 
 export const emptyAnswer: AnswerValue = { single: "", parts: {} };
 
-/** Serializes to the form the attempt route grades. */
+/** Serializes to the form the attempt route grades. Expression answers are
+ *  authored as LaTeX (MathLive) and convert to plain text here (spec Q1); the
+ *  raw value is the fallback so submission is never blocked by conversion. */
 export function serializeAnswer(shape: AnswerShape, value: AnswerValue): string {
   if (shape.answerType === "multi") return JSON.stringify(value.parts);
+  if (shape.answerType === "expression") {
+    return latexToPlain(value.single) || value.single.trim();
+  }
   return value.single;
 }
 
@@ -50,6 +60,7 @@ export function AnswerInput({
   value,
   disabled,
   partResults,
+  toolset,
   onChange,
   onSubmit,
 }: {
@@ -124,6 +135,69 @@ export function AnswerInput({
 
   if (shape.answerType === "expression") {
     return (
+      <ExpressionAnswer
+        value={value}
+        disabled={disabled}
+        toolset={toolset ?? null}
+        onChange={onChange}
+        onSubmit={onSubmit}
+        onKeyDown={onKeyDown}
+      />
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <label htmlFor="answer-single" className="sr-only">
+        Your answer
+      </label>
+      <input
+        id="answer-single"
+        type="text"
+        inputMode="decimal"
+        disabled={disabled}
+        value={value.single}
+        onChange={(event) => onChange({ ...value, single: event.target.value })}
+        onKeyDown={onKeyDown}
+        placeholder="Your answer"
+        className="w-[180px] rounded-input border border-ink-faint bg-paper-0 px-3 py-2 text-ui text-ink placeholder:text-ink-faint disabled:opacity-60 max-lg:py-3"
+      />
+      {shape.unit && <span className="text-meta text-ink-soft">{shape.unit}</span>}
+    </div>
+  );
+}
+
+/**
+ * Expression input: MathLive plus the gated expr-tier palette when the chunk
+ * loads, the original plain input otherwise (spec §8: fallback keeps the
+ * submission path identical). Multi parts stay plain inputs: the multi schema
+ * is numeric-only, so there are no expression parts to upgrade.
+ */
+function ExpressionAnswer({
+  value,
+  disabled,
+  toolset,
+  onChange,
+  onSubmit,
+  onKeyDown,
+}: {
+  value: AnswerValue;
+  disabled: boolean;
+  toolset: ProblemToolset | null;
+  onChange: (value: AnswerValue) => void;
+  onSubmit: () => void;
+  onKeyDown: (event: React.KeyboardEvent) => void;
+}) {
+  const { status, retry } = useMathLive();
+  const fieldRef = useRef<MathfieldElement | null>(null);
+
+  const exprIds = useMemo(
+    () => (toolset?.palette ?? []).filter((id) => PALETTE_SYMBOLS[id].tier === "expr"),
+    [toolset],
+  );
+
+  if (status !== "ready") {
+    return (
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2">
           <label htmlFor="answer-single" className="sr-only">
@@ -145,27 +219,33 @@ export function AnswerInput({
             <MarkdownMath variant="ui">{`$${value.single}$`}</MarkdownMath>
           </div>
         )}
+        {status === "failed" && (
+          <p className="text-meta text-ink-soft">
+            Math input could not load, using plain typing.{" "}
+            <button type="button" onClick={retry} className="text-cobalt hover:underline">
+              Retry
+            </button>
+          </p>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <label htmlFor="answer-single" className="sr-only">
-        Your answer
-      </label>
-      <input
-        id="answer-single"
-        type="text"
-        inputMode="decimal"
-        disabled={disabled}
+    <div className="flex flex-col gap-1.5">
+      <MathField
         value={value.single}
-        onChange={(event) => onChange({ ...value, single: event.target.value })}
-        onKeyDown={onKeyDown}
-        placeholder="Your answer"
-        className="w-[180px] rounded-input border border-ink-faint bg-paper-0 px-3 py-2 text-ui text-ink placeholder:text-ink-faint disabled:opacity-60 max-lg:py-3"
+        onChange={(latex) => onChange({ ...value, single: latex })}
+        onEnter={onSubmit}
+        readOnly={disabled}
+        ariaLabel="Your answer"
+        mathfieldRef={fieldRef}
       />
-      {shape.unit && <span className="text-meta text-ink-soft">{shape.unit}</span>}
+      <SymbolPalette
+        ids={exprIds}
+        disabled={disabled}
+        onInsert={(insert) => fieldRef.current?.insert(insert)}
+      />
     </div>
   );
 }
