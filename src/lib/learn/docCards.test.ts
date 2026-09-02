@@ -127,4 +127,18 @@ describe("extractDocCards equation anchor (spec 3.1)", () => {
       cardIsEmpty({ modelNumber: 1, gistMd: null, anchor: null, watchFor: [] }),
     ).toBe(true);
   });
+
+  it("accepts a law line whose sentence punctuation is followed by a curly closing quote", () => {
+    const md = [
+      "## Model 1: T",
+      "",
+      "### The idea",
+      "",
+      "A plain gist paragraph.",
+      "",
+      'Then **The rule ends with a quoted word.”** in prose.',
+    ].join("\n");
+    const [card] = extractDocCards(md, [entry]);
+    expect(card.anchor).toEqual({ kind: "law", text: 'The rule ends with a quoted word.”' });
+  });
 });

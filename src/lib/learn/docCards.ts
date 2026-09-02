@@ -119,7 +119,7 @@ function pickEquation(lines: string[]): string | null {
 }
 
 /** Trailing straight or curly double quote after the sentence punctuation. */
-const LAW_END = /[.!?][""]?$/;
+const LAW_END = /[.!?]["”]?$/;
 
 /**
  * The law-line fallback (spec decision 8): first bold run of LAW_MIN..ANCHOR_MAX
