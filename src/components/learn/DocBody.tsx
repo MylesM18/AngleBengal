@@ -1,6 +1,9 @@
+import { ModelCard } from "@/components/learn/ModelCard";
 import { ModelHeading } from "@/components/learn/ModelHeading";
 import { MARKDOWN_VARIANT_CLASS, MarkdownMath } from "@/components/shared/MarkdownMath";
+import type { DocCardData } from "@/lib/learn/docCards";
 import { getRenderedDoc, type RenderedDoc } from "@/lib/learn/docHtml";
+import { seamPlan, type CheckpointAvailability } from "@/lib/learn/seamPlan";
 import { splitModelSections } from "@/lib/learn/splitModelSections";
 import type { ModelIndexEntry } from "@/lib/modelIndex";
 import type { AccentName } from "@/lib/topicColors";
@@ -13,6 +16,10 @@ export type DocBodyProps = {
   contentMd: string;
   models: ModelIndexEntry[];
   accent: AccentName;
+  /** From getDocCards, or null when extraction failed (spec 9.2: degrade to cardless). */
+  cards?: DocCardData[] | null;
+  /** From checkpointAvailability, or null when the query failed. Used from Task 6 on. */
+  availability?: CheckpointAvailability | null;
 };
 
 /**
@@ -25,7 +32,7 @@ export type DocBodyProps = {
  * markdown and ~267 KaTeX formulas were being re-parsed on every view, in SSR
  * and again at hydration. See D-120.
  */
-export async function DocBody({ docId, contentMd, models, accent }: DocBodyProps) {
+export async function DocBody({ docId, contentMd, models, accent, cards, availability }: DocBodyProps) {
   let rendered: RenderedDoc | null = null;
   try {
     rendered = await getRenderedDoc(docId, contentMd, models);
@@ -36,6 +43,9 @@ export async function DocBody({ docId, contentMd, models, accent }: DocBodyProps
   }
 
   const { preamble, sections } = toBodies(rendered, contentMd, models);
+  const seams = new Map(
+    seamPlan(models, cards ?? null, availability ?? null).map((seam) => [seam.modelNumber, seam]),
+  );
 
   return (
     <>
@@ -44,6 +54,9 @@ export async function DocBody({ docId, contentMd, models, accent }: DocBodyProps
       {sections.map((section, i) => (
         <section key={`${i}-${section.entry.anchor}`}>
           <ModelHeading entry={section.entry} accent={accent} flush={i === 0 && preamble === null} />
+          {seams.get(section.entry.number)?.card && (
+            <ModelCard card={seams.get(section.entry.number)!.card!} />
+          )}
           <Prose body={section.body} />
         </section>
       ))}

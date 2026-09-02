@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Sheet } from "@/components/ui/Sheet";
 import { modelMissCounts } from "@/lib/attempts";
 import { prisma } from "@/lib/db";
+import { getDocCards } from "@/lib/learn/docCards";
 import { parseDocTabs } from "@/lib/learn/docTabs";
 import { deserializeModelIndex } from "@/lib/modelIndex";
 import { getDescendantCounts, getTopicDetail } from "@/lib/topics";
@@ -75,13 +76,15 @@ export default async function TopicPage({
     const index = deserializeModelIndex(doc.modelIndexJson);
     // Independent reads, so they go together: awaiting them in turn cost two
     // round trips to the pooler before this page could render (D-117).
-    const [misses, lastAttempt] = await Promise.all([
+    const [misses, lastAttempt, cards] = await Promise.all([
       modelMissCounts(doc.id),
       prisma.attempt.findFirst({
         where: { problem: { topicId: topic.id } },
         orderBy: { createdAt: "desc" },
         select: { createdAt: true },
       }),
+      // Spec 9.2: an extractor failure renders the doc cardless, never broken.
+      getDocCards(doc.id, doc.contentMd, index).catch(() => null),
     ]);
     const lastPracticed = lastAttempt
       ? `Last practiced ${lastAttempt.createdAt.toLocaleDateString("en-US", {
@@ -139,6 +142,7 @@ export default async function TopicPage({
                     contentMd={doc.contentMd}
                     models={index}
                     accent={accent}
+                    cards={cards}
                   />
                 </CopyLinkToaster>
               </div>
