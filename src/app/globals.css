@@ -94,7 +94,7 @@
   --text-display--line-height: 1;
   --text-display--font-weight: 700;
 
-  /* motion budget (spec 1e): the only two keyframe animations in the app */
+  /* motion budget (spec 1e, D-131): the three keyframe animations in the app */
   --animate-enter-sheet: enter-sheet 200ms var(--ease-paper) both;
   --animate-cut-reveal: cut-reveal 200ms var(--ease-paper) both;
   --animate-cue-fade: cue-fade 180ms var(--ease-paper) both;
@@ -169,11 +169,6 @@ body {
 @media (min-width: 1024px) {
   html[data-focus] .focus-hide {
     display: none;
-  }
-  /* Entering focus, the reading sheet settles like paper (reuses the existing
-     motion budget keyframes; reduced motion flattens it globally below). */
-  html[data-focus] [data-focus-settle] {
-    animation: enter-sheet 200ms var(--ease-paper) both;
   }
 }
 
