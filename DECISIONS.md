@@ -2345,3 +2345,37 @@ surface shows a "+ line" action key running the same commit command. The
 variant swaps on field focus, guarded so same-surface refocus does not
 re-render the keyboard. A "+ line" label in the answer box would read as
 "add a line" but submit the attempt, so the split is deliberate.
+
+### D-130. Law-line anchors render at the nearest tokens, 22px serif semibold
+
+The spec asks for "about 21px, weight 600" on a model card's law line. The
+type scale has no 21px token and arbitrary values are banned (D-046), so the
+anchor uses text-h2 (22px) on the serif family with font-semibold. Recorded
+because the rendered size deliberately differs from the spec's prose by 1px.
+
+### D-131. The motion budget grows to three keyframes for the seam cue
+
+Spec 1e capped the app at two keyframe animations (enter-sheet, cut-reveal).
+The closure cue needs an opacity-only appearance (learn digestibility spec
+5.3), which neither existing keyframe provides without movement. cue-fade
+(180ms opacity) is added as the third. Scroll-settle reveals use transitions,
+not keyframes, so they do not grow the budget.
+
+### D-132. Focus mode toggles chrome instantly; the settle replay was dropped as a no-op
+
+The digestibility spec says focus enter and exit "follow the paper motion
+grammar". The planned settle rule re-declared the reading sheet's own
+enter-sheet animation under html[data-focus], but the sheet already carries
+that animation statically, so the resolved animation value never changes and
+no replay fires. The owner accepted the instant toggle (2026-09-02): the rule
+and the data-focus-settle marker are removed rather than shipped dead.
+Reduced-motion behavior is unchanged.
+
+### D-133. Reader tab state lifted to a page-level context, D-103 preserved
+
+The perspective rail lives in the page's right column, outside
+PerspectiveTabs, so the active tab moved from PerspectiveTabs local state to
+ReaderTabProvider directly inside the article. D-103's substance holds: the
+state is still local client state (never URL state), both panes stay mounted
+with the inactive one hidden, and an in-flight generation still survives tab
+switches. Only the owner of the useState moved.

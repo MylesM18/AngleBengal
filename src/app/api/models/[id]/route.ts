@@ -70,6 +70,7 @@ export async function DELETE(
     // Tags reference the doc, so they go first.
     await prisma.$transaction([
       prisma.problemModelTag.deleteMany({ where: { docId: id } }),
+      prisma.docReadProgress.deleteMany({ where: { docId: id } }),
       prisma.attempt.updateMany({
         where: { diagnosedDocId: id },
         data: { diagnosedDocId: null },
@@ -83,6 +84,10 @@ export async function DELETE(
     // tag exists precisely so it can be dropped. `expire: 0` because a deleted
     // document has no stale value worth serving.
     revalidateTag(`doc-html:${id}`, { expire: 0 });
+
+    // Same leak-vs-correctness reasoning for the doc-cards cache (Task 1,
+    // src/lib/learn/docCards.ts).
+    revalidateTag(`doc-cards:${id}`, { expire: 0 });
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {

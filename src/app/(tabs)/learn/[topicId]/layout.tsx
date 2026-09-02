@@ -23,7 +23,7 @@ export default async function TopicLayout({ children }: { children: React.ReactN
         as="aside"
         tone="paper-1"
         aria-label="Topics"
-        className="hidden h-full min-h-0 w-[320px] shrink-0 flex-col overflow-y-auto py-2 lg:flex"
+        className="focus-hide hidden h-full min-h-0 w-[320px] shrink-0 flex-col overflow-y-auto py-2 lg:flex"
       >
         <TopicRail topics={topics} />
       </Sheet>

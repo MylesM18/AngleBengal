@@ -94,9 +94,10 @@
   --text-display--line-height: 1;
   --text-display--font-weight: 700;
 
-  /* motion budget (spec 1e): the only two keyframe animations in the app */
+  /* motion budget (spec 1e, D-131): the three keyframe animations in the app */
   --animate-enter-sheet: enter-sheet 200ms var(--ease-paper) both;
   --animate-cut-reveal: cut-reveal 200ms var(--ease-paper) both;
+  --animate-cue-fade: cue-fade 180ms var(--ease-paper) both;
 
   @keyframes enter-sheet {
     from {
@@ -116,6 +117,15 @@
     }
     to {
       transform: none;
+      opacity: 1;
+    }
+  }
+
+  @keyframes cue-fade {
+    from {
+      opacity: 0;
+    }
+    to {
       opacity: 1;
     }
   }
@@ -149,6 +159,35 @@ body {
  */
 .stock-textured {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.2 0 0 0 0 0.16 0 0 0 0 0.13 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+/*
+ * Focus mode (learn digestibility spec 6). Desktop only: below lg the mobile
+ * layout is already minimal, and a stale stored preference must never strip
+ * chrome from a phone. The attribute is set by FocusToggle on <html>.
+ */
+@media (min-width: 1024px) {
+  html[data-focus] .focus-hide {
+    display: none;
+  }
+}
+
+/*
+ * Scroll-settle reveals (learn digestibility spec 7). Transitions, not
+ * keyframes: they run once per unit when is-revealed lands. The decorator
+ * marks nothing under prefers-reduced-motion, and the global reduced-motion
+ * rule below flattens these anyway.
+ */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.scroll-reveal.is-revealed {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 180ms var(--ease-paper),
+    transform 180ms var(--ease-paper);
 }
 
 /*

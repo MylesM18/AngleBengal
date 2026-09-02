@@ -5,19 +5,27 @@ import { CopyLinkToaster } from "@/components/learn/CopyLinkToaster";
 import { DocBody } from "@/components/learn/DocBody";
 import { DocCard } from "@/components/learn/DocCard";
 import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
+import { DocCompleteStrip, ReadProgressProvider } from "@/components/learn/DocProgress";
 import { DocTabStrip } from "@/components/learn/DocTabStrip";
+import { FocusToggle } from "@/components/learn/FocusToggle";
 import { GenerateMoreStudy } from "@/components/learn/GenerateMoreStudy";
 import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
 import { ModelMissList } from "@/components/learn/ModelMissList";
 import { PerspectiveTabs } from "@/components/learn/PerspectiveTabs";
+import { ReaderRail } from "@/components/learn/ReaderRail";
+import { ReaderTabProvider } from "@/components/learn/ReaderTabContext";
+import { RevealScope } from "@/components/learn/RevealScope";
 import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
 import { ButtonLink, buttonClasses } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Sheet } from "@/components/ui/Sheet";
 import { modelMissCounts } from "@/lib/attempts";
 import { prisma } from "@/lib/db";
+import { getDocCards } from "@/lib/learn/docCards";
 import { parseDocTabs } from "@/lib/learn/docTabs";
-import { deserializeModelIndex } from "@/lib/modelIndex";
+import { splitHeadingSections } from "@/lib/learn/splitHeadingSections";
+import { deserializeModelIndex, type ModelIndexEntry } from "@/lib/modelIndex";
+import { checkpointAvailability } from "@/lib/problems/serve";
 import { getDescendantCounts, getTopicDetail } from "@/lib/topics";
 import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
 
@@ -75,13 +83,28 @@ export default async function TopicPage({
     const index = deserializeModelIndex(doc.modelIndexJson);
     // Independent reads, so they go together: awaiting them in turn cost two
     // round trips to the pooler before this page could render (D-117).
-    const [misses, lastAttempt] = await Promise.all([
+    const [misses, lastAttempt, cards, availability, initialRead, perspectiveRead] = await Promise.all([
       modelMissCounts(doc.id),
       prisma.attempt.findFirst({
         where: { problem: { topicId: topic.id } },
         orderBy: { createdAt: "desc" },
         select: { createdAt: true },
       }),
+      // Spec 9.2: an extractor failure renders the doc cardless, never broken.
+      getDocCards(doc.id, doc.contentMd, index).catch(() => null),
+      checkpointAvailability(doc.id).catch(() => null),
+      // Spec 9.2: a failed read renders everything unread rather than blocking.
+      prisma.docReadProgress
+        .findMany({ where: { docId: doc.id }, select: { modelNumber: true } })
+        .then((rows) => rows.map((row) => row.modelNumber))
+        .catch(() => [] as number[]),
+      // Same degrade-to-unread rule, keyed by topic rather than doc (spec 8).
+      topic.perspective
+        ? prisma.perspectiveReadProgress
+            .findMany({ where: { topicId: topic.id }, select: { sectionIndex: true } })
+            .then((rows) => rows.map((row) => row.sectionIndex))
+            .catch(() => [] as number[])
+        : Promise.resolve([] as number[]),
     ]);
     const lastPracticed = lastAttempt
       ? `Last practiced ${lastAttempt.createdAt.toLocaleDateString("en-US", {
@@ -96,14 +119,38 @@ export default async function TopicPage({
       .map((entry) => ({ id: entry.id, depth: entry.depth, isExemplar: entry.isExemplar }))
       .sort((a, b) => openIds.indexOf(a.id) - openIds.indexOf(b.id));
 
-    return (
-      <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10">
+    // Server-built so both the pane's seams and the rail (Task 15) key off
+    // the same section numbering without re-parsing the markdown twice.
+    const perspectiveEntries: ModelIndexEntry[] = topic.perspective
+      ? splitHeadingSections(topic.perspective.contentMd).sections.map((section, i) => ({
+          number: i + 1,
+          title: section.title,
+          anchor: `perspective-${i + 1}`,
+        }))
+      : [];
+
+    // The existing doc-surface reader, unchanged (Task 13): both columns,
+    // nested under the doc's own ReadProgressProvider. Held as a const so it
+    // can be reused verbatim whether or not the perspective surface wraps it.
+    const docScoped = (
+      <ReadProgressProvider
+        key="doc"
+        surface="doc"
+        entries={index}
+        initialRead={initialRead}
+        write={{ url: `/api/models/${doc.id}/progress`, key: "modelNumber" }}
+        cueNoun="Model"
+        finalCue="All models read"
+      >
         <div className="min-w-0 max-w-[68ch] flex-1">
-          <div className="mb-4 flex items-center justify-between gap-4 [&>nav]:mb-0">
+          <div className="focus-hide mb-4 flex items-center justify-between gap-4 [&>nav]:mb-0">
             <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={topic.docCount > 1} />
-            <ButtonLink href={`/learn/${topic.id}/history`} variant="tertiary" size="sm">
-              History
-            </ButtonLink>
+            <span className="flex items-center gap-2">
+              <FocusToggle />
+              <ButtonLink href={`/learn/${topic.id}/history`} variant="tertiary" size="sm">
+                History
+              </ButtonLink>
+            </span>
           </div>
 
           <Sheet tone="paper-0" className="animate-enter-sheet overflow-hidden">
@@ -112,7 +159,9 @@ export default async function TopicPage({
               perspective={topic.perspective ? { contentMd: topic.perspective.contentMd } : null}
               autoFire={search.new === "1" && !topic.perspective}
             >
-              <DocTabStrip topicId={topic.id} tabs={tabLabels} activeId={doc.id} />
+              <div className="focus-hide">
+                <DocTabStrip topicId={topic.id} tabs={tabLabels} activeId={doc.id} />
+              </div>
 
               <h1 className="display-cut px-4 pb-5 pt-6 text-h1 text-ink sm:px-8 sm:pt-8">{doc.title}</h1>
 
@@ -132,15 +181,20 @@ export default async function TopicPage({
               </div>
 
               <div className="px-4 py-6 sm:px-8 sm:py-8">
-                <ModelMissList misses={misses} />
-                <CopyLinkToaster>
-                  <DocBody
-                    docId={doc.id}
-                    contentMd={doc.contentMd}
-                    models={index}
-                    accent={accent}
-                  />
-                </CopyLinkToaster>
+                <RevealScope replayKey={doc.id}>
+                  <ModelMissList misses={misses} />
+                  <CopyLinkToaster>
+                    <DocBody
+                      docId={doc.id}
+                      contentMd={doc.contentMd}
+                      models={index}
+                      accent={accent}
+                      cards={cards}
+                      availability={availability}
+                    />
+                  </CopyLinkToaster>
+                  <DocCompleteStrip topicId={topic.id} />
+                </RevealScope>
               </div>
             </PerspectiveTabs>
           </Sheet>
@@ -149,8 +203,47 @@ export default async function TopicPage({
         {/* `xl`, not `lg`: at the lg edge the 320px topic rail and this 210px
             column both appeared and left the reading measure at 374px. See D-061. */}
         <div className="hidden xl:block">
-          <DocMiniTOC entries={index} accent={accent} />
+          <ReaderRail
+            models={<DocMiniTOC entries={index} accent={accent} />}
+            perspective={
+              perspectiveEntries.length > 0 ? (
+                <DocMiniTOC
+                  entries={perspectiveEntries}
+                  accent={accent}
+                  label="Sections"
+                  ariaLabel="Sections in this perspective"
+                  progressSurface="perspective"
+                />
+              ) : null
+            }
+          />
         </div>
+      </ReadProgressProvider>
+    );
+
+    return (
+      <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10">
+        <ReaderTabProvider hasPerspective={Boolean(topic.perspective)}>
+          {/* Keyed: without a stable key, a generation's router.refresh() flips this
+              branch at the same tree position and React reuses the doc provider's
+              fiber as the perspective one, relabeling already-read model numbers as
+              read perspective sections. Distinct keys force a clean remount instead. */}
+          {topic.perspective ? (
+            <ReadProgressProvider
+              key="perspective"
+              surface="perspective"
+              entries={perspectiveEntries}
+              initialRead={perspectiveRead}
+              write={{ url: `/api/topics/${topic.id}/perspective-progress`, key: "sectionIndex" }}
+              cueNoun="Section"
+              finalCue="Perspective read"
+            >
+              {docScoped}
+            </ReadProgressProvider>
+          ) : (
+            docScoped
+          )}
+        </ReaderTabProvider>
       </article>
     );
   }

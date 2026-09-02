@@ -62,6 +62,7 @@ model Topic {
   modelDocs MentalModelDoc[]
   problems  Problem[]
   perspectiveDoc PerspectiveDoc?
+  perspectiveReadProgress PerspectiveReadProgress[]
 
   @@unique([parentId, name])
 }
@@ -83,6 +84,7 @@ model MentalModelDoc {
 
   problemTags       ProblemModelTag[]
   diagnosedAttempts Attempt[]
+  readProgress      DocReadProgress[]
 
   /// THE rule "never regenerate a topic+depth that already exists", enforced in
   /// the database so two concurrent generations cannot both win (spec §3).
@@ -99,6 +101,33 @@ model PerspectiveDoc {
   topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
   contentMd String
   createdAt DateTime @default(now())
+}
+
+/// Reading progress for the Learn digestibility patterns (spec 5.2): one row
+/// per (doc, model) the reader has scrolled through. Checkmarks derive from
+/// reading alone, never from checkpoint attempts (spec decision 3); the table
+/// exists so checkmarks follow the owner across devices (spec decision 10).
+model DocReadProgress {
+  docId       String
+  doc         MentalModelDoc @relation(fields: [docId], references: [id])
+  modelNumber Int
+  readAt      DateTime       @default(now())
+
+  @@id([docId, modelNumber])
+}
+
+/// Phase-two sibling of DocReadProgress (spec 8): one row per perspective
+/// narrative section the reader has scrolled through. sectionIndex is 1-based.
+/// If a regeneration path for perspectives is ever added, it must delete these
+/// rows in the same transaction: the indexes would otherwise point at the
+/// wrong sections.
+model PerspectiveReadProgress {
+  topicId      String
+  topic        Topic    @relation(fields: [topicId], references: [id])
+  sectionIndex Int
+  readAt       DateTime @default(now())
+
+  @@id([topicId, sectionIndex])
 }
 
 model Problem {

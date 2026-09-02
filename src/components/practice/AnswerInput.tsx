@@ -8,9 +8,18 @@ import { SymbolPalette } from "@/components/math/SymbolPalette";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { useJsxGraph } from "@/components/sketchpad/GraphLayer";
 import { cx } from "@/lib/cx";
+import {
+  answerIsEmpty,
+  emptyAnswer,
+  serializeAnswer,
+  type AnswerShape,
+  type AnswerValue,
+} from "@/lib/practice/answerValue";
 import { PALETTE_SYMBOLS } from "@/lib/practice/palette";
 import type { ProblemToolset } from "@/lib/practice/tools";
-import { latexToPlain } from "@/lib/sketch/latexToPlain";
+
+export { answerIsEmpty, emptyAnswer, serializeAnswer };
+export type { AnswerShape, AnswerValue };
 
 /**
  * The answer row, which adapts to the problem's answer type (docs/06 §3):
@@ -28,34 +37,6 @@ import { latexToPlain } from "@/lib/sketch/latexToPlain";
  * (acceptance criterion 2), so the padding grows on compact only and `lg` and
  * up keeps today's exact box.
  */
-
-export type AnswerShape = {
-  answerType: "numeric" | "expression" | "multi" | "graph";
-  unit: string | null;
-  parts: { name: string; label: string; unit: string | null }[] | null;
-  graphStep: number | null;
-};
-
-export type AnswerValue = { single: string; parts: Record<string, string> };
-
-export const emptyAnswer: AnswerValue = { single: "", parts: {} };
-
-/** Serializes to the form the attempt route grades. Expression answers are
- *  authored as LaTeX (MathLive) and convert to plain text here (spec Q1); the
- *  raw value is the fallback so submission is never blocked by conversion. */
-export function serializeAnswer(shape: AnswerShape, value: AnswerValue): string {
-  if (shape.answerType === "multi") return JSON.stringify(value.parts);
-  if (shape.answerType === "expression") {
-    return latexToPlain(value.single) || value.single.trim();
-  }
-  return value.single;
-}
-
-export function answerIsEmpty(shape: AnswerShape, value: AnswerValue): boolean {
-  if (shape.answerType !== "multi") return value.single.trim().length === 0;
-  const parts = shape.parts ?? [];
-  return parts.some((part) => !(value.parts[part.name] ?? "").trim());
-}
 
 export function AnswerInput({
   shape,

@@ -26,7 +26,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh flex-col">
-      <TopBar chatOpen={chatOpen} onToggleChat={toggleChat} tutorRef={tutorRef} />
+      <div className="focus-hide">
+        <TopBar chatOpen={chatOpen} onToggleChat={toggleChat} tutorRef={tutorRef} />
+      </div>
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
