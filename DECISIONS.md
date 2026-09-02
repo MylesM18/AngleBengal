@@ -2370,3 +2370,12 @@ that animation statically, so the resolved animation value never changes and
 no replay fires. The owner accepted the instant toggle (2026-09-02): the rule
 and the data-focus-settle marker are removed rather than shipped dead.
 Reduced-motion behavior is unchanged.
+
+### D-133. Reader tab state lifted to a page-level context, D-103 preserved
+
+The perspective rail lives in the page's right column, outside
+PerspectiveTabs, so the active tab moved from PerspectiveTabs local state to
+ReaderTabProvider directly inside the article. D-103's substance holds: the
+state is still local client state (never URL state), both panes stay mounted
+with the inactive one hidden, and an in-flight generation still survives tab
+switches. Only the owner of the useState moved.
