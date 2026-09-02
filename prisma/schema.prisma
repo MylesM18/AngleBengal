@@ -83,6 +83,7 @@ model MentalModelDoc {
 
   problemTags       ProblemModelTag[]
   diagnosedAttempts Attempt[]
+  readProgress      DocReadProgress[]
 
   /// THE rule "never regenerate a topic+depth that already exists", enforced in
   /// the database so two concurrent generations cannot both win (spec §3).
@@ -99,6 +100,19 @@ model PerspectiveDoc {
   topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
   contentMd String
   createdAt DateTime @default(now())
+}
+
+/// Reading progress for the Learn digestibility patterns (spec 5.2): one row
+/// per (doc, model) the reader has scrolled through. Checkmarks derive from
+/// reading alone, never from checkpoint attempts (spec decision 3); the table
+/// exists so checkmarks follow the owner across devices (spec decision 10).
+model DocReadProgress {
+  docId       String
+  doc         MentalModelDoc @relation(fields: [docId], references: [id])
+  modelNumber Int
+  readAt      DateTime       @default(now())
+
+  @@id([docId, modelNumber])
 }
 
 model Problem {
