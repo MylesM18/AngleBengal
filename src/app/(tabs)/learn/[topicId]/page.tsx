@@ -12,6 +12,7 @@ import { GenerateMoreStudy } from "@/components/learn/GenerateMoreStudy";
 import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
 import { ModelMissList } from "@/components/learn/ModelMissList";
 import { PerspectiveTabs } from "@/components/learn/PerspectiveTabs";
+import { RevealScope } from "@/components/learn/RevealScope";
 import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
 import { ButtonLink, buttonClasses } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -150,18 +151,20 @@ export default async function TopicPage({
               </div>
 
               <div className="px-4 py-6 sm:px-8 sm:py-8">
-                <ModelMissList misses={misses} />
-                <CopyLinkToaster>
-                  <DocBody
-                    docId={doc.id}
-                    contentMd={doc.contentMd}
-                    models={index}
-                    accent={accent}
-                    cards={cards}
-                    availability={availability}
-                  />
-                </CopyLinkToaster>
-                <DocCompleteStrip topicId={topic.id} />
+                <RevealScope replayKey={doc.id}>
+                  <ModelMissList misses={misses} />
+                  <CopyLinkToaster>
+                    <DocBody
+                      docId={doc.id}
+                      contentMd={doc.contentMd}
+                      models={index}
+                      accent={accent}
+                      cards={cards}
+                      availability={availability}
+                    />
+                  </CopyLinkToaster>
+                  <DocCompleteStrip topicId={topic.id} />
+                </RevealScope>
               </div>
             </PerspectiveTabs>
           </Sheet>

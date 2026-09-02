@@ -178,6 +178,24 @@ body {
 }
 
 /*
+ * Scroll-settle reveals (learn digestibility spec 7). Transitions, not
+ * keyframes: they run once per unit when is-revealed lands. The decorator
+ * marks nothing under prefers-reduced-motion, and the global reduced-motion
+ * rule below flattens these anyway.
+ */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.scroll-reveal.is-revealed {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 180ms var(--ease-paper),
+    transform 180ms var(--ease-paper);
+}
+
+/*
  * Mobile utilities (mobile spec §7). Safe-area padding for edge chrome, and
  * a visually inert 44px hit-area extension: the ::after overlay grows the
  * touch target without changing a single rendered pixel.
