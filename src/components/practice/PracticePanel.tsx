@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { snapshotSketch } from "@/components/sketchpad/Sketchpad";
+import { BackButton } from "@/components/ui/BackButton";
 import { BaseBand } from "@/components/ui/BaseBand";
 import { Button } from "@/components/ui/Button";
 import { chipClasses } from "@/components/ui/Chip";
@@ -346,6 +347,7 @@ export function PracticePanel({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline bg-paper-1 px-4 py-2.5">
+        <BackButton fallbackHref="/practice" />
         <p className="min-w-0 flex-1 truncate text-meta text-ink">{topicPath.join("  ›  ")}</p>
         {wordProblemsOnly && (
           /* A meta chip's look, hand-written rather than `chipClasses`, because

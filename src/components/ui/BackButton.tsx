@@ -9,14 +9,15 @@ import { Icon } from "@/components/ui/Icon";
  * Returns the reader to wherever they came from (practice, a diagnosis link,
  * the Learn index), which the breadcrumb cannot do: it only walks up the
  * topic tree. A fresh tab or a shared deep link has no history to go back
- * to, so the button falls back to the Learn index rather than dead-ending.
+ * to, so the button falls back to the surface's index rather than
+ * dead-ending: /learn by default, /practice on the practice panel.
  */
-export function BackButton() {
+export function BackButton({ fallbackHref = "/learn" }: { fallbackHref?: string }) {
   const router = useRouter();
 
   const goBack = () => {
     if (window.history.length > 1) router.back();
-    else router.push("/learn");
+    else router.push(fallbackHref);
   };
 
   return (
