@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { useDocProgressOptional } from "@/components/learn/DocProgress";
+import { useReadProgress } from "@/components/learn/DocProgress";
 import { cx } from "@/lib/cx";
 import { findScrollport } from "@/lib/learn/scrollport";
 import type { ModelIndexEntry } from "@/lib/modelIndex";
@@ -48,13 +48,19 @@ const OBSERVER_MARGIN = 96;
 export function DocMiniTOC({
   entries,
   accent,
+  label = "Models",
+  ariaLabel = "Models in this document",
+  progressSurface = "doc",
 }: {
   entries: ModelIndexEntry[];
   accent: AccentName;
+  label?: string;
+  ariaLabel?: string;
+  progressSurface?: string;
 }) {
   const [activeAnchor, setActiveAnchor] = useState<string | null>(null);
   const anchorKey = entries.map((entry) => entry.anchor).join("|");
-  const progress = useDocProgressOptional();
+  const progress = useReadProgress(progressSurface);
 
   useEffect(() => {
     const anchors = anchorKey.length > 0 ? anchorKey.split("|") : [];
@@ -105,9 +111,9 @@ export function DocMiniTOC({
   if (entries.length === 0) return null;
 
   return (
-    <nav aria-label="Models in this document" className="sticky top-6 w-[210px] shrink-0">
+    <nav aria-label={ariaLabel} className="sticky top-6 w-[210px] shrink-0">
       <p className="mb-2 flex items-baseline gap-2">
-        <span className="meta-caps text-ink-soft">Models</span>
+        <span className="meta-caps text-ink-soft">{label}</span>
         {progress && (
           <span className="text-meta text-ink-soft">
             {entries.filter((entry) => progress.readSet.has(entry.number)).length} of {entries.length} read

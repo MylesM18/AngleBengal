@@ -5,13 +5,14 @@ import { CopyLinkToaster } from "@/components/learn/CopyLinkToaster";
 import { DocBody } from "@/components/learn/DocBody";
 import { DocCard } from "@/components/learn/DocCard";
 import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
-import { DocCompleteStrip, DocProgressProvider } from "@/components/learn/DocProgress";
+import { DocCompleteStrip, ReadProgressProvider } from "@/components/learn/DocProgress";
 import { DocTabStrip } from "@/components/learn/DocTabStrip";
 import { FocusToggle } from "@/components/learn/FocusToggle";
 import { GenerateMoreStudy } from "@/components/learn/GenerateMoreStudy";
 import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
 import { ModelMissList } from "@/components/learn/ModelMissList";
 import { PerspectiveTabs } from "@/components/learn/PerspectiveTabs";
+import { ReaderTabProvider } from "@/components/learn/ReaderTabContext";
 import { RevealScope } from "@/components/learn/RevealScope";
 import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
 import { ButtonLink, buttonClasses } from "@/components/ui/Button";
@@ -111,7 +112,15 @@ export default async function TopicPage({
 
     return (
       <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10">
-        <DocProgressProvider docId={doc.id} entries={index} initialRead={initialRead}>
+        <ReaderTabProvider hasPerspective={Boolean(topic.perspective)}>
+        <ReadProgressProvider
+          surface="doc"
+          entries={index}
+          initialRead={initialRead}
+          write={{ url: `/api/models/${doc.id}/progress`, key: "modelNumber" }}
+          cueNoun="Model"
+          finalCue="All models read"
+        >
         <div className="min-w-0 max-w-[68ch] flex-1">
           <div className="focus-hide mb-4 flex items-center justify-between gap-4 [&>nav]:mb-0">
             <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={topic.docCount > 1} />
@@ -175,7 +184,8 @@ export default async function TopicPage({
         <div className="hidden xl:block">
           <DocMiniTOC entries={index} accent={accent} />
         </div>
-        </DocProgressProvider>
+        </ReadProgressProvider>
+        </ReaderTabProvider>
       </article>
     );
   }

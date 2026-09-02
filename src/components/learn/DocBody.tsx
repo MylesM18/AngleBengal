@@ -67,7 +67,7 @@ export async function DocBody({ docId, contentMd, models, accent, cards, availab
               unsolved={seams.get(section.entry.number)!.checkpoint!.unsolved}
             />
           )}
-          <SectionSeam modelNumber={section.entry.number} />
+          <SectionSeam number={section.entry.number} />
         </section>
       ))}
     </>

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-
 import { PerspectivePane } from "@/components/learn/PerspectivePane";
+import { useReaderTab, type ReaderTabName } from "@/components/learn/ReaderTabContext";
 import { cx } from "@/lib/cx";
 
 export type PerspectiveTabsProps = {
@@ -14,8 +13,6 @@ export type PerspectiveTabsProps = {
   children: React.ReactNode;
 };
 
-type TabName = "perspective" | "models";
-
 /**
  * The reader's top-level Perspective | Models control (perspective spec §9).
  *
@@ -26,11 +23,9 @@ type TabName = "perspective" | "models";
  * sits on the Models tab, then render on completion without a reload.
  */
 export function PerspectiveTabs({ topicId, perspective, autoFire, children }: PerspectiveTabsProps) {
-  // Default per spec §9: Perspective when the doc exists, Models when it
-  // does not. The just-created flow lands on Models by that same rule.
-  const [active, setActive] = useState<TabName>(perspective ? "perspective" : "models");
+  const { active, setActive } = useReaderTab();
 
-  const tab = (name: TabName, label: string) => (
+  const tab = (name: ReaderTabName, label: string) => (
     <button
       type="button"
       role="tab"
