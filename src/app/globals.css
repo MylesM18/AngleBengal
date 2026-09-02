@@ -152,6 +152,22 @@ body {
 }
 
 /*
+ * Focus mode (learn digestibility spec 6). Desktop only: below lg the mobile
+ * layout is already minimal, and a stale stored preference must never strip
+ * chrome from a phone. The attribute is set by FocusToggle on <html>.
+ */
+@media (min-width: 1024px) {
+  html[data-focus] .focus-hide {
+    display: none;
+  }
+  /* Entering focus, the reading sheet settles like paper (reuses the existing
+     motion budget keyframes; reduced motion flattens it globally below). */
+  html[data-focus] [data-focus-settle] {
+    animation: enter-sheet 200ms var(--ease-paper) both;
+  }
+}
+
+/*
  * Mobile utilities (mobile spec §7). Safe-area padding for edge chrome, and
  * a visually inert 44px hit-area extension: the ::after overlay grows the
  * touch target without changing a single rendered pixel.

@@ -54,7 +54,7 @@ export function PerspectiveTabs({ topicId, perspective, autoFire, children }: Pe
       <div
         role="tablist"
         aria-label="Perspective and models"
-        className="stock-textured flex items-stretch gap-1 overflow-x-auto border-b border-hairline bg-kraft px-2 pt-2"
+        className="focus-hide stock-textured flex items-stretch gap-1 overflow-x-auto border-b border-hairline bg-kraft px-2 pt-2"
       >
         {tab("perspective", "Perspective")}
         {tab("models", "Models")}

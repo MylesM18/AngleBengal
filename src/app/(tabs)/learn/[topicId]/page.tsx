@@ -6,6 +6,7 @@ import { DocBody } from "@/components/learn/DocBody";
 import { DocCard } from "@/components/learn/DocCard";
 import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
 import { DocTabStrip } from "@/components/learn/DocTabStrip";
+import { FocusToggle } from "@/components/learn/FocusToggle";
 import { GenerateMoreStudy } from "@/components/learn/GenerateMoreStudy";
 import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
 import { ModelMissList } from "@/components/learn/ModelMissList";
@@ -102,20 +103,25 @@ export default async function TopicPage({
     return (
       <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10">
         <div className="min-w-0 max-w-[68ch] flex-1">
-          <div className="mb-4 flex items-center justify-between gap-4 [&>nav]:mb-0">
+          <div className="focus-hide mb-4 flex items-center justify-between gap-4 [&>nav]:mb-0">
             <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={topic.docCount > 1} />
-            <ButtonLink href={`/learn/${topic.id}/history`} variant="tertiary" size="sm">
-              History
-            </ButtonLink>
+            <span className="flex items-center gap-2">
+              <FocusToggle />
+              <ButtonLink href={`/learn/${topic.id}/history`} variant="tertiary" size="sm">
+                History
+              </ButtonLink>
+            </span>
           </div>
 
-          <Sheet tone="paper-0" className="animate-enter-sheet overflow-hidden">
+          <Sheet tone="paper-0" className="animate-enter-sheet overflow-hidden" data-focus-settle>
             <PerspectiveTabs
               topicId={topic.id}
               perspective={topic.perspective ? { contentMd: topic.perspective.contentMd } : null}
               autoFire={search.new === "1" && !topic.perspective}
             >
-              <DocTabStrip topicId={topic.id} tabs={tabLabels} activeId={doc.id} />
+              <div className="focus-hide">
+                <DocTabStrip topicId={topic.id} tabs={tabLabels} activeId={doc.id} />
+              </div>
 
               <h1 className="display-cut px-4 pb-5 pt-6 text-h1 text-ink sm:px-8 sm:pt-8">{doc.title}</h1>
 
