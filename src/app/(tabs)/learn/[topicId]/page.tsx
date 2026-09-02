@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 
-import { BackButton } from "@/components/learn/BackButton";
 import { Breadcrumb } from "@/components/learn/Breadcrumb";
 import { CopyLinkToaster } from "@/components/learn/CopyLinkToaster";
 import { DocBody } from "@/components/learn/DocBody";
@@ -17,6 +16,7 @@ import { ReaderRail } from "@/components/learn/ReaderRail";
 import { ReaderTabProvider } from "@/components/learn/ReaderTabContext";
 import { RevealScope } from "@/components/learn/RevealScope";
 import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
+import { BackButton } from "@/components/ui/BackButton";
 import { ButtonLink, buttonClasses } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Sheet } from "@/components/ui/Sheet";
