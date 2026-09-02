@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
+import type { CheckpointAvailability } from "@/lib/learn/seamPlan";
 import { answerShapeFor, parseAnswer } from "@/lib/math/answer";
 import { resolveToolset, sanitizePalette, type ProblemToolset } from "@/lib/practice/tools";
 import { getTopicPath } from "@/lib/topics";
@@ -143,4 +144,126 @@ function titleFor(modelIndexJson: string, modelNumber: number): string {
   } catch {
     return `Model ${modelNumber}`;
   }
+}
+
+export type CheckpointProblem = ServedProblem & {
+  /** True when every eligible problem for this model already has a correct attempt. */
+  previouslySolved: boolean;
+};
+
+/**
+ * Per-model verified problem counts for one doc (learn digestibility spec 4.1),
+ * excluding graph-answer problems because Learn has no sketchpad. Runs on every
+ * doc page render, so the select stays lean: ids, answer shapes, tag numbers.
+ */
+export async function checkpointAvailability(docId: string): Promise<CheckpointAvailability> {
+  const rows = await prisma.problem.findMany({
+    where: { verified: true, modelTags: { some: { docId } } },
+    select: {
+      id: true,
+      answerJson: true,
+      modelTags: { where: { docId }, select: { modelNumber: true } },
+    },
+  });
+
+  const eligible = rows.filter((row) => {
+    const answer = parseAnswer(row.answerJson);
+    return answer !== null && answerShapeFor(answer).answerType !== "graph";
+  });
+  if (eligible.length === 0) return {};
+
+  const solvedIds = new Set(
+    (
+      await prisma.attempt.findMany({
+        where: { correct: true, problemId: { in: eligible.map((row) => row.id) } },
+        select: { problemId: true },
+        distinct: ["problemId"],
+      })
+    ).map((attempt) => attempt.problemId),
+  );
+
+  const availability: CheckpointAvailability = {};
+  for (const row of eligible) {
+    for (const tag of row.modelTags) {
+      const slot = (availability[tag.modelNumber] ??= { total: 0, unsolved: 0 });
+      slot.total += 1;
+      if (!solvedIds.has(row.id)) slot.unsolved += 1;
+    }
+  }
+  return availability;
+}
+
+/**
+ * One problem for a checkpoint (spec 4.1): verified, tagged to (docId,
+ * modelNumber), non-graph; prefer problems without a correct attempt, lowest
+ * difficulty first, random among ties; when everything is solved, serve a
+ * random solved one flagged previouslySolved.
+ */
+export async function problemForModel(
+  docId: string,
+  modelNumber: number,
+): Promise<CheckpointProblem | null> {
+  const rows = await prisma.problem.findMany({
+    where: { verified: true, modelTags: { some: { docId, modelNumber } } },
+    select: {
+      id: true,
+      statementMd: true,
+      difficulty: true,
+      answerJson: true,
+      palette: true,
+      modelTags: {
+        select: {
+          docId: true,
+          modelNumber: true,
+          doc: { select: { modelIndexJson: true, topicId: true } },
+        },
+      },
+    },
+  });
+
+  const candidates = rows.flatMap((row) => {
+    const answer = parseAnswer(row.answerJson);
+    if (!answer) return [];
+    const shape = answerShapeFor(answer);
+    return shape.answerType === "graph" ? [] : [{ row, shape }];
+  });
+  if (candidates.length === 0) return null;
+
+  const solvedIds = new Set(
+    (
+      await prisma.attempt.findMany({
+        where: { correct: true, problemId: { in: candidates.map((c) => c.row.id) } },
+        select: { problemId: true },
+        distinct: ["problemId"],
+      })
+    ).map((attempt) => attempt.problemId),
+  );
+
+  const unsolved = candidates.filter((c) => !solvedIds.has(c.row.id));
+  const pool = unsolved.length > 0 ? unsolved : candidates;
+  const minDifficulty = Math.min(...pool.map((c) => c.row.difficulty));
+  const easiest = pool.filter((c) => c.row.difficulty === minDifficulty);
+  const chosen = easiest[Math.floor(Math.random() * easiest.length)];
+
+  const topicId = chosen.row.modelTags[0]?.doc.topicId ?? "";
+  const topicPath = topicId ? await getTopicPath(topicId) : [];
+  const rootName = topicPath[0] ?? "";
+
+  return {
+    id: chosen.row.id,
+    statementMd: chosen.row.statementMd,
+    difficulty: chosen.row.difficulty,
+    answerType: chosen.shape.answerType,
+    unit: chosen.shape.unit,
+    parts: chosen.shape.parts,
+    graphStep: chosen.shape.graphStep,
+    modelTags: chosen.row.modelTags.map((tag) => ({
+      docId: tag.docId,
+      modelNumber: tag.modelNumber,
+      topicId: tag.doc.topicId,
+      title: titleFor(tag.doc.modelIndexJson, tag.modelNumber),
+    })),
+    toolset: resolveToolset(rootName, sanitizePalette(chosen.row.palette)),
+    previouslySolved: unsolved.length === 0,
+  };
 }
