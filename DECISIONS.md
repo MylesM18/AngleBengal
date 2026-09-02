@@ -2346,14 +2346,14 @@ variant swaps on field focus, guarded so same-surface refocus does not
 re-render the keyboard. A "+ line" label in the answer box would read as
 "add a line" but submit the attempt, so the split is deliberate.
 
-## D-130: Law-line anchors render at the nearest tokens, 22px serif semibold
+### D-130. Law-line anchors render at the nearest tokens, 22px serif semibold
 
 The spec asks for "about 21px, weight 600" on a model card's law line. The
 type scale has no 21px token and arbitrary values are banned (D-046), so the
 anchor uses text-h2 (22px) on the serif family with font-semibold. Recorded
 because the rendered size deliberately differs from the spec's prose by 1px.
 
-## D-131: The motion budget grows to three keyframes for the seam cue
+### D-131. The motion budget grows to three keyframes for the seam cue
 
 Spec 1e capped the app at two keyframe animations (enter-sheet, cut-reveal).
 The closure cue needs an opacity-only appearance (learn digestibility spec
@@ -2361,7 +2361,7 @@ The closure cue needs an opacity-only appearance (learn digestibility spec
 (180ms opacity) is added as the third. Scroll-settle reveals use transitions,
 not keyframes, so they do not grow the budget.
 
-## D-132: Focus mode toggles chrome instantly; the settle replay was dropped as a no-op
+### D-132. Focus mode toggles chrome instantly; the settle replay was dropped as a no-op
 
 The digestibility spec says focus enter and exit "follow the paper motion
 grammar". The planned settle rule re-declared the reading sheet's own
