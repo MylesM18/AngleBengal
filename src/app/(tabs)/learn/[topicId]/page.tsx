@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { BackButton } from "@/components/learn/BackButton";
 import { Breadcrumb } from "@/components/learn/Breadcrumb";
 import { CopyLinkToaster } from "@/components/learn/CopyLinkToaster";
 import { DocBody } from "@/components/learn/DocBody";
@@ -143,8 +144,11 @@ export default async function TopicPage({
         finalCue="All models read"
       >
         <div className="min-w-0 max-w-[68ch] flex-1">
-          <div className="focus-hide mb-4 flex items-center justify-between gap-4 [&>nav]:mb-0">
-            <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={topic.docCount > 1} />
+          <div className="focus-hide mb-4 flex items-center justify-between gap-4">
+            <span className="flex min-w-0 flex-wrap items-center gap-2 [&>nav]:mb-0">
+              <BackButton />
+              <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={topic.docCount > 1} />
+            </span>
             <span className="flex items-center gap-2">
               <FocusToggle />
               <ButtonLink href={`/learn/${topic.id}/history`} variant="tertiary" size="sm">
@@ -260,7 +264,10 @@ export default async function TopicPage({
 
   return (
     <div className="mx-auto max-w-[860px] px-4 pt-8 pb-10 sm:px-8 sm:pt-16">
-      <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />
+      <div className="mb-3 flex flex-wrap items-center gap-2 [&>nav]:mb-0">
+        <BackButton />
+        <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />
+      </div>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="display-cut text-h1 text-ink">{topic.name}</h1>
         {canPractice ? (
