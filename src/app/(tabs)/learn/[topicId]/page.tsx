@@ -133,6 +133,7 @@ export default async function TopicPage({
     // can be reused verbatim whether or not the perspective surface wraps it.
     const docScoped = (
       <ReadProgressProvider
+        key="doc"
         surface="doc"
         entries={index}
         initialRead={initialRead}
@@ -209,8 +210,13 @@ export default async function TopicPage({
     return (
       <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10">
         <ReaderTabProvider hasPerspective={Boolean(topic.perspective)}>
+          {/* Keyed: without a stable key, a generation's router.refresh() flips this
+              branch at the same tree position and React reuses the doc provider's
+              fiber as the perspective one, relabeling already-read model numbers as
+              read perspective sections. Distinct keys force a clean remount instead. */}
           {topic.perspective ? (
             <ReadProgressProvider
+              key="perspective"
               surface="perspective"
               entries={perspectiveEntries}
               initialRead={perspectiveRead}
