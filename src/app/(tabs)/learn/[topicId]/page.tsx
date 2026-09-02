@@ -5,6 +5,7 @@ import { CopyLinkToaster } from "@/components/learn/CopyLinkToaster";
 import { DocBody } from "@/components/learn/DocBody";
 import { DocCard } from "@/components/learn/DocCard";
 import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
+import { DocCompleteStrip, DocProgressProvider } from "@/components/learn/DocProgress";
 import { DocTabStrip } from "@/components/learn/DocTabStrip";
 import { FocusToggle } from "@/components/learn/FocusToggle";
 import { GenerateMoreStudy } from "@/components/learn/GenerateMoreStudy";
@@ -78,7 +79,7 @@ export default async function TopicPage({
     const index = deserializeModelIndex(doc.modelIndexJson);
     // Independent reads, so they go together: awaiting them in turn cost two
     // round trips to the pooler before this page could render (D-117).
-    const [misses, lastAttempt, cards, availability] = await Promise.all([
+    const [misses, lastAttempt, cards, availability, initialRead] = await Promise.all([
       modelMissCounts(doc.id),
       prisma.attempt.findFirst({
         where: { problem: { topicId: topic.id } },
@@ -88,6 +89,11 @@ export default async function TopicPage({
       // Spec 9.2: an extractor failure renders the doc cardless, never broken.
       getDocCards(doc.id, doc.contentMd, index).catch(() => null),
       checkpointAvailability(doc.id).catch(() => null),
+      // Spec 9.2: a failed read renders everything unread rather than blocking.
+      prisma.docReadProgress
+        .findMany({ where: { docId: doc.id }, select: { modelNumber: true } })
+        .then((rows) => rows.map((row) => row.modelNumber))
+        .catch(() => [] as number[]),
     ]);
     const lastPracticed = lastAttempt
       ? `Last practiced ${lastAttempt.createdAt.toLocaleDateString("en-US", {
@@ -104,6 +110,7 @@ export default async function TopicPage({
 
     return (
       <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10">
+        <DocProgressProvider docId={doc.id} entries={index} initialRead={initialRead}>
         <div className="min-w-0 max-w-[68ch] flex-1">
           <div className="focus-hide mb-4 flex items-center justify-between gap-4 [&>nav]:mb-0">
             <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={topic.docCount > 1} />
@@ -154,6 +161,7 @@ export default async function TopicPage({
                     availability={availability}
                   />
                 </CopyLinkToaster>
+                <DocCompleteStrip topicId={topic.id} />
               </div>
             </PerspectiveTabs>
           </Sheet>
@@ -164,6 +172,7 @@ export default async function TopicPage({
         <div className="hidden xl:block">
           <DocMiniTOC entries={index} accent={accent} />
         </div>
+        </DocProgressProvider>
       </article>
     );
   }

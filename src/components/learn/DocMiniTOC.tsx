@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 
+import { useDocProgressOptional } from "@/components/learn/DocProgress";
 import { cx } from "@/lib/cx";
+import { findScrollport } from "@/lib/learn/scrollport";
 import type { ModelIndexEntry } from "@/lib/modelIndex";
 import { ACCENT_VAR, type AccentName } from "@/lib/topicColors";
 
@@ -52,6 +54,7 @@ export function DocMiniTOC({
 }) {
   const [activeAnchor, setActiveAnchor] = useState<string | null>(null);
   const anchorKey = entries.map((entry) => entry.anchor).join("|");
+  const progress = useDocProgressOptional();
 
   useEffect(() => {
     const anchors = anchorKey.length > 0 ? anchorKey.split("|") : [];
@@ -60,16 +63,7 @@ export function DocMiniTOC({
       .filter((el): el is HTMLElement => el !== null);
     if (heads.length === 0) return;
 
-    let node = heads[0]?.parentElement ?? null;
-    let scrollport: HTMLElement | null = null;
-    while (node) {
-      const overflowY = window.getComputedStyle(node).overflowY;
-      if (overflowY === "auto" || overflowY === "scroll") {
-        scrollport = node;
-        break;
-      }
-      node = node.parentElement;
-    }
+    const scrollport = findScrollport(heads[0]?.parentElement ?? null);
 
     const recompute = () => {
       const origin = scrollport ? scrollport.getBoundingClientRect().top : 0;
@@ -112,7 +106,14 @@ export function DocMiniTOC({
 
   return (
     <nav aria-label="Models in this document" className="sticky top-6 w-[210px] shrink-0">
-      <p className="meta-caps mb-2 text-ink-soft">Models</p>
+      <p className="mb-2 flex items-baseline gap-2">
+        <span className="meta-caps text-ink-soft">Models</span>
+        {progress && (
+          <span className="text-meta text-ink-soft">
+            {entries.filter((entry) => progress.readSet.has(entry.number)).length} of {entries.length} read
+          </span>
+        )}
+      </p>
       <ul className="flex flex-col gap-1">
         {entries.map((entry) => {
           const isActive = entry.anchor === activeAnchor;
@@ -133,6 +134,12 @@ export function DocMiniTOC({
                   {entry.number}
                 </span>
                 <span className="min-w-0">{entry.title}</span>
+                {progress?.readSet.has(entry.number) && (
+                  <span className="ml-auto shrink-0">
+                    <span aria-hidden className="text-green">✓</span>
+                    <span className="sr-only">read</span>
+                  </span>
+                )}
               </a>
             </li>
           );

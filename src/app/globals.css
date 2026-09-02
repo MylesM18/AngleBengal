@@ -97,6 +97,7 @@
   /* motion budget (spec 1e): the only two keyframe animations in the app */
   --animate-enter-sheet: enter-sheet 200ms var(--ease-paper) both;
   --animate-cut-reveal: cut-reveal 200ms var(--ease-paper) both;
+  --animate-cue-fade: cue-fade 180ms var(--ease-paper) both;
 
   @keyframes enter-sheet {
     from {
@@ -116,6 +117,15 @@
     }
     to {
       transform: none;
+      opacity: 1;
+    }
+  }
+
+  @keyframes cue-fade {
+    from {
+      opacity: 0;
+    }
+    to {
       opacity: 1;
     }
   }
