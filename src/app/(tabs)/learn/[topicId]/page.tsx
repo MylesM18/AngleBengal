@@ -20,6 +20,7 @@ import { prisma } from "@/lib/db";
 import { getDocCards } from "@/lib/learn/docCards";
 import { parseDocTabs } from "@/lib/learn/docTabs";
 import { deserializeModelIndex } from "@/lib/modelIndex";
+import { checkpointAvailability } from "@/lib/problems/serve";
 import { getDescendantCounts, getTopicDetail } from "@/lib/topics";
 import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
 
@@ -77,7 +78,7 @@ export default async function TopicPage({
     const index = deserializeModelIndex(doc.modelIndexJson);
     // Independent reads, so they go together: awaiting them in turn cost two
     // round trips to the pooler before this page could render (D-117).
-    const [misses, lastAttempt, cards] = await Promise.all([
+    const [misses, lastAttempt, cards, availability] = await Promise.all([
       modelMissCounts(doc.id),
       prisma.attempt.findFirst({
         where: { problem: { topicId: topic.id } },
@@ -86,6 +87,7 @@ export default async function TopicPage({
       }),
       // Spec 9.2: an extractor failure renders the doc cardless, never broken.
       getDocCards(doc.id, doc.contentMd, index).catch(() => null),
+      checkpointAvailability(doc.id).catch(() => null),
     ]);
     const lastPracticed = lastAttempt
       ? `Last practiced ${lastAttempt.createdAt.toLocaleDateString("en-US", {
@@ -149,6 +151,7 @@ export default async function TopicPage({
                     models={index}
                     accent={accent}
                     cards={cards}
+                    availability={availability}
                   />
                 </CopyLinkToaster>
               </div>

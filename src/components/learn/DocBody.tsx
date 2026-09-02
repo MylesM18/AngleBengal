@@ -1,3 +1,4 @@
+import { CheckpointStrip } from "@/components/learn/CheckpointStrip";
 import { ModelCard } from "@/components/learn/ModelCard";
 import { ModelHeading } from "@/components/learn/ModelHeading";
 import { MARKDOWN_VARIANT_CLASS, MarkdownMath } from "@/components/shared/MarkdownMath";
@@ -58,6 +59,13 @@ export async function DocBody({ docId, contentMd, models, accent, cards, availab
             <ModelCard card={seams.get(section.entry.number)!.card!} />
           )}
           <Prose body={section.body} />
+          {seams.get(section.entry.number)?.checkpoint && (
+            <CheckpointStrip
+              docId={docId}
+              modelNumber={section.entry.number}
+              unsolved={seams.get(section.entry.number)!.checkpoint!.unsolved}
+            />
+          )}
         </section>
       ))}
     </>
