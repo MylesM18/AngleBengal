@@ -12,6 +12,7 @@ import { GenerateMoreStudy } from "@/components/learn/GenerateMoreStudy";
 import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
 import { ModelMissList } from "@/components/learn/ModelMissList";
 import { PerspectiveTabs } from "@/components/learn/PerspectiveTabs";
+import { ReaderRail } from "@/components/learn/ReaderRail";
 import { ReaderTabProvider } from "@/components/learn/ReaderTabContext";
 import { RevealScope } from "@/components/learn/RevealScope";
 import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
@@ -202,7 +203,20 @@ export default async function TopicPage({
         {/* `xl`, not `lg`: at the lg edge the 320px topic rail and this 210px
             column both appeared and left the reading measure at 374px. See D-061. */}
         <div className="hidden xl:block">
-          <DocMiniTOC entries={index} accent={accent} />
+          <ReaderRail
+            models={<DocMiniTOC entries={index} accent={accent} />}
+            perspective={
+              perspectiveEntries.length > 0 ? (
+                <DocMiniTOC
+                  entries={perspectiveEntries}
+                  accent={accent}
+                  label="Sections"
+                  ariaLabel="Sections in this perspective"
+                  progressSurface="perspective"
+                />
+              ) : null
+            }
+          />
         </div>
       </ReadProgressProvider>
     );
