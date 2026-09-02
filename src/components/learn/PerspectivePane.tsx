@@ -1,11 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { SectionSeam, PerspectiveCompleteStrip } from "@/components/learn/DocProgress";
+import { RevealScope } from "@/components/learn/RevealScope";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
+import { splitHeadingSections } from "@/lib/learn/splitHeadingSections";
 
 type Failure = { message: string; failures?: string[] };
 
@@ -72,11 +75,7 @@ export function PerspectivePane({
   }, [autoFire, busy, contentMd, run]);
 
   if (contentMd) {
-    return (
-      <div className="px-4 py-6 sm:px-8 sm:py-8">
-        <MarkdownMath variant="reading">{contentMd}</MarkdownMath>
-      </div>
-    );
+    return <PerspectiveReader topicId={topicId} contentMd={contentMd} />;
   }
 
   return (
@@ -121,6 +120,33 @@ export function PerspectivePane({
           )}
         </Notice>
       )}
+    </div>
+  );
+}
+
+/**
+ * The sectioned narrative (learn digestibility spec 8): one MarkdownMath per
+ * ## section so C and F attach at real React seams. The heading line stays in
+ * the chunk (MarkdownBody renders it as an h2); the wrapper carries the
+ * anchor id the rail links to. The progress provider lives in the PAGE, so in
+ * the window right after an in-session generation (before router.refresh
+ * lands) the seams render null and the text still reads fine.
+ */
+function PerspectiveReader({ topicId, contentMd }: { topicId: string; contentMd: string }) {
+  const split = useMemo(() => splitHeadingSections(contentMd), [contentMd]);
+
+  return (
+    <div className="px-4 py-6 sm:px-8 sm:py-8">
+      <RevealScope replayKey={`perspective-${topicId}`}>
+        {split.preamble && <MarkdownMath variant="reading">{split.preamble}</MarkdownMath>}
+        {split.sections.map((section, i) => (
+          <section key={`${i}-${section.title}`} id={`perspective-${i + 1}`} className="scroll-mt-20">
+            <MarkdownMath variant="reading">{section.body}</MarkdownMath>
+            <SectionSeam number={i + 1} surface="perspective" />
+          </section>
+        ))}
+        <PerspectiveCompleteStrip />
+      </RevealScope>
     </div>
   );
 }

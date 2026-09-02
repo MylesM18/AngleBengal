@@ -22,7 +22,8 @@ import { modelMissCounts } from "@/lib/attempts";
 import { prisma } from "@/lib/db";
 import { getDocCards } from "@/lib/learn/docCards";
 import { parseDocTabs } from "@/lib/learn/docTabs";
-import { deserializeModelIndex } from "@/lib/modelIndex";
+import { splitHeadingSections } from "@/lib/learn/splitHeadingSections";
+import { deserializeModelIndex, type ModelIndexEntry } from "@/lib/modelIndex";
 import { checkpointAvailability } from "@/lib/problems/serve";
 import { getDescendantCounts, getTopicDetail } from "@/lib/topics";
 import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
@@ -81,7 +82,7 @@ export default async function TopicPage({
     const index = deserializeModelIndex(doc.modelIndexJson);
     // Independent reads, so they go together: awaiting them in turn cost two
     // round trips to the pooler before this page could render (D-117).
-    const [misses, lastAttempt, cards, availability, initialRead] = await Promise.all([
+    const [misses, lastAttempt, cards, availability, initialRead, perspectiveRead] = await Promise.all([
       modelMissCounts(doc.id),
       prisma.attempt.findFirst({
         where: { problem: { topicId: topic.id } },
@@ -96,6 +97,13 @@ export default async function TopicPage({
         .findMany({ where: { docId: doc.id }, select: { modelNumber: true } })
         .then((rows) => rows.map((row) => row.modelNumber))
         .catch(() => [] as number[]),
+      // Same degrade-to-unread rule, keyed by topic rather than doc (spec 8).
+      topic.perspective
+        ? prisma.perspectiveReadProgress
+            .findMany({ where: { topicId: topic.id }, select: { sectionIndex: true } })
+            .then((rows) => rows.map((row) => row.sectionIndex))
+            .catch(() => [] as number[])
+        : Promise.resolve([] as number[]),
     ]);
     const lastPracticed = lastAttempt
       ? `Last practiced ${lastAttempt.createdAt.toLocaleDateString("en-US", {
@@ -110,17 +118,28 @@ export default async function TopicPage({
       .map((entry) => ({ id: entry.id, depth: entry.depth, isExemplar: entry.isExemplar }))
       .sort((a, b) => openIds.indexOf(a.id) - openIds.indexOf(b.id));
 
-    return (
-      <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10">
-        <ReaderTabProvider hasPerspective={Boolean(topic.perspective)}>
-        <ReadProgressProvider
-          surface="doc"
-          entries={index}
-          initialRead={initialRead}
-          write={{ url: `/api/models/${doc.id}/progress`, key: "modelNumber" }}
-          cueNoun="Model"
-          finalCue="All models read"
-        >
+    // Server-built so both the pane's seams and the rail (Task 15) key off
+    // the same section numbering without re-parsing the markdown twice.
+    const perspectiveEntries: ModelIndexEntry[] = topic.perspective
+      ? splitHeadingSections(topic.perspective.contentMd).sections.map((section, i) => ({
+          number: i + 1,
+          title: section.title,
+          anchor: `perspective-${i + 1}`,
+        }))
+      : [];
+
+    // The existing doc-surface reader, unchanged (Task 13): both columns,
+    // nested under the doc's own ReadProgressProvider. Held as a const so it
+    // can be reused verbatim whether or not the perspective surface wraps it.
+    const docScoped = (
+      <ReadProgressProvider
+        surface="doc"
+        entries={index}
+        initialRead={initialRead}
+        write={{ url: `/api/models/${doc.id}/progress`, key: "modelNumber" }}
+        cueNoun="Model"
+        finalCue="All models read"
+      >
         <div className="min-w-0 max-w-[68ch] flex-1">
           <div className="focus-hide mb-4 flex items-center justify-between gap-4 [&>nav]:mb-0">
             <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={topic.docCount > 1} />
@@ -184,7 +203,26 @@ export default async function TopicPage({
         <div className="hidden xl:block">
           <DocMiniTOC entries={index} accent={accent} />
         </div>
-        </ReadProgressProvider>
+      </ReadProgressProvider>
+    );
+
+    return (
+      <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10">
+        <ReaderTabProvider hasPerspective={Boolean(topic.perspective)}>
+          {topic.perspective ? (
+            <ReadProgressProvider
+              surface="perspective"
+              entries={perspectiveEntries}
+              initialRead={perspectiveRead}
+              write={{ url: `/api/topics/${topic.id}/perspective-progress`, key: "sectionIndex" }}
+              cueNoun="Section"
+              finalCue="Perspective read"
+            >
+              {docScoped}
+            </ReadProgressProvider>
+          ) : (
+            docScoped
+          )}
         </ReaderTabProvider>
       </article>
     );
