@@ -7,6 +7,7 @@ import { DocCard } from "@/components/learn/DocCard";
 import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
 import { DocCompleteStrip, ReadProgressProvider } from "@/components/learn/DocProgress";
 import { DocTabStrip } from "@/components/learn/DocTabStrip";
+import { FeynmanGapLine } from "@/components/learn/FeynmanGapLine";
 import { FocusToggle } from "@/components/learn/FocusToggle";
 import { GenerateMoreStudy } from "@/components/learn/GenerateMoreStudy";
 import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
@@ -84,7 +85,7 @@ export default async function TopicPage({
     const index = deserializeModelIndex(doc.modelIndexJson);
     // Independent reads, so they go together: awaiting them in turn cost two
     // round trips to the pooler before this page could render (D-117).
-    const [misses, lastAttempt, cards, availability, initialRead, perspectiveRead] = await Promise.all([
+    const [misses, lastAttempt, cards, availability, initialRead, perspectiveRead, newestFeynman] = await Promise.all([
       modelMissCounts(doc.id),
       prisma.attempt.findFirst({
         where: { problem: { topicId: topic.id } },
@@ -106,6 +107,13 @@ export default async function TopicPage({
             .then((rows) => rows.map((row) => row.sectionIndex))
             .catch(() => [] as number[])
         : Promise.resolve([] as number[]),
+      prisma.feynmanSession
+        .findFirst({
+          where: { docId: doc.id },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, reportJson: true },
+        })
+        .catch(() => null),
     ]);
     const lastPracticed = lastAttempt
       ? `Last practiced ${lastAttempt.createdAt.toLocaleDateString("en-US", {
@@ -190,6 +198,7 @@ export default async function TopicPage({
               <div className="px-4 py-6 sm:px-8 sm:py-8">
                 <RevealScope replayKey={doc.id}>
                   <ModelMissList misses={misses} />
+                  <FeynmanGapLine session={newestFeynman} topicId={topic.id} />
                   <CopyLinkToaster>
                     <DocBody
                       docId={doc.id}
