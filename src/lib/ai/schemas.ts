@@ -169,3 +169,44 @@ export const ocrSchema = z.object({
 });
 
 export type OcrResult = z.infer<typeof ocrSchema>;
+
+/* ------------------------------------------------------------------ */
+/* Feynman mode (docs/superpowers/specs/2026-09-02-feynman-mode-design.md) */
+/* ------------------------------------------------------------------ */
+
+/** AI-generated coherence questions for the Feynman session. */
+export const feynmanQuestionsSchema = z.object({
+  questions: z.array(
+    z.object({
+      modelNumber: z.number().int().nullable(),
+      question: z.string(),
+    }),
+  ),
+});
+
+export type FeynmanQuestions = z.infer<typeof feynmanQuestionsSchema>;
+
+/**
+ * OpenAI strict mode rejects minItems/maxItems, so the 2-3 question bound
+ * cannot live in the schema. The questions route calls this after the AI
+ * call and treats a violation as AI_INVALID_OUTPUT: a bad count is never
+ * shown to the user.
+ */
+export function feynmanQuestionsAreCoherent(parsed: FeynmanQuestions): boolean {
+  return parsed.questions.length === 2 || parsed.questions.length === 3;
+}
+
+/** AI-generated report verdicts for the Feynman session. */
+export const feynmanReportSchema = z.object({
+  verdicts: z.array(
+    z.object({
+      modelNumber: z.number().int(),
+      verdict: z.enum(["solid", "wobbly", "missing"]),
+      symptom: z.string(),
+    }),
+  ),
+  accuracy: z.number().int().min(0).max(100),
+  simplicity: z.number().int().min(0).max(100),
+});
+
+export type FeynmanReport = z.infer<typeof feynmanReportSchema>;
