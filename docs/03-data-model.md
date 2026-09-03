@@ -183,7 +183,7 @@ Added 2026-08-27 (perspective layer): the `Topic` model gains
 `perspectiveDoc PerspectiveDoc?`, and:
 
 ```prisma
-/// The topic's narrative companion (perspective spec §6): why this
+/// The topic's plain-spoken companion (perspective spec §6): why this
 /// mathematics exists, what it really is, why its rules are forced moves.
 /// One per topic, enforced by the unique constraint so a concurrent
 /// auto-fire and button click cannot both win.

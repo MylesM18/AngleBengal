@@ -152,7 +152,7 @@ export type TopicDetail = {
   verifiedProblemCount: number;
   /** Practice generation constraint, owned per topic (docs/06 §3). */
   wordProblemsOnly: boolean;
-  /** The topic's narrative companion doc, or null before generation (perspective spec §7). */
+  /** The topic's plain-spoken companion doc, or null before generation (perspective spec §7). */
   perspective: { id: string; contentMd: string; createdAt: Date } | null;
   modelDocs: {
     id: string;

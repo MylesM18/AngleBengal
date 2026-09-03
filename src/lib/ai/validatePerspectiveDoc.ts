@@ -3,18 +3,18 @@
  *
  * Same regime as validateModelDoc: the mechanical half of non-negotiable 3,
  * applied to the perspective layer. One retry with these messages appended,
- * then a typed failure. Only the word FLOOR is a hard gate; the 2,500 ceiling
- * is stylistic, matching docs/05 §2.3.
+ * then a typed failure. Only the word FLOOR is a hard gate; the 1,400 ceiling
+ * is stylistic, matching the prompt's stated target.
  *
  * The authored trig exemplar passes this gate; a test pins that, so the gate
  * and the locked exemplar cannot drift apart.
  */
 
-export const PERSPECTIVE_MIN_WORDS = 1_200;
+export const PERSPECTIVE_MIN_WORDS = 700;
 
 /** The seven required H2 titles, exact (spec §4.1 items 2-8). */
 export const PERSPECTIVE_HEADINGS = [
-  "The question nobody handed you",
+  "The problem it solves",
   "Building it from nothing",
   "What it really is",
   "Why the rules are what they are",
@@ -59,7 +59,7 @@ export function validatePerspectiveDoc(contentMd: string): PerspectiveValidation
   // Title, then an italic one-line subtitle as the next non-empty line.
   const titleIndex = lines.findIndex((line) => /^#[ \t]+\S/.test(line));
   if (titleIndex === -1) {
-    failures.push('Missing the "# {narrative title}" document title.');
+    failures.push('Missing the "# {plain title}" document title.');
   } else {
     const next = lines.slice(titleIndex + 1).find((line) => line.trim().length > 0);
     const italic = next ? /^(\*[^*].*\*|_[^_].*_)$/.test(next.trim()) : false;
@@ -101,7 +101,7 @@ export function validatePerspectiveDoc(contentMd: string): PerspectiveValidation
 
   if (words < PERSPECTIVE_MIN_WORDS) {
     failures.push(
-      `The document is ${words} words. The floor is ${PERSPECTIVE_MIN_WORDS}; aim for 1,200-2,500.`,
+      `The document is ${words} words. The floor is ${PERSPECTIVE_MIN_WORDS}; aim for 700-1,400.`,
     );
   }
 

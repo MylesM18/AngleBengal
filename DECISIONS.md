@@ -2439,3 +2439,16 @@ for model docs and problem statements.
 `FeynmanGapLine`'s notice opens with the plain label "Explanation gaps"
 rather than a full sentence, reading as a heading over the list of wobbly
 and missing models beneath it.
+
+### D-141. Perspective docs drop the storied voice for direct, point-first prose
+
+The perspective regime (docs/05 §9) is rewritten to the owner-approved voice
+in docs/superpowers/specs/2026-09-03-perspective-direct-voice-design.md:
+every section leads with its point, scene fiction is forbidden, "The
+question nobody handed you" becomes "The problem it solves", and the length
+target drops from 1,200-2,500 words (hard floor 1,200) to 700-1,400 (hard
+floor 700). The locked trig exemplar is replaced by the owner-approved
+direct-voice rewrite and stays locked. All PerspectiveDoc and
+PerspectiveReadProgress rows are cleared once at ship, in one transaction
+(scripts/clear-perspective-docs.ts), so topics regenerate lazily in the new
+voice; reading progress resets deliberately because the text is new.
