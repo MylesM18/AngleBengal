@@ -538,7 +538,7 @@ Run each and confirm:
 - `npm run typecheck` -> exits 0
 - `npm run lint` -> exits 0
 - `npm test` -> full suite green
-- `grep -rln "The question nobody handed you" src/ content/ docs/05-ai-integration.md` -> no output
+- `grep -rln "The question nobody handed you" src/ content/ docs/05-ai-integration.md` -> exactly one line, `src/lib/ai/prompts.test.ts` (the deliberate negative-assertion string from Task 2; no other file)
 - `wc -w content/exemplars/trig-perspective.md` -> between 700 and 1,400
 
 - [ ] **Step 3: Commit**
