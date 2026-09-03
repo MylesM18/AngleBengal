@@ -35,6 +35,7 @@ import {
 import { CalculatorChip } from "./calculator/CalculatorChip";
 import { DiagnosisCard } from "./DiagnosisCard";
 import { DifficultySelector } from "./DifficultySelector";
+import { FeynmanNudge, type FeynmanNudgeData } from "./FeynmanNudge";
 
 /**
  * The practice loop's left panel (docs/06 §3). The sketchpad that shares this
@@ -62,6 +63,7 @@ type Outcome = {
   solutionMd: string;
   diagnosis: Diagnosis | null;
   parts: { name: string; label: string; match: boolean }[] | null;
+  nudge: FeynmanNudgeData | null;
 };
 
 export function PracticePanel({
@@ -578,6 +580,10 @@ export function PracticePanel({
 
             {outcome && !outcome.correct && !outcome.diagnosis && terminalActions && (
               <div className="flex flex-wrap gap-2 max-lg:gap-3">{terminalActions}</div>
+            )}
+
+            {outcome && !outcome.correct && outcome.nudge && (
+              <FeynmanNudge nudge={outcome.nudge} topicId={topicId} />
             )}
 
             {solutionShown && (
