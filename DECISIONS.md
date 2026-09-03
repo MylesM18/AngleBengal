@@ -2379,3 +2379,63 @@ ReaderTabProvider directly inside the article. D-103's substance holds: the
 state is still local client state (never URL state), both panes stay mounted
 with the inactive one hidden, and an in-flight generation still survives tab
 switches. Only the owner of the useState moved.
+
+### D-134. The Feynman question count is enforced after the call, not in the schema
+
+OpenAI's strict JSON schema mode rejects `minItems` and `maxItems` on arrays,
+the same constraint the problem generator's `palette` field already works
+around in `schemas.ts`, so the rule that a Feynman round asks 2 or 3
+questions cannot live in `feynmanQuestionsSchema` itself.
+`feynmanQuestionsAreCoherent()` checks the count after the AI call returns; a
+count outside 2 or 3 is treated as `AI_INVALID_OUTPUT`, and nothing is shown
+to the student. This is a deliberate deviation from the spec's "enforced by
+the schema" wording. The intent, that the learner never sees a malformed
+question count, is preserved by moving the check one step later.
+
+### D-135. Write and defend stage submits gate on trimmed non-emptiness
+
+`FeynmanLive`'s write stage enables "Submit explanation" only once the
+explanation is non-empty after trimming, and the defend stage enables
+"Finish and grade" only once every entry in the answer set is non-empty
+after trimming. A box padded with only spaces cannot advance either stage.
+
+### D-136. The Feynman intro line renders on the write stage only
+
+The line introducing the Feynman technique ("teach it in plain words, find
+out what you actually know") renders only while the write stage, including
+its asking substage, is active. By the time a learner reaches the defend
+stage they already know what the mode is doing, so the line is dropped
+rather than repeated above the follow-up questions.
+
+### D-137. A Feynman wait's busy state lives in the spinner and an aria-live line, not the button label
+
+Neither "Submit explanation" nor "Finish and grade" changes text while its
+request is in flight: `Button`'s own loading state carries the busy visual,
+and a separate `aria-live="polite"` line under each button carries the
+waiting copy for assistive tech, sitting empty otherwise. The label stays
+one fixed string regardless of stage, and the two things that do change, the
+spinner and the announced text, each own exactly one job.
+
+### D-138. The Feynman session page's reread link appears on every verdict row, solid included
+
+The gap report page renders a "Reread Model N" link for every verdict row
+with no filter on the verdict itself. A model the learner nailed is still
+worth rereading, and withholding the link from a solid row would read as the
+link being a consequence of a bad grade rather than a shortcut back to the
+document.
+
+### D-139. Archived Feynman transcript text renders in the ui markdown voice with meta-caps headings
+
+The gap report page renders the archived explanation, questions, and answers
+through `MarkdownMath variant="ui"`, under `meta-caps` section headings
+("Your explanation", "The student's questions"), matching the precedent
+D-047 already set for the attempt-history and diagnosis surfaces. The
+transcript is chrome around the reading experience rather than the document
+itself, so it takes the UI voice instead of the serif reading voice reserved
+for model docs and problem statements.
+
+### D-140. The doc page's Feynman gap notice leads with "Explanation gaps"
+
+`FeynmanGapLine`'s notice opens with the plain label "Explanation gaps"
+rather than a full sentence, reading as a heading over the list of wobbly
+and missing models beneath it.
