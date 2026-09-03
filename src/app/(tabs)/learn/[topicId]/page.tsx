@@ -151,6 +151,9 @@ export default async function TopicPage({
             </span>
             <span className="flex items-center gap-2">
               <FocusToggle />
+              <ButtonLink href={`/learn/${topic.id}/feynman?doc=${doc.id}`} variant="tertiary" size="sm">
+                Feynman
+              </ButtonLink>
               <ButtonLink href={`/learn/${topic.id}/history`} variant="tertiary" size="sm">
                 History
               </ButtonLink>
