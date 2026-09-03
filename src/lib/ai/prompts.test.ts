@@ -8,9 +8,11 @@ import {
   diagnosticUser,
   FEYNMAN_GRADER,
   FEYNMAN_STUDENT,
+  perspectiveSystem,
   perspectiveUser,
   problemGeneratorSystem,
 } from "./prompts";
+import { PERSPECTIVE_HEADINGS, PERSPECTIVE_MIN_WORDS } from "./validatePerspectiveDoc";
 
 describe("perspectiveUser", () => {
   it("lists level-1 models by number and title", () => {
@@ -124,5 +126,27 @@ describe("feynman prompts", () => {
     expect(user).toContain("Q1: Why multiply?");
     expect(user).toContain("A1: Each hour adds one speed's worth.");
     expect(user).toContain("Q2: What breaks it?");
+  });
+});
+
+describe("perspectiveSystem", () => {
+  it("instructs every heading the validator enforces", async () => {
+    const system = await perspectiveSystem();
+    for (const heading of PERSPECTIVE_HEADINGS) {
+      expect(system).toContain(`"## ${heading}"`);
+    }
+  });
+
+  it("states the new length target and floor", async () => {
+    const system = await perspectiveSystem();
+    expect(system).toContain("700-1,400");
+    expect(PERSPECTIVE_MIN_WORDS).toBe(700);
+  });
+
+  it("carries no trace of the storied regime", async () => {
+    const system = await perspectiveSystem();
+    expect(system).not.toContain("The question nobody handed you");
+    expect(system).not.toContain("unhurried");
+    expect(system).not.toContain("narrative companions");
   });
 });
