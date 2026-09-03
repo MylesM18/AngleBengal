@@ -147,6 +147,6 @@ describe("perspectiveSystem", () => {
     const system = await perspectiveSystem();
     expect(system).not.toContain("The question nobody handed you");
     expect(system).not.toContain("unhurried");
-    expect(system).not.toContain("narrative companions");
+    expect(system).not.toContain("narrative");
   });
 });
