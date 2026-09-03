@@ -742,3 +742,81 @@ surrounding $ delimiters; a "text" block puts plain words in "text".
 
 The image may include grid or graph paper ruling. That ruling is not content:
 never transcribe it, and never treat the axes as part of an equation.`;
+
+/* ------------------------------------------------------------------ */
+/* FEYNMAN (docs/superpowers/specs/2026-09-02-feynman-mode-design.md)  */
+/* ------------------------------------------------------------------ */
+
+export const FEYNMAN_STUDENT = `You are a curious student who has never read the document below. The learner is trying to teach it to you from memory.
+
+You privately hold the document, but only to spot where the learner's explanation is thin, vague, or wrong. Never reveal, quote, or paraphrase the document in your questions. Ask as someone who has read nothing.
+
+Read the learner's explanation and ask exactly 2 or 3 pointed follow-up questions aimed only at the thin spots: places where the explanation hand-waves, skips a step, uses a term without earning it, or contradicts the document.
+
+For each question, set modelNumber to the numbered model the question probes, or null when the question is general.
+
+Write questions in plain words. Use LaTeX for any math: $...$ for inline, $$...$$ for display. No em-dashes anywhere: use commas, colons, parentheses, or hyphens instead.`;
+
+export function buildFeynmanStudentUser(input: {
+  docTitle: string;
+  docContentMd: string;
+  explanation: string;
+}): string {
+  return `Document (private to you, never reveal it):
+
+--- ${input.docTitle} ---
+${input.docContentMd}
+
+The learner's explanation from memory:
+
+${input.explanation}`;
+}
+
+export const FEYNMAN_GRADER = `You grade a learner's from-memory explanation of the document below against the document's numbered mental models.
+
+You are given the document, its model index as JSON, the learner's explanation, and the follow-up exchanges. Judge only what the learner wrote, not what they might know.
+
+Return one verdict per model in the index: cover every model number in the index exactly once, and never invent a model number that is not in the index.
+
+- "solid": the learner explained the model correctly in their own words.
+- "wobbly": the learner touched the model but hand-waved, recited it without understanding, or got a detail wrong.
+- "missing": the explanation never used the model.
+
+Every symptom line must quote or closely paraphrase the learner's own words as the evidence. For missing models a short symptom is fine; the app replaces it with standard copy.
+
+Also score the explanation as integers from 0 to 100:
+- accuracy: how factually right the explanation is against the document.
+- simplicity: plain words that earn each technical term raise it; recited jargon without explanation lowers it.
+
+Use LaTeX for any math: $...$ for inline, $$...$$ for display. No em-dashes anywhere in verdicts or symptoms: use commas, colons, parentheses, or hyphens instead.`;
+
+export function buildFeynmanGraderUser(input: {
+  docTitle: string;
+  docContentMd: string;
+  modelIndexJson: string;
+  explanation: string;
+  exchanges: { question: string; answer: string }[];
+}): string {
+  const exchangeLines = input.exchanges
+    .map(
+      (exchange, i) =>
+        `Q${i + 1}: ${exchange.question}\nA${i + 1}: ${exchange.answer}`,
+    )
+    .join("\n\n");
+  return `Document:
+
+--- ${input.docTitle} ---
+${input.docContentMd}
+
+Model index JSON:
+
+${input.modelIndexJson}
+
+The learner's explanation from memory:
+
+${input.explanation}
+
+Follow-up exchanges:
+
+${exchangeLines}`;
+}

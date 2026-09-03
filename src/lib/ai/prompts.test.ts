@@ -2,7 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { diagnosticUser, perspectiveUser, problemGeneratorSystem } from "./prompts";
+import {
+  buildFeynmanGraderUser,
+  buildFeynmanStudentUser,
+  diagnosticUser,
+  FEYNMAN_GRADER,
+  FEYNMAN_STUDENT,
+  perspectiveUser,
+  problemGeneratorSystem,
+} from "./prompts";
 
 describe("perspectiveUser", () => {
   it("lists level-1 models by number and title", () => {
@@ -75,5 +83,46 @@ describe("diagnosticUser typed lines", () => {
   it("omits the block when there are none", () => {
     const message = diagnosticUser({ ...base, typedLines: null });
     expect(message).not.toContain("TYPED SOLUTION LINES");
+  });
+});
+
+describe("feynman prompts", () => {
+  it("FEYNMAN_STUDENT pins the question count and house style", () => {
+    expect(FEYNMAN_STUDENT).toContain("exactly 2 or 3");
+    expect(FEYNMAN_STUDENT).toContain("No em-dashes");
+  });
+
+  it("FEYNMAN_GRADER pins the bijection and house style", () => {
+    expect(FEYNMAN_GRADER).toContain("exactly once");
+    expect(FEYNMAN_GRADER).toContain("No em-dashes");
+  });
+
+  it("buildFeynmanStudentUser embeds the doc fence and explanation", () => {
+    const user = buildFeynmanStudentUser({
+      docTitle: "DRT",
+      docContentMd: "## Model 1: The rate triangle",
+      explanation: "Distance is speed times time.",
+    });
+    expect(user).toContain("--- DRT ---");
+    expect(user).toContain("## Model 1: The rate triangle");
+    expect(user).toContain("Distance is speed times time.");
+  });
+
+  it("buildFeynmanGraderUser embeds the index and numbered exchanges", () => {
+    const user = buildFeynmanGraderUser({
+      docTitle: "DRT",
+      docContentMd: "## Model 1: The rate triangle",
+      modelIndexJson: '[{"number":1,"title":"The rate triangle"}]',
+      explanation: "Distance is speed times time.",
+      exchanges: [
+        { question: "Why multiply?", answer: "Each hour adds one speed's worth." },
+        { question: "What breaks it?", answer: "Changing speed." },
+      ],
+    });
+    expect(user).toContain("--- DRT ---");
+    expect(user).toContain('[{"number":1,"title":"The rate triangle"}]');
+    expect(user).toContain("Q1: Why multiply?");
+    expect(user).toContain("A1: Each hour adds one speed's worth.");
+    expect(user).toContain("Q2: What breaks it?");
   });
 });
