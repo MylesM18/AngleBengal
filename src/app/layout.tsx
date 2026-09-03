@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   description:
     "A mathematics tutor built on mental models: learn the models, practice against them, and find out which one failed when an answer goes wrong.",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/anglebengal-mark.svg", apple: "/apple-touch-icon.png" },
+  icons: { icon: "/favicon.svg", apple: "/apple-touch-icon.png" },
 };
 
 /**
