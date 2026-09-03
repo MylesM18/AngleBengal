@@ -10,7 +10,7 @@ describe("validatePerspectiveDoc", () => {
     const result = validatePerspectiveDoc(buildPerspectiveDoc());
     expect(result.failures).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(result.wordCount).toBeGreaterThanOrEqual(1200);
+    expect(result.wordCount).toBeGreaterThanOrEqual(700);
   });
 
   it("accepts the locked trig exemplar", () => {
@@ -48,7 +48,13 @@ describe("validatePerspectiveDoc", () => {
   it("rejects a document under the word floor", () => {
     const result = validatePerspectiveDoc(buildPerspectiveDoc({ words: 0 }));
     expect(result.ok).toBe(false);
-    expect(result.failures.join("\n")).toContain("floor is 1200");
+    expect(result.failures.join("\n")).toContain("floor is 700");
+  });
+
+  it("accepts a document at the new floor", () => {
+    const result = validatePerspectiveDoc(buildPerspectiveDoc({ words: 700 }));
+    expect(result.ok).toBe(true);
+    expect(result.wordCount).toBeGreaterThanOrEqual(700);
   });
 
   it("reports multiple failures together", () => {

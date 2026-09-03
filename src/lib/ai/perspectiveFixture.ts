@@ -43,8 +43,8 @@ export function buildPerspectiveDoc(options: PerspectiveFixtureOptions = {}): st
   };
 
   section(
-    "The question nobody handed you",
-    "You are standing on a shoreline watching a ship. You need its distance and you cannot walk on water.",
+    "The problem it solves",
+    "Finding a distance you cannot touch is the problem: every rope and stride needs contact with the thing it measures.",
   );
   section(
     "Building it from nothing",

@@ -9,7 +9,7 @@ describe("splitHeadingSections (spec 8)", () => {
   it("splits the perspective exemplar into its seven narrative sections", () => {
     const { preamble, sections } = splitHeadingSections(exemplar);
     expect(sections.map((section) => section.title)).toEqual([
-      "The question nobody handed you",
+      "The problem it solves",
       "Building it from nothing",
       "What it really is",
       "Why the rules are what they are",
