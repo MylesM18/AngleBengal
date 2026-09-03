@@ -6,7 +6,7 @@ import { splitHeadingSections } from "@/lib/learn/splitHeadingSections";
 const exemplar = readFileSync("content/exemplars/trig-perspective.md", "utf8");
 
 describe("splitHeadingSections (spec 8)", () => {
-  it("splits the perspective exemplar into its seven narrative sections", () => {
+  it("splits the perspective exemplar into its seven sections", () => {
     const { preamble, sections } = splitHeadingSections(exemplar);
     expect(sections.map((section) => section.title)).toEqual([
       "The problem it solves",

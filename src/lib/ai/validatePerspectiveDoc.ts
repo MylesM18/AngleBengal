@@ -59,7 +59,7 @@ export function validatePerspectiveDoc(contentMd: string): PerspectiveValidation
   // Title, then an italic one-line subtitle as the next non-empty line.
   const titleIndex = lines.findIndex((line) => /^#[ \t]+\S/.test(line));
   if (titleIndex === -1) {
-    failures.push('Missing the "# {narrative title}" document title.');
+    failures.push('Missing the "# {plain title}" document title.');
   } else {
     const next = lines.slice(titleIndex + 1).find((line) => line.trim().length > 0);
     const italic = next ? /^(\*[^*].*\*|_[^_].*_)$/.test(next.trim()) : false;
