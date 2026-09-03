@@ -30,7 +30,9 @@ export type PromptName =
   | "wolfram-equivalence"
   | "diagnostic"
   | "tutor"
-  | "ocr";
+  | "ocr"
+  | "feynman-student"
+  | "feynman-grader";
 
 /** Injected-context ceiling for the tutor and diagnostic calls (docs/02). */
 export const CONTEXT_TOKEN_BUDGET = 12_000;
