@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Breadcrumb } from "@/components/learn/Breadcrumb";
@@ -9,6 +10,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { attemptHistory, attemptSummary } from "@/lib/attempts";
 import { cx } from "@/lib/cx";
+import { prisma } from "@/lib/db";
 import { getTopicDetail } from "@/lib/topics";
 
 export const dynamic = "force-dynamic";
@@ -47,9 +49,21 @@ export default async function HistoryPage({
 
   const modelNumber = model ? Number.parseInt(model, 10) : undefined;
   const filtered = Number.isInteger(modelNumber) ? modelNumber : undefined;
-  const [attempts, summary] = await Promise.all([
+  const [attempts, summary, feynmanSessions] = await Promise.all([
     attemptHistory(topicId, filtered !== undefined ? { modelNumber: filtered } : {}),
     attemptSummary(topicId),
+    prisma.feynmanSession.findMany({
+      where: { doc: { topicId } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        createdAt: true,
+        accuracy: true,
+        simplicity: true,
+        coverage: true,
+        doc: { select: { title: true } },
+      },
+    }),
   ]);
 
   const title = filtered !== undefined ? `Attempts blamed on Model ${filtered}` : "Attempt history";
@@ -133,6 +147,32 @@ export default async function HistoryPage({
           </ul>
         </Sheet>
       )}
+
+      {feynmanSessions.length > 0 ? (
+        <>
+          <h2 className="meta-caps mt-10">Explanations</h2>
+          <Sheet tone="paper-1" className="mt-3 overflow-hidden">
+            <ul className="divide-y divide-hairline">
+              {feynmanSessions.map((s) => (
+                <li key={s.id}>
+                  <Link
+                    href={`/learn/${topicId}/feynman/${s.id}`}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-paper-0"
+                  >
+                    <span className="text-ui font-medium text-ink">{s.doc.title}</span>
+                    <span className="text-ui text-ink-soft">
+                      Accuracy {s.accuracy} · Simplicity {s.simplicity} · Coverage {s.coverage}
+                    </span>
+                    <span className="ml-auto text-meta text-ink-soft">
+                      {s.createdAt.toLocaleString("en-US", TIME_FORMAT)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Sheet>
+        </>
+      ) : null}
     </div>
   );
 }
