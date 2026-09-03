@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { Breadcrumb } from "@/components/learn/Breadcrumb";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
+import { BackButton } from "@/components/ui/BackButton";
 import { ButtonLink } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import type { FeynmanReport } from "@/lib/ai/schemas";
@@ -74,7 +75,10 @@ export default async function FeynmanSessionPage({
 
   return (
     <div className="mx-auto max-w-[860px] px-4 pt-8 pb-10 sm:px-8 sm:pt-16">
-      <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />
+      <div className="mb-3 flex flex-wrap items-center gap-2 [&>nav]:mb-0">
+        <BackButton fallbackHref={`/learn/${topic.id}`} />
+        <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />
+      </div>
       <h1 className="display-cut text-h1 text-ink">Gap report</h1>
       <p className="mt-2 text-meta text-ink-soft">
         {session.doc.title} · {session.createdAt.toLocaleString("en-US", TIME_FORMAT)}

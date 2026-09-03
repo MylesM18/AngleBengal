@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumb } from "@/components/learn/Breadcrumb";
 import { FeynmanLive } from "@/components/learn/FeynmanLive";
+import { BackButton } from "@/components/ui/BackButton";
 import { prisma } from "@/lib/db";
 import { getTopicDetail } from "@/lib/topics";
 
@@ -36,7 +37,10 @@ export default async function FeynmanPage({
 
   return (
     <div className="mx-auto max-w-[860px] px-4 pt-8 pb-10 sm:px-8 sm:pt-16">
-      <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />
+      <div className="mb-3 flex flex-wrap items-center gap-2 [&>nav]:mb-0">
+        <BackButton fallbackHref={`/learn/${topic.id}`} />
+        <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />
+      </div>
       <FeynmanLive topicId={topicId} docId={doc.id} docTitle={doc.title} />
     </div>
   );
