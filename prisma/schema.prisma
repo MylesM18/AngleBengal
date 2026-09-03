@@ -85,10 +85,29 @@ model MentalModelDoc {
   problemTags       ProblemModelTag[]
   diagnosedAttempts Attempt[]
   readProgress      DocReadProgress[]
+  feynmanSessions   FeynmanSession[]
 
   /// THE rule "never regenerate a topic+depth that already exists", enforced in
   /// the database so two concurrent generations cannot both win (spec §3).
   @@unique([topicId, depth])
+}
+
+/// One completed Feynman session for a doc: the archived explanation, the
+/// student exchanges, and the graded report. The three scores are
+/// denormalized so History lists sessions without JSON parsing.
+model FeynmanSession {
+  id            String         @id @default(cuid())
+  docId         String
+  doc           MentalModelDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  explanation   String
+  exchangesJson String
+  reportJson    String
+  accuracy      Int
+  simplicity    Int
+  coverage      Int
+  createdAt     DateTime       @default(now())
+
+  @@index([docId, createdAt])
 }
 
 /// The topic's narrative companion (perspective spec §6): why this
