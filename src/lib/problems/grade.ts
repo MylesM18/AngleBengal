@@ -37,6 +37,7 @@ export type AttemptResult = {
   diagnosis: Diagnosis | null;
   /** Per-part outcomes for multi answers, so the UI can mark each input. */
   parts: { name: string; label: string; match: boolean }[] | null;
+  topicId: string;
 };
 
 export async function submitAttempt(input: {
@@ -113,6 +114,7 @@ export async function submitAttempt(input: {
     solutionMd: problem.solutionMd,
     diagnosis,
     parts: comparison.parts ?? null,
+    topicId: problem.topicId,
   };
 }
 

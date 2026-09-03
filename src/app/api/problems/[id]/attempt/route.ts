@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { ApiError, errorBody } from "@/lib/ai/errors";
+import { feynmanNudgeForTopic } from "@/lib/feynman";
 import { submitAttempt } from "@/lib/problems/grade";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,19 @@ export async function POST(
       ocrBlocks: body.ocrBlocks ?? null,
       typedLines: body.typedLines ?? null,
     });
-    return NextResponse.json(result);
+    const nudge = result.correct
+      ? null
+      : await feynmanNudgeForTopic(result.topicId).catch((error) => {
+          console.error("feynman nudge lookup failed:", error);
+          return null;
+        });
+    return NextResponse.json({
+      correct: result.correct,
+      solutionMd: result.solutionMd,
+      diagnosis: result.diagnosis,
+      parts: result.parts,
+      nudge,
+    });
   } catch (error) {
     if (error instanceof ApiError) {
       return NextResponse.json(errorBody(error), { status: error.status });
