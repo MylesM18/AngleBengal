@@ -40,6 +40,52 @@ export function classifierResultIsCoherent(result: ClassifierResult): boolean {
   return hasExisting !== hasNew;
 }
 
+/** Subjects spec §4.1: subject planning (field guard, name, emblem, topics). */
+export const subjectPlannerSchema = z.object({
+  inScope: z.boolean(),
+  field: z.enum(["mathematics", "physics", "engineering", "economics"]).nullable(),
+  canonicalName: z.string(),
+  emoji: z.string(),
+  topics: z.array(z.string()),
+  reason: z.string(),
+});
+
+export type SubjectPlan = z.infer<typeof subjectPlannerSchema>;
+
+/**
+ * The 5-to-8 topic bound lives here rather than in the JSON Schema because an
+ * out-of-scope refusal legitimately carries an empty topics array, and a JSON
+ * Schema cannot express "bounded only when inScope". Enforced after parsing,
+ * like `classifierResultIsCoherent`.
+ */
+export function subjectPlanIsCoherent(plan: SubjectPlan): boolean {
+  if (!plan.inScope) return true;
+  if (plan.field === null || plan.canonicalName.trim() === "") return false;
+  const names = plan.topics.map((name) => name.trim().toLowerCase());
+  if (names.some((name) => name === "")) return false;
+  if (new Set(names).size !== names.length) return false;
+  return names.length >= 5 && names.length <= 8;
+}
+
+/** Subjects spec §4.2: filing one topic inside one subject's subtree. */
+export const subjectTopicSchema = z.object({
+  belongs: z.boolean(),
+  existingTopicId: z.string().nullable(),
+  newTopicPath: z.array(z.string()).nullable(),
+  canonicalName: z.string(),
+  reason: z.string(),
+});
+
+export type SubjectTopicResult = z.infer<typeof subjectTopicSchema>;
+
+/** Exactly one destination when the topic belongs, none when it does not. */
+export function subjectTopicResultIsCoherent(result: SubjectTopicResult): boolean {
+  if (!result.belongs) return result.existingTopicId === null && result.newTopicPath === null;
+  const hasExisting = result.existingTopicId !== null && result.existingTopicId !== "";
+  const hasNew = result.newTopicPath !== null && result.newTopicPath.length > 0;
+  return hasExisting !== hasNew;
+}
+
 /**
  * Rewrites `oneOf` to `anyOf` in place, recursively.
  *

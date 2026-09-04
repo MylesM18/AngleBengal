@@ -13,6 +13,7 @@ export type ApiErrorCode =
   | "MISSING_API_KEY"
   | "EXEMPLAR_PROTECTED"
   | "NOT_MATH"
+  | "OUT_OF_SCOPE"
   | "POOL_EMPTY"
   | "UNREADABLE"
   | "UNAUTHORIZED"
@@ -28,6 +29,7 @@ const STATUS: Record<ApiErrorCode, number> = {
   MISSING_API_KEY: 503,
   EXEMPLAR_PROTECTED: 409,
   NOT_MATH: 422,
+  OUT_OF_SCOPE: 422,
   POOL_EMPTY: 404,
   UNREADABLE: 422,
   UNAUTHORIZED: 401,

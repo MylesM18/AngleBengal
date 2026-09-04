@@ -22,6 +22,8 @@ export type PromptName =
   | "generator"
   | "perspective"
   | "classifier"
+  | "subject-planner"
+  | "subject-topic"
   | "verifier"
   | "verifier-reject"
   | "equivalence"
