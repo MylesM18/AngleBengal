@@ -2580,3 +2580,16 @@ with any future art change, and the PNG is regenerated from the SVG at the
 same time. No favicon.ico exists, matching the prior state: blind
 /favicon.ico requests 404 harmlessly, and every linked icon path already
 passes the guard's root-level public-file rule.
+
+### D-153. The favicon drops the plum plate and fills the frame
+
+Owner call (2026-09-04), superseding D-151's plate rationale for the tab
+icon only: the favicon becomes the bare cream-detail mark on a transparent
+ground, cropped to viewBox 34 32 172 172 so the head fills the slot and
+renders visibly larger than the plated version (a tab icon's box is fixed;
+bigger means less padding). Legibility holds because every cream accent
+sits inside the rust head, which is what contrasts against the tab strip,
+the same reason the header wears the bare mark on paper. The plum plate
+survives where it belongs, on apple-touch-icon.png and icon-512.png, whose
+home-screen tiles need their own ground. favicon-32.png is regenerated from
+the new SVG with alpha, and the icon URLs bump to ?v=3 per D-152.
