@@ -7,6 +7,7 @@ import { useId, useState } from "react";
 import { ChipLink } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/lib/cx";
+import { shelfTree } from "@/lib/learn/shelf";
 import type { TopicNode } from "@/lib/topics";
 import { ACCENT_VAR, accentForRoot, type AccentName } from "@/lib/topicColors";
 
@@ -55,8 +56,12 @@ export function TopicRail({ topics }: Props) {
   const [query, setQuery] = useState("");
   const searchId = useId();
 
+  // Same shelf rules as the cover grids (subjects spec 8.4): hidden nodes
+  // leave the rail, favorites pin first at every level. The reveal for
+  // hidden items lives on the shelf views, not here.
+  const shelved = shelfTree(topics);
   const needle = query.trim().toLowerCase();
-  const visible = filterTree(topics, needle);
+  const visible = filterTree(shelved, needle);
   const forceOpen = needle.length > 0;
 
   /**
@@ -249,7 +254,7 @@ function TopicBranch({
               active ? "text-ink" : muted ? "text-ink-soft" : "text-ink",
             )}
           >
-            {topic.name}
+            {depth === 0 ? `${topic.emoji ?? topic.glyph} ${topic.name}` : topic.name}
           </span>
           {topic.docCount > 0 && (
             <span
