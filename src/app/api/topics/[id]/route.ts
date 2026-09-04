@@ -25,17 +25,30 @@ export async function GET(
   }
 }
 
-const patchSchema = z.object({
-  wordProblemsOnly: z.boolean(),
-});
+const patchSchema = z
+  .object({
+    wordProblemsOnly: z.boolean().optional(),
+    hidden: z.boolean().optional(),
+    favorited: z.boolean().optional(),
+  })
+  .refine(
+    (body) =>
+      [body.wordProblemsOnly, body.hidden, body.favorited].filter(
+        (value) => value !== undefined,
+      ).length === 1,
+    { message: "Send exactly one of wordProblemsOnly, hidden, favorited." },
+  );
 
 /**
- * PATCH /api/topics/[id]: the practice surface's word-problem setting (docs/04).
+ * PATCH /api/topics/[id]: the topic's three settings (docs/04): the practice
+ * surface's word-problem constraint, and the Learn shelves' hide and favorite
+ * writes (subjects spec §6).
  *
- * Deliberately narrow. The only mutable field a topic has is this one, so the
- * body schema names it rather than accepting a partial topic: a route that
- * takes whatever it is handed would let a stray key rename a topic or reparent
- * it, and nothing in the product asks for that.
+ * Deliberately narrow. The body names exactly one mutable field per call
+ * rather than accepting a partial topic: a route that takes whatever it is
+ * handed would let a stray key rename a topic or reparent it, and nothing in
+ * the product asks for that. `favorited: true` is idempotent: the FIRST
+ * timestamp wins, so re-favoriting never reorders the pins.
  */
 export async function PATCH(
   request: Request,
@@ -55,10 +68,28 @@ export async function PATCH(
 
   try {
     const { id } = await params;
+
+    let data: { wordProblemsOnly?: boolean; hidden?: boolean; favoritedAt?: Date | null };
+    if (body.favorited !== undefined) {
+      const current = await prisma.topic.findUnique({
+        where: { id },
+        select: { favoritedAt: true },
+      });
+      if (!current) {
+        const notFound = new ApiError("NOT_FOUND", "No topic with that id.");
+        return NextResponse.json(errorBody(notFound), { status: notFound.status });
+      }
+      data = { favoritedAt: body.favorited ? (current.favoritedAt ?? new Date()) : null };
+    } else if (body.hidden !== undefined) {
+      data = { hidden: body.hidden };
+    } else {
+      data = { wordProblemsOnly: body.wordProblemsOnly };
+    }
+
     const updated = await prisma.topic.update({
       where: { id },
-      data: { wordProblemsOnly: body.wordProblemsOnly },
-      select: { id: true, wordProblemsOnly: true },
+      data,
+      select: { id: true, wordProblemsOnly: true, hidden: true, favoritedAt: true },
     });
     return NextResponse.json(updated);
   } catch (error) {
