@@ -57,6 +57,16 @@ model Topic {
   /// Nullable because only ROOT topics carry a glyph (spec §4).
   symbolId    String?
   symbol      MathSymbol? @relation(fields: [symbolId], references: [id])
+  /// One emoji, the subject's emblem (subjects spec §3). Root topics only,
+  /// like symbolId; subtopics inherit their root's at read time. Null falls
+  /// back to the glyph.
+  emoji       String?
+  /// Hidden from the Learn shelves (subjects spec §1.3). Visual only: links,
+  /// breadcrumbs, practice, and Recent keep working.
+  hidden      Boolean  @default(false)
+  /// Set when favorited, cleared when unfavorited. Ascending order is the pin
+  /// order; setting is idempotent (the first timestamp wins).
+  favoritedAt DateTime?
   createdAt   DateTime @default(now())
 
   modelDocs MentalModelDoc[]

@@ -55,6 +55,17 @@ const TAXONOMY: TaxonomyNode[] = [
 const EXEMPLAR_RELATIVE_PATH = "content/exemplars/drt-mental-models.md";
 const EXEMPLAR_TOPIC_NAME = "Distance-Rate-Time";
 
+/** The seeded subjects' emblems (subjects spec §3). Mirrors the values the
+ *  subject_layer migration backfills, so a fresh database seeds identically. */
+const SUBJECT_EMOJI: Record<string, string> = {
+  Algebra: "🧮",
+  Geometry: "📐",
+  Trigonometry: "🌊",
+  Precalculus: "📈",
+  Calculus: "🎢",
+  "Statistics & Probability": "🎲",
+};
+
 async function seedTaxonomy(glyphToSymbolId: Map<string, string>): Promise<Map<string, string>> {
   const takenSlugs = new Set(
     (await prisma.topic.findMany({ select: { slug: true } })).map((t) => t.slug),
@@ -66,12 +77,17 @@ async function seedTaxonomy(glyphToSymbolId: Map<string, string>): Promise<Map<s
     for (const [name, children] of nodes) {
       const existing = await prisma.topic.findFirst({
         where: { name, parentId },
-        select: { id: true },
+        select: { id: true, emoji: true },
       });
 
       let id: string;
       if (existing) {
         id = existing.id;
+        // A root seeded before the emblem era picks its emoji up on re-seed.
+        const emblem = parentId ? null : (SUBJECT_EMOJI[name] ?? null);
+        if (!parentId && emblem && existing.emoji === null) {
+          await prisma.topic.update({ where: { id }, data: { emoji: emblem } });
+        }
       } else {
         const slug = uniqueSlug(name, takenSlugs);
         takenSlugs.add(slug);
@@ -82,6 +98,7 @@ async function seedTaxonomy(glyphToSymbolId: Map<string, string>): Promise<Map<s
             parentId,
             // Only roots carry a glyph; subtopics inherit their root's.
             symbolId: parentId ? null : (glyphToSymbolId.get(glyphForRootName(name)) ?? null),
+            emoji: parentId ? null : (SUBJECT_EMOJI[name] ?? null),
           },
           select: { id: true },
         });
