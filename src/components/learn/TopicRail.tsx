@@ -254,7 +254,7 @@ function TopicBranch({
               active ? "text-ink" : muted ? "text-ink-soft" : "text-ink",
             )}
           >
-            {depth === 0 ? `${topic.emoji ?? topic.glyph} ${topic.name}` : topic.name}
+            {topic.name}
           </span>
           {topic.docCount > 0 && (
             <span
