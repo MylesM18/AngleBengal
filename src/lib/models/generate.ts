@@ -49,7 +49,7 @@ export async function generateModelDoc(request: string): Promise<GenerateResult>
   if (!classification.isMath) {
     throw new ApiError(
       "NOT_MATH",
-      "That is not a mathematics topic. Try something like \"related rates\", \"unit circle\", or \"mixture problems\".",
+      "That is outside mathematics, physics, engineering, and economics. Try something like \"related rates\", \"unit circle\", or \"mixture problems\".",
     );
   }
 

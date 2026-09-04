@@ -47,20 +47,20 @@ export async function loadExemplarForPrompt(): Promise<string> {
 /* CLASSIFIER (docs/05 §3)                                             */
 /* ------------------------------------------------------------------ */
 
-export const CLASSIFIER_SYSTEM = `You are a librarian for a mathematics curriculum. Given a user's free-text
-request for a math topic and the current topic taxonomy, decide where it
-belongs.
+export const CLASSIFIER_SYSTEM = `You are a librarian for a quantitative curriculum spanning mathematics,
+physics, engineering, and economics. Given a user's free-text request for a
+topic and the current topic taxonomy, decide where it belongs.
 
 Rules:
 - Prefer filing under an EXISTING topic. Only propose new nodes when nothing
   fits at all.
 - New paths must be at most 3 levels deep and must reuse an existing root
-  (Algebra, Geometry, Trigonometry, Precalculus, Calculus, Statistics &
-  Probability) unless the topic truly belongs to none of them (e.g., Linear
-  Algebra, Discrete Math), in which case a new root is allowed.
+  shown in the taxonomy unless the topic truly belongs to none of them, in
+  which case a new root is allowed.
 - Normalize names to standard curriculum terminology in Title Case
   ("Related Rates", not "related rates problems").
-- If the request is not a mathematics topic, set isMath to false.
+- If the request is not a topic within those four fields, set isMath to
+  false.
 
 Return existingTopicId as the id string of the matching topic and newTopicPath
 as null, OR existingTopicId as null and newTopicPath as the full root-to-leaf
@@ -88,6 +88,82 @@ ${renderTaxonomy(topics)}`;
 }
 
 /* ------------------------------------------------------------------ */
+/* SUBJECT PLANNER (subjects spec §4.1)                                */
+/* ------------------------------------------------------------------ */
+
+export const SUBJECT_PLANNER_SYSTEM = `You are a curriculum planner for a personal learning app. Given a user's
+free-text request for a SUBJECT, decide whether it belongs to one of the four
+allowed fields and, if so, plan its starter topics.
+
+Allowed fields: mathematics, physics, engineering, economics.
+
+Rules:
+- A subject is a course-sized area of one allowed field ("Thermodynamics",
+  "Linear Algebra", "Microeconomics"). If the request names a narrow topic
+  rather than a subject ("related rates"), return the course-sized subject
+  that contains it as canonicalName and include the requested item among the
+  topics.
+- If the request does not belong to any allowed field, set inScope to false,
+  field to null, canonicalName and emoji to empty strings, topics to an empty
+  array, and write one plain sentence in reason saying the request is outside
+  mathematics, physics, engineering, and economics.
+- When inScope is true: canonicalName is the subject's standard name in Title
+  Case. topics is 5 to 8 starter topics in standard curriculum terminology,
+  Title Case, ordered foundational to advanced, no duplicates, each a real
+  topic of THIS subject. emoji is exactly one emoji that visually evokes the
+  subject and is not already used by an existing subject. reason is one short
+  sentence naming the field.
+- If the request IS one of the existing subjects, return that subject's exact
+  existing name as canonicalName; the app resolves it to the existing subject.
+- Never use em-dashes in any text you return.`;
+
+export function subjectPlannerUser(
+  request: string,
+  roots: { name: string; emoji: string | null }[],
+): string {
+  const lines = roots.map((root) => `- ${root.name}${root.emoji ? ` ${root.emoji}` : ""}`);
+  return `Request: ${request}
+
+Existing subjects (name, emoji):
+${lines.length > 0 ? lines.join("\n") : "- (none)"}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* SUBJECT TOPIC ADD (subjects spec §4.2)                              */
+/* ------------------------------------------------------------------ */
+
+export const SUBJECT_TOPIC_SYSTEM = `You are a librarian for one subject's topic tree in a personal learning app.
+Given a user's free-text request for a topic and the subject's current
+subtree, decide whether the topic genuinely belongs to this subject and where
+it files.
+
+Rules:
+- belongs is true only when the request is a real topic OF THIS SUBJECT. A
+  topic of a different subject, or anything outside mathematics, physics,
+  engineering, and economics, gets belongs false, both destinations null, an
+  empty canonicalName, and one plain sentence in reason.
+- Prefer an existing node: when the requested topic already exists in the
+  subtree, return its id as existingTopicId and newTopicPath as null.
+- Otherwise return existingTopicId as null and newTopicPath as the path of
+  node names under the subject root, at most 2 levels, Title Case, standard
+  curriculum terminology. The subject's own name never appears in
+  newTopicPath. To file under an existing intermediate node, start the path
+  with that node's exact name.
+- canonicalName is the topic's standard name in Title Case.
+- Exactly one of existingTopicId and newTopicPath is non-null when belongs is
+  true.
+- Never use em-dashes in any text you return.`;
+
+export function subjectTopicUser(request: string, subjectName: string, subtree: string): string {
+  return `Request: ${request}
+
+Subject: ${subjectName}
+
+Current subtree:
+${subtree}`;
+}
+
+/* ------------------------------------------------------------------ */
 /* GENERATOR (docs/05 §2)                                              */
 /* ------------------------------------------------------------------ */
 
@@ -100,12 +176,13 @@ ${renderTaxonomy(topics)}`;
 export async function generatorSystem(): Promise<string> {
   const exemplar = await loadExemplarForPrompt();
 
-  return `You are a mathematics educator who writes mental model documents: guides that
+  return `You are an educator across the quantitative disciplines (mathematics, physics,
+engineering, and economics) who writes mental model documents: guides that
 teach how to THINK about a class of problems, not procedures to memorize. Your
 documents close the translation gap, the moment when a student has read a
 problem, has numbers on the page, and does not know what mathematics to write.
 
-You will be given a math topic. Write a complete mental model document for it
+You will be given a topic. Write a complete mental model document for it
 in markdown, following EXACTLY the structure of the exemplar document provided
 below. The exemplar is about distance-rate-time problems; your document is
 about the given topic, but its architecture, depth, and voice must match.
@@ -277,14 +354,15 @@ export async function loadPerspectiveExemplar(): Promise<string> {
 export async function perspectiveSystem(): Promise<string> {
   const exemplar = await loadPerspectiveExemplar();
 
-  return `You are a mathematics educator who writes perspective documents: plain-spoken
-companions that teach why a piece of mathematics exists, what it really is,
-and why its machinery is shaped the way it is. Your documents close the
-meaning gap: the moment when a student can follow procedures but does not
-know what the mathematics is for, where it came from, or why its rules could
-not have been otherwise.
+  return `You are an educator across the quantitative disciplines (mathematics, physics,
+engineering, and economics) who writes perspective documents: plain-spoken
+companions that teach why a topic exists, what it really is, and why its
+machinery is shaped the way it is. Your documents close the meaning gap: the
+moment when a student can follow procedures but does not know what the
+machinery is for, where it came from, or why its rules could not have been
+otherwise.
 
-You will be given a math topic and the mental models the reader's library
+You will be given a topic and the mental models the reader's library
 already teaches for it. Write a complete perspective document in markdown,
 following EXACTLY the structure of the exemplar document provided below. The
 exemplar is about trigonometry; your document is about the given topic, but
