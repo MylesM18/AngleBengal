@@ -14,9 +14,8 @@ import { classifierResultIsCoherent, classifierSchema } from "@/lib/ai/schemas";
 import { validateModelDoc } from "@/lib/ai/validateModelDoc";
 import { isUniqueViolation, prisma } from "@/lib/db";
 import { parseDocTitle, parseModelIndex, serializeModelIndex } from "@/lib/modelIndex";
-import { uniqueSlug } from "@/lib/slug";
-import { glyphForRootName } from "@/lib/symbols";
 import { getTopicPath, getTopicTree } from "@/lib/topics";
+import { createTopicPath } from "@/lib/topics/create";
 
 /**
  * Flow A (docs/02): classify -> create topic path if needed -> generate ->
@@ -49,7 +48,7 @@ export async function generateModelDoc(request: string): Promise<GenerateResult>
   if (!classification.isMath) {
     throw new ApiError(
       "NOT_MATH",
-      "That is not a mathematics topic. Try something like \"related rates\", \"unit circle\", or \"mixture problems\".",
+      "That is outside mathematics, physics, engineering, and economics. Try something like \"related rates\", \"unit circle\", or \"mixture problems\".",
     );
   }
 
@@ -61,8 +60,30 @@ export async function generateModelDoc(request: string): Promise<GenerateResult>
   }
 
   const topicId = await resolveTopic(classification.existingTopicId, classification.newTopicPath);
+  return generateDocForTopic(topicId, classification.canonicalName || undefined);
+}
+
+/**
+ * The generation tail for a topic that already exists (subjects spec §5.3):
+ * the empty-state button and the subject flows know their topic id, so they
+ * skip classification entirely, which is both faster and immune to
+ * misfiling. `topicNameOverride` preserves the free-text path's behavior of
+ * preferring the classifier's canonical name over the stored node name.
+ */
+export async function generateDocForTopic(
+  topicId: string,
+  topicNameOverride?: string,
+): Promise<GenerateResult> {
+  const topic = await prisma.topic.findUnique({
+    where: { id: topicId },
+    select: { id: true, name: true },
+  });
+  if (!topic) {
+    throw new ApiError("NOT_FOUND", "No topic with that id.");
+  }
+
   const topicPath = await getTopicPath(topicId);
-  const topicName = classification.canonicalName || topicPath[topicPath.length - 1];
+  const topicName = topicNameOverride || topic.name;
 
   // A topic holds exactly one level 1 document (@@unique([topicId, depth])),
   // so asking again for a topic that already has one costs nothing. This is
@@ -165,49 +186,7 @@ async function resolveTopic(
     throw new ApiError("AI_INVALID_OUTPUT", "The classifier returned no destination topic.");
   }
 
-  const takenSlugs = new Set(
-    (await prisma.topic.findMany({ select: { slug: true } })).map((topic) => topic.slug),
-  );
-
-  let parentId: string | null = null;
-  for (const rawName of newTopicPath) {
-    const name = rawName.trim();
-    if (!name) continue;
-
-    const existing: { id: string } | null = await prisma.topic.findFirst({
-      where: { name, parentId },
-      select: { id: true },
-    });
-
-    if (existing) {
-      parentId = existing.id;
-      continue;
-    }
-
-    const slug = uniqueSlug(name, takenSlugs);
-    takenSlugs.add(slug);
-    // A new ROOT gets the same glyph D-078 would have hashed for it, resolved
-    // to a MathSymbol row so the cover reads from the database like every
-    // other root. Subtopics inherit their root's at read time.
-    const symbolId =
-      parentId === null
-        ? ((
-            await prisma.mathSymbol.findUnique({
-              where: { glyph: glyphForRootName(name) },
-              select: { id: true },
-            })
-          )?.id ?? null)
-        : null;
-
-    const created: { id: string } = await prisma.topic.create({
-      data: { name, slug, parentId, symbolId },
-      select: { id: true },
-    });
-    parentId = created.id;
-  }
-
-  if (!parentId) {
-    throw new ApiError("AI_INVALID_OUTPUT", "The classifier returned an empty topic path.");
-  }
-  return parentId;
+  // The walk itself lives in src/lib/topics/create.ts, shared with the
+  // subject topic-add flow (subjects spec §5.2).
+  return createTopicPath(null, newTopicPath);
 }

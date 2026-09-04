@@ -16,11 +16,11 @@ One topic with its `modelDocs` (id, title, createdAt) and counts, including `wor
 
 ### PATCH /api/topics/[id]
 ```json
-{ "wordProblemsOnly": true }
+{ "wordProblemsOnly": true }   or   { "hidden": true }   or   { "favorited": true }
 ```
-The topic's only mutable field, set from the topic card on /practice. The body schema names it rather than accepting a partial topic, so nothing else about a topic can be edited through this route.
-Success `200`: `{ "id": "...", "wordProblemsOnly": true }`
-Failures: `400 BAD_REQUEST` (body is not `{ wordProblemsOnly: boolean }`), `404 NOT_FOUND`.
+Exactly one key per call: the practice surface's word-problem constraint, or the Learn shelves' hide and favorite writes (subjects spec). The body schema names the three mutable fields rather than accepting a partial topic, so nothing else about a topic can be edited through this route. `favorited: true` is idempotent, the FIRST timestamp wins, so re-favoriting never reorders the pins; `favorited: false` clears it.
+Success `200`: `{ "id": "...", "wordProblemsOnly": false, "hidden": false, "favoritedAt": "2026-09-03T00:00:00.000Z" | null }`
+Failures: `400 BAD_REQUEST` (not exactly one known key), `404 NOT_FOUND`.
 
 ### POST `/api/topics/[id]/perspective`
 
@@ -41,13 +41,43 @@ validation; otherwise the shared AI error codes (Conventions).
 `perspective` (`{ id, contentMd, createdAt }` or `null`) alongside
 `modelDocs`; there is no separate GET route.
 
+## Subjects
+
+A subject is a root topic (subjects spec). Both routes run the CLASSIFIER
+model and create topic rows only; no documents are generated.
+
+### POST /api/subjects/generate
+```json
+{ "request": "thermodynamics" }
+```
+Validates the request against the four allowed fields (mathematics, physics,
+engineering, economics), normalizes the name, picks one emoji emblem, plans
+5 to 8 starter topics, and creates the root plus its children in one
+transaction. When the planned name matches an existing root
+case-insensitively, that root is returned and nothing is created.
+Success `201`: `{ "subjectId": "...", "name": "Thermodynamics", "emoji": "🔥", "created": 6, "existing": false }`
+Failures: `422 OUT_OF_SCOPE` (outside the four fields; friendly dead end, no
+retry), `502 AI_INVALID_OUTPUT` (incoherent plan), `400`, `500` per
+Conventions.
+
+### POST /api/subjects/[id]/topics
+```json
+{ "request": "carnot cycle" }
+```
+Files one topic inside this subject's subtree (docs/05 §11): an existing
+node is returned as-is, a new path is created under the subject by the same
+level-by-level reuse walk the classifier flow uses.
+Success `201`: `{ "topicId": "...", "existing": false }`
+Failures: `422 OUT_OF_SCOPE` (does not belong to this subject),
+`404 NOT_FOUND` (the id is not a root topic), `502 AI_INVALID_OUTPUT`.
+
 ## Mental model docs
 
 ### POST /api/models/generate
 ```json
-{ "request": "related rates" }
+{ "request": "related rates" }   or   { "topicId": "..." }
 ```
-Runs classify → create-topic-path-if-needed → generate → validate → save (docs/02 flow A).
+Exactly one of the two keys. `request` runs classify → create-topic-path-if-needed → generate → validate → save (docs/02 flow A). `topicId` generates for a topic that already exists and skips classification entirely (subjects spec §5.3); it is what the empty topic page's Generate button sends. `404 NOT_FOUND` when the topicId does not exist.
 Success `201`: `{ "docId": "...", "topicId": "...", "topicPath": ["Calculus","Applications","Related Rates"] }`
 If the classified topic already holds a level 1 document, that document is returned rather than a duplicate being generated. The response shape is unchanged and no generation call is made; the caller cannot tell the difference apart from the latency.
 Failures: `422 GENERATION_INVALID` (failed structural validation twice), `502 AI_UNAVAILABLE`.

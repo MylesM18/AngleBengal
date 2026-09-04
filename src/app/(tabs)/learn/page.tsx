@@ -1,11 +1,14 @@
 import Link from "next/link";
 
-import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
+import { CoverActions } from "@/components/learn/CoverActions";
+import { GenerateSubjectInput } from "@/components/learn/GenerateSubjectInput";
+import { HiddenShelf } from "@/components/learn/HiddenShelf";
 import { TopicCoverCard } from "@/components/learn/TopicCoverCard";
 import { TopicRail } from "@/components/learn/TopicRail";
 import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { prisma } from "@/lib/db";
+import { partitionHidden, sortFavoritesFirst } from "@/lib/learn/shelf";
 import { deserializeModelIndex } from "@/lib/modelIndex";
 import { accentForRoot } from "@/lib/topicColors";
 import {
@@ -61,6 +64,10 @@ export default async function LearnIndexPage() {
     const root = rootById.get(id);
     return root ? [root] : [];
   });
+  // Shelf rules (subjects spec 8.1): hidden subjects leave the grid for the
+  // reveal below it; favorites pin first in the order they were favorited.
+  const shelf = partitionHidden(roots);
+  const visibleRoots = sortFavoritesFirst(shelf.visible);
 
   return (
     <div className="h-full overflow-y-auto p-2">
@@ -68,10 +75,10 @@ export default async function LearnIndexPage() {
         <header>
           <h1 className="display-cut text-display text-ink">Learn</h1>
           <p className="mt-3 max-w-[40ch] text-ui text-ink-soft">
-            Mental models for any math topic, filed into a tree you can browse. Open a cover, or
-            generate a new set.
+            Mental models for mathematics, physics, engineering, and economics, filed into a tree
+            you can browse. Open a cover, or create a new subject.
           </p>
-          <GenerateTopicInput />
+          <GenerateSubjectInput />
         </header>
 
         <section aria-labelledby="learn-topics">
@@ -79,28 +86,39 @@ export default async function LearnIndexPage() {
             Topics
           </h2>
 
-          {roots.length > COVER_GRID_MAX_ROOTS ? (
+          {visibleRoots.length > COVER_GRID_MAX_ROOTS ? (
             <Sheet tone="paper-1" className="animate-enter-sheet py-2">
               <TopicRail topics={tree} />
             </Sheet>
           ) : (
             <ul aria-label="Topic covers" className="animate-enter-sheet grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {roots.map((root) => {
+              {visibleRoots.map((root) => {
                 const c = counts.get(root.id) ?? ZERO;
                 return (
-                  <li key={root.id}>
+                  <li key={root.id} className="relative">
                     <TopicCoverCard
                       href={`/learn/${root.id}`}
                       name={root.name}
-                      glyph={root.glyph}
+                      glyph={root.emoji ?? root.glyph}
                       meta={`${plural(c.docs, "model")} · ${plural(c.verifiedProblems, "problem")}`}
                       accent={accentForRoot(root.name)}
                     />
+                    <CoverActions topicId={root.id} favorited={root.favoritedAt !== null} />
                   </li>
                 );
               })}
             </ul>
           )}
+
+          <HiddenShelf
+            noun="subject"
+            items={shelf.hidden.map((root) => ({
+              id: root.id,
+              name: root.name,
+              emblem: root.emoji ?? root.glyph,
+              href: `/learn/${root.id}`,
+            }))}
+          />
 
           <h2 className="meta-caps mt-10 text-ink-soft">Recent</h2>
           <Sheet tone="paper-1" className="mt-2 overflow-hidden">

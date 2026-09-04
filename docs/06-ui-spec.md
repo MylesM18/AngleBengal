@@ -12,10 +12,16 @@ Two layout worlds, desktop and compact, split at `lg` (1024px): the sections bel
 
 **Left sidebar (280px):** the topic tree.
 - Collapsible nodes; topics with docs show a count badge; topics with no docs render muted.
-- Pinned at top: a single input, placeholder "Generate mental models for any topic...". Submitting fires flow A. While generating: an inline progress row under the input ("Classifying → Writing models → Filing under Calculus / Applications / Related Rates") driven by staged fetch states. On success, navigate to the doc. On failure, inline retry.
+- Shelf rules (subjects spec): hidden nodes leave the tree, favorites pin first at every level, and root rows are prefixed with the subject's emblem (emoji, glyph fallback).
+
+**Subject layer (subjects spec, 2026-09-03):**
+- The Learn index input creates SUBJECTS, not topics: placeholder "Create a subject: math, engineering, physics, or economics...". One planner call (docs/05 §10) validates the four-field whitelist, names the subject, picks an emoji emblem, and files 5 to 8 starter topic rows. Progress: "Planning the subject" then "Filed {name} with {n} topics". Out-of-scope requests render the warning notice with no retry; other failures retry inline.
+- Covers wear `emoji ?? glyph` as the corner emblem. Every cover carries a favorite star and a hide control in its top-right corner (siblings of the link, never inside it). Favorites pin to the top of their list, first favorited first; hidden covers move to a "Show hidden (n)" reveal under the grid, each row a dimmed link with an Unhide button. Hiding is visual only.
+- A subject's page (a root topic page) carries an "Add a topic to {subject}..." input above its subtopic grid: docs/05 §11 files the topic inside the subject or explains why it does not belong. Success navigates to the topic; its page offers doc generation.
+- An empty NON-root topic page offers a "Generate the models" button that posts `{ topicId }` (no classifier, docs/04). The free-text `{ request }` body remains API-valid but no longer has a UI mount.
 
 **Main pane:**
-- Topic selected, no doc selected: topic header, its doc list as cards (title, model count, date), and its verified-problem count with a "Practice this topic" button linking to `/practice/[topicId]`.
+- Topic selected, no doc selected: topic header, its doc list as cards (title, model count, date), and its verified-problem count with a "Practice this topic" button linking to `/practice/[topicId]`. Subject pages prefix their heading with the emblem and show the add-topic input.
 - Doc selected: the rendered document via `<MarkdownMath>`. Each `## Model N` heading gets an `id="model-n"` anchor and a copy-link affordance. A sticky mini-TOC (right edge, doc pages only) lists the models by number and name.
 - Exemplar doc shows a small "Exemplar" badge; its delete action is absent.
 
@@ -92,7 +98,8 @@ ui/          Button, Input, Select, Dialog, Toast, Tabs, Badge, Spinner,
              ResizableSplit, Drawer, Collapse
 shared/      MarkdownMath (react-markdown + remark-math + rehype-katex + gfm),
              TopicPathBreadcrumb, ModelTagChip
-learn/       TopicTree, GenerateTopicInput, DocCard, DocReader, DocMiniTOC
+learn/       TopicTree, GenerateSubjectInput, AddTopicInput, GenerateDocButton,
+             CoverActions, HiddenShelf, DocCard, DocReader, DocMiniTOC
 practice/    ProblemCard, AnswerInput (numeric|expression|multi), ResultPanel,
              DiagnosisCard, PoolEmptyState, DifficultySelector
 sketchpad/   SketchCanvas, SketchToolbar, BackgroundLayer, CleanCopyPanel

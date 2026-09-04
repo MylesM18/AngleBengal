@@ -9,6 +9,12 @@ import {
   FEYNMAN_GRADER,
   FEYNMAN_STUDENT,
   perspectiveSystem,
+  SUBJECT_PLANNER_SYSTEM,
+  SUBJECT_TOPIC_SYSTEM,
+  subjectPlannerUser,
+  subjectTopicUser,
+  CLASSIFIER_SYSTEM,
+  generatorSystem,
   perspectiveUser,
   problemGeneratorSystem,
 } from "./prompts";
@@ -148,5 +154,53 @@ describe("perspectiveSystem", () => {
     expect(system).not.toContain("The question nobody handed you");
     expect(system).not.toContain("unhurried");
     expect(system).not.toContain("narrative");
+  });
+});
+
+describe("subject prompts (subjects spec 4)", () => {
+  it("SUBJECT_PLANNER_SYSTEM pins the four fields, the topic bound, and house style", () => {
+    expect(SUBJECT_PLANNER_SYSTEM).toContain(
+      "Allowed fields: mathematics, physics, engineering, economics.",
+    );
+    expect(SUBJECT_PLANNER_SYSTEM).toContain("5 to 8 starter topics");
+    expect(SUBJECT_PLANNER_SYSTEM).toContain("exactly one emoji");
+    expect(SUBJECT_PLANNER_SYSTEM).toContain("Never use em-dashes");
+    expect(SUBJECT_PLANNER_SYSTEM).not.toContain("—");
+  });
+
+  it("subjectPlannerUser embeds the request and the existing subjects", () => {
+    const user = subjectPlannerUser("thermo", [
+      { name: "Algebra", emoji: "🧮" },
+      { name: "Calculus", emoji: null },
+    ]);
+    expect(user).toContain("Request: thermo");
+    expect(user).toContain("- Algebra 🧮");
+    expect(user).toContain("- Calculus");
+    expect(subjectPlannerUser("x", [])).toContain("- (none)");
+  });
+
+  it("SUBJECT_TOPIC_SYSTEM pins the subject scoping rules", () => {
+    expect(SUBJECT_TOPIC_SYSTEM).toContain("OF THIS SUBJECT");
+    expect(SUBJECT_TOPIC_SYSTEM).toContain("never appears in\n  newTopicPath");
+    expect(SUBJECT_TOPIC_SYSTEM).toContain("at most 2 levels");
+    expect(SUBJECT_TOPIC_SYSTEM).not.toContain("—");
+  });
+
+  it("subjectTopicUser embeds request, subject, and subtree", () => {
+    const user = subjectTopicUser("carnot cycle", "Thermodynamics", "- Thermodynamics [id: t1]");
+    expect(user).toContain("Request: carnot cycle");
+    expect(user).toContain("Subject: Thermodynamics");
+    expect(user).toContain("- Thermodynamics [id: t1]");
+  });
+
+  it("the classifier and generators speak all four fields, not mathematics alone", async () => {
+    const flat = (text: string) => text.replace(/\s+/g, " ");
+    expect(CLASSIFIER_SYSTEM).not.toContain("mathematics curriculum");
+    expect(flat(CLASSIFIER_SYSTEM)).toContain("mathematics, physics, engineering, and economics");
+    const generator = await generatorSystem();
+    expect(generator).not.toContain("a mathematics educator");
+    expect(flat(generator)).toContain("mathematics, physics, engineering, and economics");
+    const perspective = await perspectiveSystem();
+    expect(perspective).not.toContain("a mathematics educator");
   });
 });

@@ -1,7 +1,7 @@
 import type { SVGProps } from "react";
 
 /**
- * The app's icon set (spec 1f, D-048): twelve 16px glyphs drawn as 1.5px
+ * The app's icon set (spec 1f, D-048): fourteen 16px glyphs drawn as 1.5px
  * strokes in currentColor. No icon dependency. Paths live on a 16x16 grid.
  */
 export type IconName =
@@ -16,7 +16,9 @@ export type IconName =
   | "check"
   | "cross"
   | "copy"
-  | "close";
+  | "close"
+  | "star"
+  | "hide";
 
 const PATHS: Record<IconName, string> = {
   pen: "M11.5 2.5l2 2L5 13H3v-2l8.5-8.5z M10 4l2 2",
@@ -31,6 +33,8 @@ const PATHS: Record<IconName, string> = {
   cross: "M4 4l8 8 M12 4l-8 8",
   copy: "M6 6h7v7H6z M3 10V3h7",
   close: "M3.5 3.5l9 9 M12.5 3.5l-9 9",
+  star: "M8 2.5l1.7 3.6 3.9.5-2.9 2.7.7 3.9L8 11.4l-3.4 1.8.7-3.9L2.4 6.6l3.9-.5L8 2.5z",
+  hide: "M2 8s2.2-3.5 6-3.5S14 8 14 8s-2.2 3.5-6 3.5S2 8 2 8z M6.6 8a1.4 1.4 0 1 0 2.8 0 1.4 1.4 0 0 0-2.8 0z M3.5 12.5l9-9",
 };
 
 export type IconProps = {

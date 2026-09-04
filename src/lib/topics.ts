@@ -16,6 +16,13 @@ export type TopicNode = {
   name: string;
   slug: string;
   glyph: string;
+  /** The subject's emblem, inherited root-down like the glyph; null falls
+   *  back to the glyph (subjects spec §7). */
+  emoji: string | null;
+  /** Off the Learn shelves when true; the topic itself keeps working. */
+  hidden: boolean;
+  /** Epoch ms (serializable to client components); ascending is pin order. */
+  favoritedAt: number | null;
   parentId: string | null;
   docCount: number;
   verifiedProblemCount: number;
@@ -30,6 +37,9 @@ type TopicRow = {
   slug: string;
   parentId: string | null;
   wordProblemsOnly: boolean;
+  emoji: string | null;
+  hidden: boolean;
+  favoritedAt: Date | null;
   symbol: { glyph: string } | null;
   _count: { modelDocs: number };
 };
@@ -87,6 +97,9 @@ function buildTree(rows: TopicRow[], verified: Map<string, number>): TopicNode[]
       name: row.name,
       slug: row.slug,
       glyph: row.symbol?.glyph ?? DEFAULT_GLYPH,
+      emoji: row.emoji,
+      hidden: row.hidden,
+      favoritedAt: row.favoritedAt?.getTime() ?? null,
       parentId: row.parentId,
       docCount: row._count.modelDocs,
       verifiedProblemCount: verified.get(row.id) ?? 0,
@@ -107,14 +120,16 @@ function buildTree(rows: TopicRow[], verified: Map<string, number>): TopicNode[]
     for (const node of list) sortByName(node.children);
   };
   // Only roots carry a symbolId; the whole subtree wears the root's emblem
-  // (spec §4), which is what `glyphForRoot(topic.path[0])` used to do.
-  const inheritGlyph = (list: TopicNode[], glyph: string): void => {
+  // (spec §4), which is what `glyphForRoot(topic.path[0])` used to do. The
+  // emoji inherits by exactly the same rule (subjects spec §7).
+  const inheritEmblems = (list: TopicNode[], glyph: string, emoji: string | null): void => {
     for (const node of list) {
       node.glyph = glyph;
-      inheritGlyph(node.children, glyph);
+      node.emoji = emoji;
+      inheritEmblems(node.children, glyph, emoji);
     }
   };
-  for (const root of roots) inheritGlyph(root.children, root.glyph);
+  for (const root of roots) inheritEmblems(root.children, root.glyph, root.emoji);
 
   sortByName(roots);
 
@@ -130,6 +145,9 @@ export const getTopicTree = cache(async (): Promise<TopicNode[]> => {
         slug: true,
         parentId: true,
         wordProblemsOnly: true,
+        emoji: true,
+        hidden: true,
+        favoritedAt: true,
         symbol: { select: { glyph: true } },
         _count: { select: { modelDocs: true } },
       },
@@ -144,6 +162,11 @@ export type TopicDetail = {
   name: string;
   slug: string;
   glyph: string;
+  /** The root's emblem, inherited like the glyph (subjects spec §7). */
+  emoji: string | null;
+  /** This topic's own shelf state (subjects spec §7). */
+  hidden: boolean;
+  favoritedAt: number | null;
   parentId: string | null;
   description: string | null;
   path: string[];
@@ -162,7 +185,7 @@ export type TopicDetail = {
     depth: number;
     createdAt: Date;
   }[];
-  children: { id: string; name: string }[];
+  children: { id: string; name: string; hidden: boolean; favoritedAt: number | null }[];
 };
 
 /**
@@ -218,6 +241,8 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
         parentId: true,
         description: true,
         wordProblemsOnly: true,
+        hidden: true,
+        favoritedAt: true,
         perspectiveDoc: { select: { id: true, contentMd: true, createdAt: true } },
         modelDocs: {
           select: {
@@ -230,14 +255,17 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
           },
           orderBy: { depth: "asc" },
         },
-        children: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+        children: {
+          select: { id: true, name: true, hidden: true, favoritedAt: true },
+          orderBy: { name: "asc" },
+        },
       },
     }),
     prisma.problem.count({ where: { topicId, verified: true } }),
-    // The root owns the glyph; a leaf inherits it. pathNodes[0] IS the root.
+    // The root owns the emblems; a leaf inherits them. pathNodes[0] IS the root.
     prisma.topic.findUnique({
       where: { id: rootId },
-      select: { symbol: { select: { glyph: true } } },
+      select: { emoji: true, symbol: { select: { glyph: true } } },
     }),
   ]);
   if (!topic) return null;
@@ -249,6 +277,9 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
     name: topic.name,
     slug: topic.slug,
     glyph: root?.symbol?.glyph ?? DEFAULT_GLYPH,
+    emoji: root?.emoji ?? null,
+    hidden: topic.hidden,
+    favoritedAt: topic.favoritedAt?.getTime() ?? null,
     parentId: topic.parentId,
     description: topic.description,
     path,
@@ -265,7 +296,12 @@ export async function getTopicDetail(topicId: string): Promise<TopicDetail | nul
       depth: doc.depth,
       createdAt: doc.createdAt,
     })),
-    children: topic.children,
+    children: topic.children.map((child) => ({
+      id: child.id,
+      name: child.name,
+      hidden: child.hidden,
+      favoritedAt: child.favoritedAt?.getTime() ?? null,
+    })),
   };
 }
 

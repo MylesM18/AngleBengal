@@ -8,9 +8,12 @@ import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
 import { DocCompleteStrip, ReadProgressProvider } from "@/components/learn/DocProgress";
 import { DocTabStrip } from "@/components/learn/DocTabStrip";
 import { FeynmanGapLine } from "@/components/learn/FeynmanGapLine";
+import { AddTopicInput } from "@/components/learn/AddTopicInput";
+import { CoverActions } from "@/components/learn/CoverActions";
 import { FocusToggle } from "@/components/learn/FocusToggle";
+import { GenerateDocButton } from "@/components/learn/GenerateDocButton";
 import { GenerateMoreStudy } from "@/components/learn/GenerateMoreStudy";
-import { GenerateTopicInput } from "@/components/learn/GenerateTopicInput";
+import { HiddenShelf } from "@/components/learn/HiddenShelf";
 import { ModelMissList } from "@/components/learn/ModelMissList";
 import { PerspectiveTabs } from "@/components/learn/PerspectiveTabs";
 import { ReaderRail } from "@/components/learn/ReaderRail";
@@ -24,6 +27,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { modelMissCounts } from "@/lib/attempts";
 import { prisma } from "@/lib/db";
 import { getDocCards } from "@/lib/learn/docCards";
+import { partitionHidden, sortFavoritesFirst } from "@/lib/learn/shelf";
 import { parseDocTabs } from "@/lib/learn/docTabs";
 import { splitHeadingSections } from "@/lib/learn/splitHeadingSections";
 import { deserializeModelIndex, type ModelIndexEntry } from "@/lib/modelIndex";
@@ -268,6 +272,11 @@ export default async function TopicPage({
   const totals = counts.get(topic.id) ?? ZERO;
   const canPractice = totals.verifiedProblems > 0;
   const empty = topic.modelDocs.length === 0 && topic.children.length === 0;
+  // A subject is a root topic (subjects spec 1); only subjects take the add
+  // input and wear the emoji in their heading.
+  const isSubject = topic.parentId === null;
+  const childShelf = partitionHidden(topic.children);
+  const visibleChildren = sortFavoritesFirst(childShelf.visible);
   const countLine = [
     plural(totals.docs, "model document"),
     plural(totals.verifiedProblems, "verified problem"),
@@ -281,7 +290,10 @@ export default async function TopicPage({
         <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />
       </div>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="display-cut text-h1 text-ink">{topic.name}</h1>
+        <h1 className="display-cut text-h1 text-ink">
+          {isSubject && topic.emoji ? `${topic.emoji} ` : ""}
+          {topic.name}
+        </h1>
         {canPractice ? (
           <ButtonLink href={`/practice/${topic.id}`} size="md">
             Practice this topic
@@ -311,35 +323,52 @@ export default async function TopicPage({
         </div>
       ) : null}
 
-      {topic.children.length > 0 ? (
+      {topic.children.length > 0 || isSubject ? (
         <>
           <h2 className="meta-caps mt-10">Subtopics</h2>
-          <ul aria-label="Subtopics" className="mt-3 grid grid-cols-1 gap-6 sm:grid-cols-2">
-            {topic.children.map((child) => {
-              const c = counts.get(child.id) ?? ZERO;
-              return (
-                <li key={child.id}>
-                  <TopicCoverCard
-                    href={`/learn/${child.id}`}
-                    name={child.name}
-                    glyph={topic.glyph}
-                    meta={`${plural(c.docs, "model")} · ${plural(c.verifiedProblems, "problem")}`}
-                    accent={accent}
-                  />
-                </li>
-              );
-            })}
-          </ul>
+          {isSubject ? (
+            <div className="mt-3 max-w-[520px]">
+              <AddTopicInput subjectId={topic.id} subjectName={topic.name} />
+            </div>
+          ) : null}
+          {visibleChildren.length > 0 ? (
+            <ul aria-label="Subtopics" className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {visibleChildren.map((child) => {
+                const c = counts.get(child.id) ?? ZERO;
+                return (
+                  <li key={child.id} className="relative">
+                    <TopicCoverCard
+                      href={`/learn/${child.id}`}
+                      name={child.name}
+                      glyph={topic.emoji ?? topic.glyph}
+                      meta={`${plural(c.docs, "model")} · ${plural(c.verifiedProblems, "problem")}`}
+                      accent={accent}
+                    />
+                    <CoverActions topicId={child.id} favorited={child.favoritedAt !== null} />
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+          <HiddenShelf
+            noun="topic"
+            items={childShelf.hidden.map((child) => ({
+              id: child.id,
+              name: child.name,
+              emblem: topic.emoji ?? topic.glyph,
+              href: `/learn/${child.id}`,
+            }))}
+          />
         </>
       ) : null}
 
-      {empty ? (
+      {empty && !isSubject ? (
         <EmptyState
           shape="wedge"
           accent={ACCENT_VAR[accent]}
           title="No models here yet"
           line="Generate the first mental model document for this topic."
-          action={<GenerateTopicInput initialValue={topic.name} compact />}
+          action={<GenerateDocButton topicId={topic.id} />}
           className="mt-8"
         />
       ) : null}
