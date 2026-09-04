@@ -63,11 +63,15 @@ UPDATE "Topic" SET "emoji" = '🎲' WHERE "parentId" IS NULL AND "name" = 'Stati
 - [x] **Step 4: Seed parity** in `prisma/seed.ts`: a `SUBJECT_EMOJI: Record<string, string>` map with the same six values; root creation passes `emoji: SUBJECT_EMOJI[name] ?? null`; an existing root with null emoji and a map entry gets updated (idempotent re-seed on a fresh database only; never run against live).
 - [x] **Step 5: Commit** `feat: subject layer columns on Topic with seeded emblems`
 
-> **Result:** Steps 2 and 3 deviated: the Supabase session pooler (:5432)
-> refused connections all session and the transaction pooler degraded, so the
+> **Result:** Steps 2 and 3 deviated: the Supabase Postgres path from the dev
+> machine was unreliable all session (schema-engine commands hang; plain
+> queries intermittently work; production was healthy throughout), so the
 > migration was hand-authored in Prisma's deterministic generated form as
-> `20260904003234_subject_layer` and its APPLY IS PENDING Supabase recovery
-> (commands in PR #21; mechanism in D-149). Everything else ran as written.
+> `20260904003234_subject_layer`, APPLIED 2026-09-04 via `prisma db execute`
+> over the transaction pooler, and recorded in `_prisma_migrations` by a
+> direct insert carrying the file's sha256. Verified live: all three columns
+> present, all six root emblems backfilled, 12/12 migration directories
+> recorded with none missing or extra. Mechanism in D-149.
 
 ### Task 2: Pure helpers, emoji normalization and shelf ordering
 
