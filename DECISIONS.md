@@ -2452,3 +2452,94 @@ direct-voice rewrite and stays locked. All PerspectiveDoc and
 PerspectiveReadProgress rows are cleared once at ship, in one transaction
 (scripts/clear-perspective-docs.ts), so topics regenerate lazily in the new
 voice; reading progress resets deliberately because the text is new.
+
+### D-142. Subjects are root topics; the Learn index input creates them
+
+The subject layer (docs/superpowers/specs/2026-09-03-learn-subjects-design.md)
+adds no table: a subject IS a root topic, so the tree, glyph inheritance,
+accent hashing, counts roll-up, and classifier taxonomy all keep working
+unchanged. The index's free-text input now creates subjects through the
+CLASSIFIER-model planner (docs/05 §10), which guards a four-field whitelist
+(mathematics, physics, engineering, economics), normalizes the name, picks
+one emoji, and files 5 to 8 starter topic rows in one sequential
+transaction. No documents are generated; docs stay on demand per topic. A
+planned name matching an existing root case-insensitively resolves to that
+root, which is also the root-duplication guard, because Postgres treats the
+NULL parentId in @@unique([parentId, name]) as distinct.
+
+### D-143. Emoji emblems: a Topic column, inherited like the glyph, glyph fallback
+
+Topic.emoji holds one emoji for root topics; subtopics inherit their root's
+at read time exactly as they inherit the glyph, and every display site
+renders emoji ?? glyph, so a null emoji (bad planner output, or a root
+created through the legacy classifier path) degrades to the D-078 glyph
+rather than failing anything. normalizeSubjectEmoji keeps the first grapheme
+and requires Extended_Pictographic. The six seeded subjects get fixed
+emblems, backfilled by the subject_layer migration and mirrored in seed.ts:
+Algebra 🧮, Geometry 📐, Trigonometry 🌊, Precalculus 📈, Calculus 🎢,
+Statistics & Probability 🎲.
+
+### D-144. Hide is visual-only; favorites pin by first-favorited order
+
+Topic.hidden removes a subject or topic from the cover grids and the rail
+only: links, breadcrumbs, practice, the Recent list, and the classifier
+taxonomy all still see it, so nothing breaks by hiding. Each shelf view
+carries its own "Show hidden (n)" reveal with unhide actions; the rail
+filters hidden nodes but hosts no reveal. Topic.favoritedAt ascending is the
+pin order (first favorited shows first), favorite is idempotent (the first
+timestamp wins, enforced in the PATCH route), and unfavorite clears the
+timestamp, returning the item to its normal position. The PATCH route
+accepts exactly one of wordProblemsOnly, hidden, favorited per call, keeping
+the named-fields philosophy it already had.
+
+### D-145. Doc generation for a known topic skips the classifier
+
+POST /api/models/generate now takes { request } OR { topicId }. The empty
+topic page's action became GenerateDocButton posting { topicId }: no
+classifier call, no misfiling risk, and it works for non-mathematics
+subjects regardless of classifier behavior. GenerateTopicInput is retired
+(both mounts replaced); the free-text form stays API-valid per docs/04. The
+classifier and generator prompts widened their discipline wording to the
+four fields (docs/05 §2.1, §3), the perspective prompt swapped only its
+mathematics-specific clauses (§9, voice rules untouched), and the NOT_MATH
+error code keeps its historical name with an updated message, since renaming
+the wire code buys nothing.
+
+### D-146. Add-topic lives on subject pages and files within the subject only
+
+The AddTopicInput renders on root topic pages only. Its librarian call
+(docs/05 §11) sees just that subject's subtree, may return an existing node
+id (verified against the subtree's ids; a hallucinated id is
+AI_INVALID_OUTPUT) or a new path of at most 2 levels under the subject,
+created by the same createTopicPath walk the classifier flow uses, now
+shared in src/lib/topics/create.ts. Success navigates to the topic, whose
+page offers doc generation.
+
+### D-147. Practice-side prompts keep their mathematics wording for now
+
+The problem generator, verifier, equivalence, diagnostic, tutor, and OCR
+prompts still say "mathematics". Problems for physics, engineering, and
+economics topics are quantitative and generate through the existing pipeline
+regardless; a wording pass there is deliberate future work, not an
+oversight, and belongs to whatever effort makes Practice first-class for the
+new fields.
+
+### D-148. The cover-grid cap counts visible roots
+
+COVER_GRID_MAX_ROOTS stays 12 and now counts VISIBLE roots (after hiding),
+so hiding subjects can keep the shelf a cover grid even as subjects
+accumulate. Past the cap the index swaps to the TopicRail, which obeys the
+same shelf rules internally, and the HiddenShelf reveal renders below either
+branch.
+
+### D-149. The subject_layer migration was authored and applied outside migrate dev
+
+The Supabase session pooler (DIRECT_URL, port 5432) refused connections on
+2026-09-03/04 while the transaction pooler stayed reachable, so
+prisma migrate dev could not run. The migration file was written by hand in
+Prisma's deterministic generated form (one AlterTable adding emoji,
+favoritedAt, hidden, plus the six emblem UPDATEs) and applied through the
+transaction pooler with prisma db execute, then recorded in
+_prisma_migrations via prisma migrate resolve --applied, so migrate status
+converges to the same end state migrate dev would have produced. A later
+schema change on a healthy pooler proceeds normally.

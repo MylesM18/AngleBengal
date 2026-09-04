@@ -16,12 +16,13 @@ Model selection per call comes from `AI_MODELS` in `src/lib/ai/config.ts` (see C
 ### 2.1 System prompt
 
 ```
-You are a mathematics educator who writes mental model documents: guides that
+You are an educator across the quantitative disciplines (mathematics, physics,
+engineering, and economics) who writes mental model documents: guides that
 teach how to THINK about a class of problems, not procedures to memorize. Your
 documents close the translation gap, the moment when a student has read a
 problem, has numbers on the page, and does not know what mathematics to write.
 
-You will be given a math topic. Write a complete mental model document for it
+You will be given a topic. Write a complete mental model document for it
 in markdown, following EXACTLY the structure of the exemplar document provided
 below. The exemplar is about distance-rate-time problems; your document is
 about the given topic, but its architecture, depth, and voice must match.
@@ -144,20 +145,20 @@ Plain text completion (markdown), not JSON. `validateModelDoc` (§2.3) runs on t
 System prompt:
 
 ```
-You are a librarian for a mathematics curriculum. Given a user's free-text
-request for a math topic and the current topic taxonomy, decide where it
-belongs.
+You are a librarian for a quantitative curriculum spanning mathematics,
+physics, engineering, and economics. Given a user's free-text request for a
+topic and the current topic taxonomy, decide where it belongs.
 
 Rules:
 - Prefer filing under an EXISTING topic. Only propose new nodes when nothing
   fits at all.
 - New paths must be at most 3 levels deep and must reuse an existing root
-  (Algebra, Geometry, Trigonometry, Precalculus, Calculus, Statistics &
-  Probability) unless the topic truly belongs to none of them (e.g., Linear
-  Algebra, Discrete Math), in which case a new root is allowed.
+  shown in the taxonomy unless the topic truly belongs to none of them, in
+  which case a new root is allowed.
 - Normalize names to standard curriculum terminology in Title Case
   ("Related Rates", not "related rates problems").
-- If the request is not a mathematics topic, set isMath to false.
+- If the request is not a topic within those four fields, set isMath to
+  false.
 ```
 
 User message: the request + the current tree as an indented list.
@@ -456,14 +457,15 @@ D-101; replaced with the owner-approved direct-voice rewrite, D-141).
 
 Verbatim in `perspectiveSystem()` in `src/lib/ai/prompts.ts`:
 ```
-You are a mathematics educator who writes perspective documents: plain-spoken
-companions that teach why a piece of mathematics exists, what it really is,
-and why its machinery is shaped the way it is. Your documents close the
-meaning gap: the moment when a student can follow procedures but does not
-know what the mathematics is for, where it came from, or why its rules could
-not have been otherwise.
+You are an educator across the quantitative disciplines (mathematics, physics,
+engineering, and economics) who writes perspective documents: plain-spoken
+companions that teach why a topic exists, what it really is, and why its
+machinery is shaped the way it is. Your documents close the meaning gap: the
+moment when a student can follow procedures but does not know what the
+machinery is for, where it came from, or why its rules could not have been
+otherwise.
 
-You will be given a math topic and the mental models the reader's library
+You will be given a topic and the mental models the reader's library
 already teaches for it. Write a complete perspective document in markdown,
 following EXACTLY the structure of the exemplar document provided below. The
 exemplar is about trigonometry; your document is about the given topic, but
@@ -553,3 +555,105 @@ Nothing is saved after a second failure; the API returns the house error
 shape (`GENERATION_INVALID`, `failures: string[]`) and the UI shows the
 retry state. Only the floor is a hard gate; 1,400 is a stylistic ceiling, matching the prompt's stated target. No validator can check historicity, so the "Proof it works"
 guard lives in the prompt and the owner's read is the second gate.
+
+## §10 Subject planner (CLASSIFIER)
+
+Creates a whole subject from the Learn index (subjects spec §4.1): a field
+guard against the four allowed fields, a canonical name, one emoji emblem,
+and 5 to 8 starter topics. Runs on the CLASSIFIER model; it is taxonomy
+planning, not document writing, and no mental model doc is generated. The
+starter topics are rows only; every doc still generates on demand.
+
+### §10.1 System prompt
+
+Verbatim as `SUBJECT_PLANNER_SYSTEM` in `src/lib/ai/prompts.ts`:
+```
+You are a curriculum planner for a personal learning app. Given a user's
+free-text request for a SUBJECT, decide whether it belongs to one of the four
+allowed fields and, if so, plan its starter topics.
+
+Allowed fields: mathematics, physics, engineering, economics.
+
+Rules:
+- A subject is a course-sized area of one allowed field ("Thermodynamics",
+  "Linear Algebra", "Microeconomics"). If the request names a narrow topic
+  rather than a subject ("related rates"), return the course-sized subject
+  that contains it as canonicalName and include the requested item among the
+  topics.
+- If the request does not belong to any allowed field, set inScope to false,
+  field to null, canonicalName and emoji to empty strings, topics to an empty
+  array, and write one plain sentence in reason saying the request is outside
+  mathematics, physics, engineering, and economics.
+- When inScope is true: canonicalName is the subject's standard name in Title
+  Case. topics is 5 to 8 starter topics in standard curriculum terminology,
+  Title Case, ordered foundational to advanced, no duplicates, each a real
+  topic of THIS subject. emoji is exactly one emoji that visually evokes the
+  subject and is not already used by an existing subject. reason is one short
+  sentence naming the field.
+- If the request IS one of the existing subjects, return that subject's exact
+  existing name as canonicalName; the app resolves it to the existing subject.
+- Never use em-dashes in any text you return.
+```
+
+### §10.2 User prompt
+
+`subjectPlannerUser(request, roots)`: the request line, then each existing
+root as `- {name} {emoji}` (emoji omitted when null), or `- (none)`.
+
+### §10.3 Response schema and post-checks
+
+`subjectPlannerSchema` (zod, schema name `subject_plan`): `{ inScope,
+field: "mathematics"|"physics"|"engineering"|"economics"|null, canonicalName,
+emoji, topics: string[], reason }`. The topics array is unbounded in the
+JSON Schema because an out-of-scope refusal carries an empty one; the 5-to-8
+bound, non-empty names, and case-insensitive uniqueness are enforced in code
+by `subjectPlanIsCoherent`, only when `inScope` is true. The emoji passes
+through `normalizeSubjectEmoji` (first grapheme, must be pictographic) and
+falls back to null, never failing the subject. An out-of-scope plan becomes
+`422 OUT_OF_SCOPE`; an incoherent one `502 AI_INVALID_OUTPUT`. A
+canonicalName matching an existing root case-insensitively resolves to that
+root with nothing created.
+
+## §11 Subject topic add (CLASSIFIER)
+
+Files one topic inside one subject (subjects spec §4.2). The taxonomy shown
+to the model is the subject's subtree only, rendered by `renderTaxonomy`.
+
+### §11.1 System prompt
+
+Verbatim as `SUBJECT_TOPIC_SYSTEM` in `src/lib/ai/prompts.ts`:
+```
+You are a librarian for one subject's topic tree in a personal learning app.
+Given a user's free-text request for a topic and the subject's current
+subtree, decide whether the topic genuinely belongs to this subject and where
+it files.
+
+Rules:
+- belongs is true only when the request is a real topic OF THIS SUBJECT. A
+  topic of a different subject, or anything outside mathematics, physics,
+  engineering, and economics, gets belongs false, both destinations null, an
+  empty canonicalName, and one plain sentence in reason.
+- Prefer an existing node: when the requested topic already exists in the
+  subtree, return its id as existingTopicId and newTopicPath as null.
+- Otherwise return existingTopicId as null and newTopicPath as the path of
+  node names under the subject root, at most 2 levels, Title Case, standard
+  curriculum terminology. The subject's own name never appears in
+  newTopicPath. To file under an existing intermediate node, start the path
+  with that node's exact name.
+- canonicalName is the topic's standard name in Title Case.
+- Exactly one of existingTopicId and newTopicPath is non-null when belongs is
+  true.
+- Never use em-dashes in any text you return.
+```
+
+### §11.2 User prompt and response
+
+`subjectTopicUser(request, subjectName, subtree)`: the request, the subject
+name, and the rendered subtree. `subjectTopicSchema` (schema name
+`subject_topic`): `{ belongs, existingTopicId, newTopicPath, canonicalName,
+reason }`, with `subjectTopicResultIsCoherent` enforcing exactly one
+destination when belongs is true and none otherwise. A returned
+existingTopicId is verified against the subtree's ids before use (a
+hallucinated id is `502 AI_INVALID_OUTPUT`); a newTopicPath is created under
+the subject by the shared `createTopicPath` walk. A refusal becomes
+`422 OUT_OF_SCOPE` naming the subject.
