@@ -2568,3 +2568,15 @@ rounded to rx 104 at 512) rather than a bare transparent mark, because
 every accent sits inside the rust head and a plate is what keeps the tab
 chip legible on both light and dark tab strips. apple-touch-icon.png and
 icon-512.png already carried this look and are untouched.
+
+### D-152. Favicon delivery: PNG fallback for Safari plus a version query
+
+The D-151 favicon was live on production but invisible to the owner: Safari
+does not load SVG favicons at all, and other browsers cache favicons far
+longer than the page. The metadata icons entry therefore lists favicon.svg
+AND a favicon-32.png rasterized from the same SVG (Safari takes the PNG),
+both behind ?v=2 so every browser refetches once. The version increments
+with any future art change, and the PNG is regenerated from the SVG at the
+same time. No favicon.ico exists, matching the prior state: blind
+/favicon.ico requests 404 harmlessly, and every linked icon path already
+passes the guard's root-level public-file rule.

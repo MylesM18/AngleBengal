@@ -43,7 +43,16 @@ export const metadata: Metadata = {
   description:
     "A mathematics tutor built on mental models: learn the models, practice against them, and find out which one failed when an answer goes wrong.",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/favicon.svg", apple: "/apple-touch-icon.png" },
+  // The PNG exists because Safari does not load SVG favicons; the ?v=2 query
+  // makes every browser refetch past its (very sticky) favicon cache after
+  // the D-151 art change. Bump the version whenever the art changes again.
+  icons: {
+    icon: [
+      { url: "/favicon.svg?v=2", type: "image/svg+xml" },
+      { url: "/favicon-32.png?v=2", sizes: "32x32", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 /**
