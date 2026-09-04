@@ -145,11 +145,11 @@ Paper physics only: slide, settle, lift, press. Durations 150-220ms, `cubic-bezi
 **Concept:** a bengal head cut from terracotta paper whose nose is a measured angle: two rays meeting at a vertex beneath an arc tick. Cat first, geometry on the second look. The ear notches and coat rosettes are true die-cuts (compound paths with holes), so the mark physically obeys the paper system on any surface.
 
 **Files** (in `/brand`):
-- `anglebengal-mark.svg`: primary, ink details, for paper surfaces
-- `anglebengal-mark-dark.svg`: cream details, for plum/dark surfaces
+- `anglebengal-mark.svg`: ink details, kept for print and paper contexts that want the ink pass
+- `anglebengal-mark-dark.svg`: cream details, the app's standard mark on every surface (D-151): header, login, chat, favicon
 - `anglebengal-lockup.svg`: mark + wordmark (wordmark is live text in Archivo; convert to outlines before any print use)
 
-**Usage:** minimum size 24px; clear space = the ear height on all sides; never recolor beyond the two provided variants; never place on the raw desk without a sheet except in the app header. Favicon: the mark on `--paper-0`.
+**Usage:** minimum size 24px; clear space = the ear height on all sides; never recolor beyond the two provided variants; never place on the raw desk without a sheet except in the app header. Favicon: the app-icon composition, the cream-detail mark on its `--plum` plate with rounded corners (D-151), so the accents read on light and dark tab strips alike.
 
 **Wordmark:** "AngleBengal" set in Archivo 700 at 112% width, tight tracking (-0.01em), ink. The "A" may take the nose-angle's arc as a crossbar accent in a future refinement; not required for v1.
 

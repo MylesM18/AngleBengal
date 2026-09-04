@@ -14,7 +14,7 @@ export default function LoginPage() {
     <main className="flex min-h-dvh items-center justify-center bg-desk p-4">
       <div className="w-full max-w-sm rounded-chip bg-paper-1 p-6 shadow-sheet">
         <div className="mb-5 flex items-center gap-2.5">
-          <Image src="/anglebengal-mark.svg" alt="" width={28} height={28} priority />
+          <Image src="/anglebengal-mark-dark.svg" alt="" width={28} height={28} priority />
           <div>
             <div className="font-expanded text-ui-lg text-ink">AngleBengal</div>
             <div className="text-meta text-ink-soft">Sign in to continue</div>

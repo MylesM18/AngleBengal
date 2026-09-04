@@ -44,7 +44,7 @@ export function TopBar({ chatOpen, onToggleChat, tutorRef }: TopBarProps) {
             the Largest Contentful Paint; without it Next warns to load it
             eagerly. */}
         <Image
-          src="/anglebengal-mark.svg"
+          src="/anglebengal-mark-dark.svg"
           alt=""
           width={24}
           height={24}
