@@ -273,7 +273,7 @@ export default async function TopicPage({
   const canPractice = totals.verifiedProblems > 0;
   const empty = topic.modelDocs.length === 0 && topic.children.length === 0;
   // A subject is a root topic (subjects spec 1); only subjects take the add
-  // input and wear the emoji in their heading.
+  // input.
   const isSubject = topic.parentId === null;
   const childShelf = partitionHidden(topic.children);
   const visibleChildren = sortFavoritesFirst(childShelf.visible);
@@ -290,10 +290,7 @@ export default async function TopicPage({
         <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />
       </div>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="display-cut text-h1 text-ink">
-          {isSubject && topic.emoji ? `${topic.emoji} ` : ""}
-          {topic.name}
-        </h1>
+        <h1 className="display-cut text-h1 text-ink">{topic.name}</h1>
         {canPractice ? (
           <ButtonLink href={`/practice/${topic.id}`} size="md">
             Practice this topic
@@ -340,7 +337,7 @@ export default async function TopicPage({
                     <TopicCoverCard
                       href={`/learn/${child.id}`}
                       name={child.name}
-                      glyph={topic.emoji ?? topic.glyph}
+                      glyph={topic.glyph}
                       meta={`${plural(c.docs, "model")} · ${plural(c.verifiedProblems, "problem")}`}
                       accent={accent}
                     />
@@ -355,7 +352,7 @@ export default async function TopicPage({
             items={childShelf.hidden.map((child) => ({
               id: child.id,
               name: child.name,
-              emblem: topic.emoji ?? topic.glyph,
+              emblem: topic.glyph,
               href: `/learn/${child.id}`,
             }))}
           />

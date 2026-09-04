@@ -2543,3 +2543,28 @@ transaction pooler with prisma db execute, then recorded in
 _prisma_migrations via prisma migrate resolve --applied, so migrate status
 converges to the same end state migrate dev would have produced. A later
 schema change on a healthy pooler proceeds normally.
+
+### D-150. Subject emblems return to the math glyphs; emoji stays as dormant data
+
+Owner call (2026-09-04, right after PR #21 merged): covers, the rail, the
+hidden shelves, and subject headings render the D-078 math glyph again
+instead of the planner's emoji. The revert is display-only. Topic.emoji, its
+migration, the planner's emoji field, and normalizeSubjectEmoji all stay:
+the column is applied to the live database, new subjects keep storing a
+planned emoji, and dropping the contract would cost a migration plus prompt
+and schema churn for no benefit. The rail's root rows go back to plain
+names (the pre-#21 look) rather than taking a glyph prefix. If emblems ever
+return, the data is already there.
+
+### D-151. The cream-detail mark everywhere; the favicon is the app icon
+
+Owner call (2026-09-04): the white-accent bengal (anglebengal-mark-dark.svg,
+cream #F9F5EC details) becomes the app's standard mark on every surface:
+the header, the login card, and the favicon join the chat surfaces that
+already used it. This supersedes docs/08's original paper-surfaces rule for
+the ink variant, which is kept for print contexts. The favicon reuses the
+app icon's composition (the cream-detail head on the #4C3E57 plum plate,
+rounded to rx 104 at 512) rather than a bare transparent mark, because
+every accent sits inside the rust head and a plate is what keeps the tab
+chip legible on both light and dark tab strips. apple-touch-icon.png and
+icon-512.png already carried this look and are untouched.

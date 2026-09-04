@@ -1,6 +1,8 @@
-<svg viewBox="27 26 186 186" xmlns="http://www.w3.org/2000/svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <title>AngleBengal</title>
-  <desc>A bengal cat head cut from terracotta paper. The ear notches are die-cut holes, the coat rosettes are crescent cuts, and the nose is a measured angle: two rays meeting at a vertex under an arc tick.</desc>
+  <desc>The app-icon composition at favicon size: the cream-detail bengal mark on its plum plate, so the accents read on light and dark tab strips alike.</desc>
+  <rect width="512" height="512" rx="104" fill="#4C3E57"/>
+  <g transform="translate(-14 -11.75) scale(2.25)">
 
   <!-- head sheet with die-cut ear notches (real holes) -->
   <path fill-rule="evenodd" fill="#B5522E" d="
@@ -10,26 +12,27 @@
     M 69.6 73.9 L 75.7 53.4 L 84.8 68.6 Z"/>
 
   <!-- forehead stripes -->
-  <path d="M 106 86 L 103 102" stroke="#322921" stroke-width="5" stroke-linecap="round"/>
-  <path d="M 120 84 L 120 102" stroke="#322921" stroke-width="5" stroke-linecap="round"/>
-  <path d="M 134 86 L 137 102" stroke="#322921" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 106 86 L 103 102" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 120 84 L 120 102" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 134 86 L 137 102" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/>
 
   <!-- eyes -->
-  <circle cx="95" cy="126" r="7.5" fill="#322921"/>
-  <circle cx="145" cy="126" r="7.5" fill="#322921"/>
+  <circle cx="95" cy="126" r="7.5" fill="#F9F5EC"/>
+  <circle cx="145" cy="126" r="7.5" fill="#F9F5EC"/>
 
   <!-- nose: the hidden measured angle -->
-  <path d="M 120 160 L 107 145" stroke="#322921" stroke-width="5" stroke-linecap="round"/>
-  <path d="M 120 160 L 133 145" stroke="#322921" stroke-width="5" stroke-linecap="round"/>
-  <path d="M 113.8 152.8 A 9.5 9.5 0 0 1 126.2 152.8" stroke="#322921" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <path d="M 120 160 L 107 145" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 120 160 L 133 145" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 113.8 152.8 A 9.5 9.5 0 0 1 126.2 152.8" stroke="#F9F5EC" stroke-width="3.5" fill="none" stroke-linecap="round"/>
 
   <!-- crescent rosettes: ink spots with offset die-cut bites -->
-  <path fill-rule="evenodd" fill="#322921" d="
+  <path fill-rule="evenodd" fill="#F9F5EC" d="
     M 77 143 A 7 7 0 1 0 77 157 A 7 7 0 1 0 77 143 Z
     M 80 141.2 A 5.8 5.8 0 1 0 80 152.8 A 5.8 5.8 0 1 0 80 141.2 Z"/>
-  <path fill-rule="evenodd" fill="#322921" d="
+  <path fill-rule="evenodd" fill="#F9F5EC" d="
     M 160 157 A 6 6 0 1 0 160 169 A 6 6 0 1 0 160 157 Z
     M 157.5 160.5 A 5 5 0 1 0 157.5 170.5 A 5 5 0 1 0 157.5 160.5 Z"/>
-  <circle cx="166" cy="138" r="3.2" fill="#322921"/>
-  <circle cx="90" cy="174" r="3" fill="#322921"/>
+  <circle cx="166" cy="138" r="3.2" fill="#F9F5EC"/>
+  <circle cx="90" cy="174" r="3" fill="#F9F5EC"/>
+  </g>
 </svg>

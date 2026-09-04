@@ -99,7 +99,7 @@ export default async function LearnIndexPage() {
                     <TopicCoverCard
                       href={`/learn/${root.id}`}
                       name={root.name}
-                      glyph={root.emoji ?? root.glyph}
+                      glyph={root.glyph}
                       meta={`${plural(c.docs, "model")} · ${plural(c.verifiedProblems, "problem")}`}
                       accent={accentForRoot(root.name)}
                     />
@@ -115,7 +115,7 @@ export default async function LearnIndexPage() {
             items={shelf.hidden.map((root) => ({
               id: root.id,
               name: root.name,
-              emblem: root.emoji ?? root.glyph,
+              emblem: root.glyph,
               href: `/learn/${root.id}`,
             }))}
           />

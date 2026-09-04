@@ -16,8 +16,8 @@ export type TopicNode = {
   name: string;
   slug: string;
   glyph: string;
-  /** The subject's emblem, inherited root-down like the glyph; null falls
-   *  back to the glyph (subjects spec §7). */
+  /** The subject's emoji, inherited root-down like the glyph. Data only
+   *  since D-150: every emblem display renders the glyph. */
   emoji: string | null;
   /** Off the Learn shelves when true; the topic itself keeps working. */
   hidden: boolean;
@@ -162,7 +162,8 @@ export type TopicDetail = {
   name: string;
   slug: string;
   glyph: string;
-  /** The root's emblem, inherited like the glyph (subjects spec §7). */
+  /** The root's emoji, inherited like the glyph. Data only since D-150:
+   *  every emblem display renders the glyph. */
   emoji: string | null;
   /** This topic's own shelf state (subjects spec §7). */
   hidden: boolean;
