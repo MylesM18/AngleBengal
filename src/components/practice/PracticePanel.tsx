@@ -116,11 +116,22 @@ export function PracticePanel({
 }) {
   const [difficulty, setDifficulty] = useState(2);
   const [counts, setCounts] = useState(initialCounts);
+
+  /**
+   * The fetch effect reads difficulty through this ref instead of closing
+   * over the state, and deliberate difficulty changes bump reloadKey
+   * themselves. That split is what lets a served problem sync the selector
+   * to its own difficulty (a resumed problem can come from another pool,
+   * D-157) without refiring the request that just served it.
+   */
+  const difficultyRef = useRef(2);
   /**
    * The loaded problem is stored together with the request it answers, and
    * `loading` is derived by comparing the two. That keeps the fetch effect
    * free of synchronous setState (which React flags as a cascading render)
-   * without pretending the request is instant.
+   * without pretending the request is instant. Every deliberate ask (mount,
+   * Skip, Next, a difficulty switch) is a reloadKey bump; difficulty itself
+   * travels by ref so the D-157 selector sync cannot restart a request.
    */
   const [reloadKey, setReloadKey] = useState(0);
   const [loaded, setLoaded] = useState<{ key: string; problem: ServedProblem | null } | null>(
@@ -147,7 +158,7 @@ export function PracticePanel({
     }
   }, [topicId]);
 
-  const requestKey = `${topicId}:${difficulty}:${reloadKey}`;
+  const requestKey = `${topicId}:${reloadKey}`;
   const problem = loaded?.key === requestKey ? loaded.problem : null;
   const loading = loaded?.key !== requestKey;
 
@@ -192,7 +203,9 @@ export function PracticePanel({
     const resumeId = resumeIdRef.current;
     const resumeQuery = resumeId ? `&problemId=${resumeId}` : "";
 
-    fetch(`/api/problems/next?topicId=${topicId}&difficulty=${difficulty}${resumeQuery}`)
+    fetch(
+      `/api/problems/next?topicId=${topicId}&difficulty=${difficultyRef.current}${resumeQuery}`,
+    )
       .then(async (response) => {
         if (response.status === 404) return null;
         if (!response.ok) throw new Error("Could not load a problem.");
@@ -219,6 +232,15 @@ export function PracticePanel({
 
         setLoaded({ key: requestKey, problem: next });
         if (next) {
+          // The selector follows the problem on screen (D-157): a resumed
+          // problem may come from another difficulty's pool, and leaving the
+          // selector on the default misstated what Next would serve. The ref
+          // moves with the state, and because the fetch reads the ref, this
+          // sync cannot refire the request that just served the problem.
+          if (next.difficulty !== difficultyRef.current) {
+            difficultyRef.current = next.difficulty;
+            setDifficulty(next.difficulty);
+          }
           const store = useSketchStore.getState();
           if (isNewProblem) {
             store.resetForNewProblem();
@@ -276,7 +298,7 @@ export function PracticePanel({
     return () => {
       cancelled = true;
     };
-  }, [topicId, difficulty, requestKey, onAnswerChange]);
+  }, [topicId, requestKey, onAnswerChange]);
 
   // The tutor must not keep seeing a problem after the panel is gone.
   useEffect(() => clearActiveProblem, []);
@@ -493,7 +515,12 @@ export function PracticePanel({
             setOutcome(null);
             setRevealedSolution(null);
             onAnswerChange(emptyAnswer);
+            // Ref and state move together; the request itself is asked for
+            // through reloadKey now that difficulty is off the request key
+            // (D-157).
+            difficultyRef.current = level;
             setDifficulty(level);
+            setReloadKey((key) => key + 1);
           }}
         />
       </header>
