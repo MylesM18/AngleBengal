@@ -31,9 +31,12 @@ const GRAPH_STEPS: { value: number; label: string }[] = [
 ];
 
 /**
- * The Graph-mode second row (spec Q4): the owner's explicit, scoped bend of
- * the one-strip rule, recorded in docs/06. Renders only in Graph mode, below
- * the kraft strip, which keeps only ink tools. Snap is always on.
+ * The graph second row (spec Q4): the owner's explicit, scoped bend of the
+ * one-strip rule, recorded in docs/06. Renders whenever the paper is set to
+ * Graph (D-154), below the kraft strip, which keeps only ink tools. The
+ * placement tools show only when the served problem's toolset declares graph
+ * tools; the "1 sq =" scale selector is always present, since the numbered
+ * axes are. Snap is always on.
  */
 export function GraphRail() {
   const toolset = useSketchStore((state) => state.toolset);
@@ -50,7 +53,8 @@ export function GraphRail() {
   const yRef = useRef<HTMLInputElement | null>(null);
   const titleId = useId();
 
-  const allowed: GraphRailTool[] = [...(toolset?.graphTools ?? []), "eraser"];
+  const hasTools = (toolset?.graphTools.length ?? 0) > 0;
+  const allowed: GraphRailTool[] = hasTools ? [...(toolset?.graphTools ?? []), "eraser"] : [];
   const disabled = status !== "ready";
 
   function placeExact(): void {
@@ -82,22 +86,26 @@ export function GraphRail() {
           {TOOL_LABELS[tool]}
         </button>
       ))}
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setCoordsOpen((open) => !open)}
-        aria-expanded={coordsOpen}
-        className="rounded-chip border border-ink-faint px-2 py-1 font-mono text-meta text-ink disabled:opacity-60"
-      >
-        x,y
-      </button>
-      <button
-        type="button"
-        onClick={undo}
-        className="rounded-chip border border-ink-faint px-2 py-1 text-meta text-ink"
-      >
-        Undo
-      </button>
+      {hasTools && (
+        <>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setCoordsOpen((open) => !open)}
+            aria-expanded={coordsOpen}
+            className="rounded-chip border border-ink-faint px-2 py-1 font-mono text-meta text-ink disabled:opacity-60"
+          >
+            x,y
+          </button>
+          <button
+            type="button"
+            onClick={undo}
+            className="rounded-chip border border-ink-faint px-2 py-1 text-meta text-ink"
+          >
+            Undo
+          </button>
+        </>
+      )}
       <div className="flex items-center gap-1" role="group" aria-label="Units per grid square">
         <span className="select-none font-mono text-meta text-ink-soft">1 sq =</span>
         {GRAPH_STEPS.map(({ value, label }) => (
@@ -125,7 +133,7 @@ export function GraphRail() {
           {hint}
         </span>
       )}
-      {status === "failed" && (
+      {hasTools && status === "failed" && (
         <span className="flex items-center gap-2 text-meta text-ink-soft" role="status">
           Graph tools could not load.
           <button type="button" onClick={retry} className="text-cobalt hover:underline">

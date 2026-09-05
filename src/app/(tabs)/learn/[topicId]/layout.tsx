@@ -28,7 +28,11 @@ export default async function TopicLayout({ children }: { children: React.ReactN
         <TopicRail topics={topics} />
       </Sheet>
 
-      <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
+      {/* data-learn-scroller: DocScrollMemory saves and restores this
+          element's scroll offset (D-156). */}
+      <div data-learn-scroller className="min-w-0 flex-1 overflow-y-auto">
+        {children}
+      </div>
     </div>
   );
 }

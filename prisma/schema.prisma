@@ -184,6 +184,7 @@ model Problem {
 
   modelTags ProblemModelTag[]
   attempts  Attempt[]
+  work      ProblemWork?
 
   @@index([topicId, verified, difficulty])
 }
@@ -221,6 +222,27 @@ model Attempt {
   createdAt DateTime @default(now())
 
   @@index([problemId, createdAt])
+}
+
+/// Where the app should land when the owner returns (D-156). Single row, id
+/// "owner": the client reports its location as it changes, the root page
+/// reads it back and redirects there. contextJson is a JSON string carrying
+/// surface detail (reader scroll offset, active practice problem id).
+model ResumeState {
+  id          String   @id
+  path        String
+  contextJson String
+  updatedAt   DateTime @updatedAt
+}
+
+/// In-progress sketchpad work, one row per problem (D-156): strokes, typed
+/// lines, graph objects, and the answer draft as one JSON string, replaced
+/// on every autosave and rehydrated whenever that problem is served again.
+model ProblemWork {
+  problemId String   @id
+  problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  stateJson String
+  updatedAt DateTime @updatedAt
 }
 
 model ChatSession {

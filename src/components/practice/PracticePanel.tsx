@@ -20,6 +20,13 @@ import {
   setActiveProblem,
 } from "@/lib/practiceSession";
 import type { ProblemToolset } from "@/lib/practice/tools";
+import {
+  beginProblemWork,
+  noteProblemWork,
+  reportDetail,
+  suspendProblemWork,
+} from "@/lib/resume/client";
+import { parseWorkState, type ProblemWorkState } from "@/lib/resume/workState";
 import { latexToPlain } from "@/lib/sketch/latexToPlain";
 import { useSketchStore } from "@/lib/sketch/store";
 import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
@@ -76,6 +83,7 @@ export function PracticePanel({
   onProblemChange,
   calculatorOpen,
   onToggleCalculator,
+  initialProblemId = null,
 }: {
   topicId: string;
   topicPath: string[];
@@ -99,6 +107,12 @@ export function PracticePanel({
   calculatorOpen: boolean;
   /** Toggles the calculator; also lazily mounts it on first open. */
   onToggleCalculator: () => void;
+  /**
+   * The problem to reopen first (D-156): the server page reads it from the
+   * resume record. Applies to the initial request only; Skip, Next, and the
+   * difficulty switch ask for a fresh problem as always.
+   */
+  initialProblemId?: string | null;
 }) {
   const [difficulty, setDifficulty] = useState(2);
   const [counts, setCounts] = useState(initialCounts);
@@ -137,8 +151,23 @@ export function PracticePanel({
   const problem = loaded?.key === requestKey ? loaded.problem : null;
   const loading = loaded?.key !== requestKey;
 
+  /**
+   * The problem the initial request should reopen (D-156). A ref rather
+   * than state: it is consumed by requests, never rendered, and it must
+   * survive the dev double-effect without being spent by the first pass.
+   * Any deliberate ask for a fresh problem clears it.
+   */
+  const resumeIdRef = useRef(initialProblemId);
+
+  /** Latest answer, for the work saver's flush-time payload build. */
+  const answerRef = useRef(answer);
+
   /** Asks for a fresh problem. Safe to call from an event handler. */
   const loadProblem = useCallback(() => {
+    // Flush pending work for the outgoing problem before the canvas resets,
+    // so a reset can never overwrite saved work (D-156).
+    suspendProblemWork();
+    resumeIdRef.current = null;
     // docs/06 §4: strokes are per attempt, cleared on problem change.
     useSketchStore.getState().resetForNewProblem();
     setError(null);
@@ -160,24 +189,75 @@ export function PracticePanel({
   useEffect(() => {
     let cancelled = false;
 
-    fetch(`/api/problems/next?topicId=${topicId}&difficulty=${difficulty}`)
+    const resumeId = resumeIdRef.current;
+    const resumeQuery = resumeId ? `&problemId=${resumeId}` : "";
+
+    fetch(`/api/problems/next?topicId=${topicId}&difficulty=${difficulty}${resumeQuery}`)
       .then(async (response) => {
         if (response.status === 404) return null;
         if (!response.ok) throw new Error("Could not load a problem.");
         return (await response.json()) as ServedProblem;
       })
-      .then((next) => {
+      .then(async (next) => {
         if (cancelled) return;
+
+        // Saved work loads before the canvas is touched, so the reset and
+        // the restore land in the same commit (D-156). Any failure here
+        // reads as "no saved work": a fresh canvas, never a blocked problem.
+        let saved: ProblemWorkState | null = null;
+        const isNewProblem = next !== null && next.id !== prevProblemIdRef.current;
+        if (isNewProblem) {
+          suspendProblemWork();
+          saved = await fetch(`/api/problems/${next.id}/work`)
+            .then((response) => (response.ok ? response.json() : null))
+            .then((payload) =>
+              parseWorkState((payload as { state?: unknown } | null)?.state),
+            )
+            .catch(() => null);
+          if (cancelled) return;
+        }
+
         setLoaded({ key: requestKey, problem: next });
         if (next) {
-          if (next.id !== prevProblemIdRef.current) {
-            useSketchStore.getState().resetForNewProblem();
+          const store = useSketchStore.getState();
+          if (isNewProblem) {
+            store.resetForNewProblem();
           }
           prevProblemIdRef.current = next.id;
           setActiveProblem(next.id, next.answerType);
-          useSketchStore.getState().setToolset(next.toolset);
-          useSketchStore.getState().setGraphStep(next.graphStep ?? 1);
+          store.setToolset(next.toolset);
+          store.setGraphStep(next.graphStep ?? 1);
+          // A graph answer is drawn on the graph paper, so make sure that
+          // paper is up. Other problems respect the paper the user chose
+          // (D-154: Graph lives on the background, not a mode).
+          if (next.answerType === "graph") {
+            store.setBackground("graph");
+          }
+          if (saved) {
+            // Restored on top of the problem defaults, so what the owner
+            // last saw wins. The ref syncs before onAnswerChange so the
+            // answer-watch effect below reads no delta and stays clean.
+            store.hydrateForProblem(saved);
+            answerRef.current = saved.answer;
+            onAnswerChange(saved.answer);
+          }
+          reportDetail({ problemId: next.id });
+          beginProblemWork(next.id, () => {
+            const current = useSketchStore.getState();
+            return {
+              strokes: current.strokes,
+              typedLines: current.typedLines,
+              graphObjects: current.graphObjects,
+              graphShades: current.graphShades,
+              graphStep: current.graphStep,
+              background: current.background,
+              mode: current.mode,
+              ocrBlocks: current.ocrBlocks,
+              answer: answerRef.current,
+            };
+          });
         } else {
+          suspendProblemWork();
           prevProblemIdRef.current = null;
           clearActiveProblem();
           useSketchStore.getState().setToolset(null);
@@ -185,6 +265,7 @@ export function PracticePanel({
       })
       .catch((loadError: unknown) => {
         if (cancelled) return;
+        suspendProblemWork();
         setLoaded({ key: requestKey, problem: null });
         prevProblemIdRef.current = null;
         clearActiveProblem();
@@ -195,17 +276,50 @@ export function PracticePanel({
     return () => {
       cancelled = true;
     };
-  }, [topicId, difficulty, requestKey]);
+  }, [topicId, difficulty, requestKey, onAnswerChange]);
 
   // The tutor must not keep seeing a problem after the panel is gone.
   useEffect(() => clearActiveProblem, []);
 
-  // Leaving practice must not leave a stale toolset for whatever mounts next.
+  // Leaving practice must not leave a stale toolset for whatever mounts
+  // next, and pending work flushes on the way out (D-156).
   useEffect(() => {
     return () => {
+      suspendProblemWork();
       useSketchStore.getState().setToolset(null);
     };
   }, []);
+
+  // Autosave (D-156): every change to what the work payload carries marks it
+  // dirty; the client module debounces the actual POST. Between suspend and
+  // the next begin (problem changes) notes are dropped, so resets never
+  // overwrite the outgoing problem's save.
+  useEffect(() => {
+    return useSketchStore.subscribe((state, previous) => {
+      if (
+        state.strokes !== previous.strokes ||
+        state.typedLines !== previous.typedLines ||
+        state.graphObjects !== previous.graphObjects ||
+        state.graphShades !== previous.graphShades ||
+        state.graphStep !== previous.graphStep ||
+        state.background !== previous.background ||
+        state.mode !== previous.mode ||
+        state.ocrBlocks !== previous.ocrBlocks
+      ) {
+        noteProblemWork();
+      }
+    });
+  }, []);
+
+  // The answer draft is part of the saved work. The ref sync keeps the
+  // flush-time payload current; the guard keeps a hydrate's own echo (the
+  // ref is synced before onAnswerChange there) from marking dirty.
+  useEffect(() => {
+    if (answerRef.current !== answer) {
+      answerRef.current = answer;
+      noteProblemWork();
+    }
+  }, [answer]);
 
   /**
    * `problem` is derived, not state, so this fires on both edges: a loaded
@@ -372,6 +486,9 @@ export function PracticePanel({
           onChange={(level) => {
             // A difficulty switch loads a different problem, so the canvas is
             // stale work for a question no longer on screen (docs/06 §4).
+            // Same flush-before-reset rule as loadProblem (D-156).
+            suspendProblemWork();
+            resumeIdRef.current = null;
             useSketchStore.getState().resetForNewProblem();
             setOutcome(null);
             setRevealedSolution(null);

@@ -28,7 +28,8 @@ export function LoginForm() {
       if (response.ok) {
         // Full navigation, not a client transition: the new cookie should be
         // on the very next document request and nothing cached should linger.
-        window.location.replace("/learn");
+        // The root page forwards to wherever the owner left off (D-156).
+        window.location.replace("/");
         return;
       }
       setError(loginErrorMessage(response.status));

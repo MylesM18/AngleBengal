@@ -40,12 +40,15 @@ export function PracticeWorkspace({
   topicPath,
   initialCounts,
   wordProblemsOnly,
+  initialProblemId = null,
 }: {
   topicId: string;
   topicPath: string[];
   initialCounts: Record<number, number>;
   /** Passed through to the panel, which reflects it without offering a switch. */
   wordProblemsOnly: boolean;
+  /** The problem to reopen first, from the resume record (D-156). */
+  initialProblemId?: string | null;
 }) {
   const [answer, setAnswer] = useState<AnswerValue>(emptyAnswer);
   const { answerType } = usePracticeSession();
@@ -154,6 +157,7 @@ export function PracticeWorkspace({
           topicPath={topicPath}
           initialCounts={initialCounts}
           wordProblemsOnly={wordProblemsOnly}
+          initialProblemId={initialProblemId}
           answer={answer}
           onAnswerChange={setAnswer}
           // The setter is passed bare on purpose. A `useState` setter has a

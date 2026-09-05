@@ -127,3 +127,62 @@ describe("graph objects and unified undo", () => {
     expect(state.opLog).toEqual([]);
   });
 });
+
+describe("hydrateForProblem (D-156)", () => {
+  beforeEach(reset);
+
+  it("restores saved work and bumps counters past restored ids", () => {
+    useSketchStore.getState().hydrateForProblem({
+      strokes: [
+        { id: "s900", points: [[1, 2, 0.5]], width: "M", color: "ink" },
+      ],
+      typedLines: [{ id: "t900", latex: "x=1" }],
+      graphObjects: [{ id: "g900", kind: "point", dashed: false, points: [[0, 0]] }],
+      graphShades: [{ id: "h901", testPoint: [1, 1] }],
+      graphStep: 0.5,
+      background: "grid",
+      mode: "type",
+      ocrBlocks: [{ kind: "math", latex: "x" }],
+      answer: { single: "", parts: {} },
+    });
+
+    const state = useSketchStore.getState();
+    expect(state.strokes.map((stroke) => stroke.id)).toEqual(["s900"]);
+    expect(state.typedLines[0].latex).toBe("x=1");
+    expect(state.graphObjects[0].id).toBe("g900");
+    expect(state.graphShades[0].id).toBe("h901");
+    expect(state.graphStep).toBe(0.5);
+    expect(state.background).toBe("grid");
+    expect(state.mode).toBe("type");
+    // History starts clean: undo cannot reach into a previous sitting.
+    expect(state.opLog).toEqual([]);
+
+    // New ids never collide with restored ones.
+    state.addStroke([[3, 4, 0.5]]);
+    const line = useSketchStore.getState().addTypedLineAfter(null);
+    const object = useSketchStore.getState().addGraphObject("point", [[2, 2]], false);
+    const strokeIds = useSketchStore.getState().strokes.map((stroke) => stroke.id);
+    expect(new Set(strokeIds).size).toBe(strokeIds.length);
+    expect(Number.parseInt(strokeIds[1].slice(1), 10)).toBeGreaterThan(900);
+    expect(line).not.toBe("t900");
+    expect(Number.parseInt(object.slice(1), 10)).toBeGreaterThan(901);
+  });
+
+  it("keeps at most one shade, matching the placement invariant", () => {
+    useSketchStore.getState().hydrateForProblem({
+      strokes: [],
+      typedLines: [],
+      graphObjects: [],
+      graphShades: [
+        { id: "h1", testPoint: [1, 1] },
+        { id: "h2", testPoint: [2, 2] },
+      ],
+      graphStep: 1,
+      background: "graph",
+      mode: "draw",
+      ocrBlocks: null,
+      answer: { single: "", parts: {} },
+    });
+    expect(useSketchStore.getState().graphShades).toHaveLength(1);
+  });
+});

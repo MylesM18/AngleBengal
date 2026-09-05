@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { MathfieldElement, VirtualKeyboardKeycap, VirtualKeyboardLayout } from "mathlive";
 
 import { cx } from "@/lib/cx";
+import { pathKeepsKeyboard } from "@/lib/math/keyboardDismiss";
 
 /**
  * App-tailored virtual keyboard layouts (D-128, D-129). MathLive's default
@@ -27,7 +28,17 @@ function appMathLayout(lastKey: Partial<VirtualKeyboardKeycap>): VirtualKeyboard
       ["7", "8", "9", "\\div", "(", ")", { latex: "\\sqrt{#@}", label: "&radic;" }, { latex: "#@^{#?}", label: "x&#8319;" }],
       ["4", "5", "6", "\\times", "x", "n", { latex: "\\frac{#@}{#?}", label: "a/b" }, "="],
       ["1", "2", "3", "-", "<", ">", ",", { label: "[backspace]", width: 1 }],
-      [{ label: "0", width: 1 }, ".", "+", { label: "[left]", width: 1.5 }, { label: "[right]", width: 1.5 }, lastKey],
+      // The bottom-right corner is the close key (D-155): the keyboard also
+      // hides on any tap outside it, but an explicit control has to exist.
+      [
+        { label: "0", width: 1 },
+        ".",
+        "+",
+        { label: "[left]", width: 1 },
+        { label: "[right]", width: 1 },
+        lastKey,
+        { label: "[hide-keyboard]", width: 1 },
+      ],
     ],
   };
 }
@@ -68,6 +79,31 @@ type LoadStatus = "loading" | "ready" | "failed";
 let loadPromise: Promise<boolean> | null = null;
 let loadStatus: LoadStatus = "loading";
 const listeners = new Set<() => void>();
+let dismissInstalled = false;
+
+/**
+ * Click-outside puts the keyboard away, on touch and on desktop alike
+ * (D-155). Capture phase, so a surface that stops propagation cannot strand
+ * the keyboard on screen. Blurring the field matters as much as hiding: with
+ * the auto policy a still-focused field would not re-raise the keyboard on
+ * the next tap, so hide-without-blur would leave a dead input.
+ */
+function installKeyboardDismiss(): void {
+  if (dismissInstalled) return;
+  dismissInstalled = true;
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      const keyboard = window.mathVirtualKeyboard;
+      if (!keyboard.visible) return;
+      if (pathKeepsKeyboard(event.composedPath())) return;
+      keyboard.hide();
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active.tagName === "MATH-FIELD") active.blur();
+    },
+    true,
+  );
+}
 
 function notify(): void {
   for (const listener of listeners) listener();
@@ -82,6 +118,7 @@ export function loadMathLive(): Promise<boolean> {
         mathlive.MathfieldElement.fontsDirectory = "/mathlive-fonts";
         mathlive.MathfieldElement.soundsDirectory = null;
         applyKeyboardLayouts("default");
+        installKeyboardDismiss();
         loadStatus = "ready";
         notify();
         return true;

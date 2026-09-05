@@ -34,6 +34,11 @@ export function TypedLinesLayer() {
   return (
     <div
       className={cx("absolute inset-0 overflow-y-auto", typing ? "" : "pointer-events-none")}
+      // In type mode this whole layer is the typing surface: tapping the
+      // paper starts or activates a line, so it must not dismiss the math
+      // keyboard on the way (keyboardDismiss.ts). Inert in draw mode, where
+      // pointer events pass through to the ink canvas.
+      data-keep-math-keyboard=""
       onClick={(event) => {
         // A click on empty paper in type mode starts the first line, or a new
         // trailing line when the last one already has content.
