@@ -2622,3 +2622,30 @@ layouts gain the built-in hide key in the bottom-right corner. Keep
 surfaces carry data-keep-math-keyboard: the symbol palette, the calculator
 window, and the typed-lines paper, whose taps feed the focused field rather
 than leave it.
+
+### D-156. Resume: the app reopens where the owner left off
+
+Owner call (2026-09-05). Three pieces, all additive and all degrade-to-
+nothing on failure:
+
+1. A single ResumeState row (id "owner") records the current in-app
+   location. The client reports it as it changes (a debounced POST from the
+   tabs layout, plus a pagehide beacon); the root page and the post-login
+   redirect land on the recorded path. Only validated tab paths ever come
+   back from the row (isResumablePath), so a bad row falls back to /learn
+   and the redirect can never leave the origin or loop.
+2. The learn reader's scroll offset rides the same row (contextJson). It
+   restores only when the row's path matches the reader's URL exactly and
+   the URL carries no fragment: a #model-N deep link wins over memory.
+3. Per-problem work lives in ProblemWork, one row per problem: strokes,
+   typed lines, graph objects, paper, mode, OCR blocks, and the answer
+   draft, autosaved (1.5s debounce) on every change and rehydrated whenever
+   that problem is served again, from resume or by chance. The practice
+   panel suspends the saver before any canvas reset, which is the ordering
+   that keeps a reset from overwriting the outgoing problem's save. The
+   recorded problem id survives detours through other tabs (it means "the
+   problem in progress", not "the last URL"), and serving it back is
+   topic-scoped with a silent fallback to a fresh pick, so stale ids
+   self-heal. The undo history is deliberately not saved: restored work
+   starts with a clean history. Blank states save like any other: a cleared
+   canvas comes back cleared.

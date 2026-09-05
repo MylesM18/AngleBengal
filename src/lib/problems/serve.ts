@@ -27,49 +27,37 @@ export type ServedProblem = {
   toolset: ProblemToolset;
 };
 
-/**
- * One verified problem the student has not already answered correctly, chosen
- * at random among those eligible so repeated visits do not march through the
- * pool in insertion order.
- */
-export async function nextProblem(
-  topicId: string,
-  difficulty: number,
-): Promise<ServedProblem | null> {
-  const solvedIds = (
-    await prisma.attempt.findMany({
-      where: { correct: true, problem: { topicId } },
-      select: { problemId: true },
-      distinct: ["problemId"],
-    })
-  ).map((attempt) => attempt.problemId);
-
-  const eligible = await prisma.problem.findMany({
-    where: {
-      topicId,
-      difficulty,
-      verified: true,
-      id: { notIn: solvedIds.length ? solvedIds : undefined },
-    },
+/** The row shape both serving paths read; kept as one constant so
+ *  problemById cannot drift from nextProblem. */
+const SERVE_SELECT = {
+  id: true,
+  statementMd: true,
+  difficulty: true,
+  answerJson: true,
+  palette: true,
+  modelTags: {
     select: {
-      id: true,
-      statementMd: true,
-      difficulty: true,
-      answerJson: true,
-      palette: true,
-      modelTags: {
-        select: {
-          docId: true,
-          modelNumber: true,
-          doc: { select: { modelIndexJson: true, topicId: true } },
-        },
-      },
+      docId: true,
+      modelNumber: true,
+      doc: { select: { modelIndexJson: true, topicId: true } },
     },
-  });
+  },
+} as const;
 
-  if (eligible.length === 0) return null;
+type ServeRow = {
+  id: string;
+  statementMd: string;
+  difficulty: number;
+  answerJson: string;
+  palette: unknown;
+  modelTags: {
+    docId: string;
+    modelNumber: number;
+    doc: { modelIndexJson: string; topicId: string };
+  }[];
+};
 
-  const chosen = eligible[Math.floor(Math.random() * eligible.length)];
+async function toServed(chosen: ServeRow, topicId: string): Promise<ServedProblem | null> {
   const answer = parseAnswer(chosen.answerJson);
   if (!answer) return null;
 
@@ -94,6 +82,55 @@ export async function nextProblem(
     })),
     toolset: resolveToolset(rootName, sanitizePalette(chosen.palette)),
   };
+}
+
+/**
+ * One specific verified problem, served in the same shape as nextProblem.
+ * The resume flow asks for the problem that was on screen (D-156); solved
+ * status does not matter, the owner is returning to it on purpose.
+ */
+export async function problemById(
+  topicId: string,
+  problemId: string,
+): Promise<ServedProblem | null> {
+  const row = await prisma.problem.findFirst({
+    where: { id: problemId, topicId, verified: true },
+    select: SERVE_SELECT,
+  });
+  if (!row) return null;
+  return toServed(row, topicId);
+}
+
+/**
+ * One verified problem the student has not already answered correctly, chosen
+ * at random among those eligible so repeated visits do not march through the
+ * pool in insertion order.
+ */
+export async function nextProblem(
+  topicId: string,
+  difficulty: number,
+): Promise<ServedProblem | null> {
+  const solvedIds = (
+    await prisma.attempt.findMany({
+      where: { correct: true, problem: { topicId } },
+      select: { problemId: true },
+      distinct: ["problemId"],
+    })
+  ).map((attempt) => attempt.problemId);
+
+  const eligible = await prisma.problem.findMany({
+    where: {
+      topicId,
+      difficulty,
+      verified: true,
+      id: { notIn: solvedIds.length ? solvedIds : undefined },
+    },
+    select: SERVE_SELECT,
+  });
+
+  if (eligible.length === 0) return null;
+
+  return toServed(eligible[Math.floor(Math.random() * eligible.length)], topicId);
 }
 
 /** Verified, unsolved problem counts per difficulty, for the pool indicator. */

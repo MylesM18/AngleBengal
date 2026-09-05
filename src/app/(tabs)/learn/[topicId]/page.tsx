@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Breadcrumb } from "@/components/learn/Breadcrumb";
 import { CopyLinkToaster } from "@/components/learn/CopyLinkToaster";
 import { DocBody } from "@/components/learn/DocBody";
+import { DocScrollMemory } from "@/components/learn/DocScrollMemory";
 import { DocCard } from "@/components/learn/DocCard";
 import { DocMiniTOC } from "@/components/learn/DocMiniTOC";
 import { DocCompleteStrip, ReadProgressProvider } from "@/components/learn/DocProgress";
@@ -243,6 +244,8 @@ export default async function TopicPage({
 
     return (
       <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10">
+        {/* Keyed per doc so switching tabs re-arms the restore cleanly. */}
+        <DocScrollMemory key={doc.id} />
         <ReaderTabProvider hasPerspective={Boolean(topic.perspective)}>
           {/* Keyed: without a stable key, a generation's router.refresh() flips this
               branch at the same tree position and React reuses the doc provider's

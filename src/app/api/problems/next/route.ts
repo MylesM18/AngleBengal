@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { ApiError, errorBody } from "@/lib/ai/errors";
-import { nextProblem } from "@/lib/problems/serve";
+import { nextProblem, problemById } from "@/lib/problems/serve";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +9,11 @@ export const dynamic = "force-dynamic";
  * GET /api/problems/next?topicId=...&difficulty=2 (docs/04).
  *
  * Only verified problems are ever considered (non-negotiable 2).
+ *
+ * An optional problemId asks for that exact problem instead (the resume
+ * flow, D-156). A problemId that no longer resolves falls back to the
+ * random pick inside this route, so the client never needs a second
+ * request to recover.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -26,8 +31,11 @@ export async function GET(request: Request) {
     return NextResponse.json(errorBody(badRequest), { status: badRequest.status });
   }
 
+  const problemId = url.searchParams.get("problemId");
+
   try {
-    const problem = await nextProblem(topicId, difficulty);
+    const resumed = problemId ? await problemById(topicId, problemId) : null;
+    const problem = resumed ?? (await nextProblem(topicId, difficulty));
     if (!problem) {
       const empty = new ApiError(
         "POOL_EMPTY",

@@ -9,6 +9,9 @@ import type { GraphKind, ProblemToolset } from "@/lib/practice/tools";
 // close a runtime cycle. WorldPoint is erased at compile time either way.
 import type { WorldPoint } from "./graphCoords";
 
+// Type-only for the same reason: workState imports this store's types.
+import type { ProblemWorkState } from "@/lib/resume/workState";
+
 /**
  * The practice-session sketchpad store (docs/06 §4).
  *
@@ -133,11 +136,29 @@ type SketchState = {
   setToolset: (toolset: ProblemToolset | null) => void;
   /** Called on problem change, after the snapshot has been taken. */
   resetForNewProblem: () => void;
+  /**
+   * Restore saved work for the problem being served (D-156). Called after
+   * resetForNewProblem and after the problem's own defaults, so what the
+   * owner last saw wins. The undo history starts clean on purpose.
+   */
+  hydrateForProblem: (saved: ProblemWorkState) => void;
 };
 
 let strokeCounter = 0;
 let typedLineCounter = 0;
 let graphCounter = 0;
+
+/** Highest numeric suffix among restored ids, so the counters can jump past
+ *  them and a new stroke can never collide with a restored one. */
+function maxIdSuffix(ids: string[], prefix: string): number {
+  let max = 0;
+  for (const id of ids) {
+    if (!id.startsWith(prefix)) continue;
+    const n = Number.parseInt(id.slice(prefix.length), 10);
+    if (Number.isInteger(n) && n > max) max = n;
+  }
+  return max;
+}
 
 /** Bounds the unified history the way the stroke list already was. */
 function pushOp(opLog: OpEntry[], entry: OpEntry): OpEntry[] {
@@ -353,4 +374,35 @@ export const useSketchStore = create<SketchState>((set) => ({
       graphTool: null,
       graphStep: 1,
     }),
+
+  hydrateForProblem: (saved) => {
+    strokeCounter = Math.max(
+      strokeCounter,
+      maxIdSuffix(saved.strokes.map((stroke) => stroke.id), "s"),
+    );
+    typedLineCounter = Math.max(
+      typedLineCounter,
+      maxIdSuffix(saved.typedLines.map((line) => line.id), "t"),
+    );
+    graphCounter = Math.max(
+      graphCounter,
+      maxIdSuffix(saved.graphObjects.map((object) => object.id), "g"),
+      maxIdSuffix(saved.graphShades.map((shade) => shade.id), "h"),
+    );
+    set({
+      strokes: saved.strokes,
+      typedLines: saved.typedLines,
+      // The one-shade invariant (addGraphShade) holds on restore too.
+      graphShades: saved.graphShades.slice(0, 1),
+      graphObjects: saved.graphObjects,
+      graphStep: saved.graphStep,
+      background: saved.background,
+      mode: saved.mode,
+      ocrBlocks: saved.ocrBlocks,
+      activeLineId: null,
+      graphTool: null,
+      pendingGraphPoints: [],
+      opLog: [],
+    });
+  },
 }));
