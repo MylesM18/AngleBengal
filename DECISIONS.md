@@ -2649,3 +2649,19 @@ nothing on failure:
    self-heal. The undo history is deliberately not saved: restored work
    starts with a clean history. Blank states save like any other: a cleared
    canvas comes back cleared.
+
+### D-157. The difficulty selector follows the problem on screen
+
+Owner call (2026-09-05), closing the quirk shipped with D-156: a resumed
+problem can come from a different difficulty's pool than the selector's
+default, and leaving the selector where it was misstated both the problem
+being shown and what Next would serve. On every served problem the selector
+now syncs to that problem's actual difficulty. Mechanically, the fetch
+effect reads difficulty through a ref and every deliberate ask for a
+problem bumps reloadKey (difficulty left the request key), so the sync is
+pure display-and-future-intent: it can never refire the request that just
+served the problem, which would have replaced the resumed problem with a
+fresh pick and, worse, re-run the problem defaults over freshly hydrated
+work. A pleasant side effect: resuming into a difficulty-5 problem then
+pressing Next serves from the difficulty-5 pool instead of the default
+pool the owner was never looking at.
