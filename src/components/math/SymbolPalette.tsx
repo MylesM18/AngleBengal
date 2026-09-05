@@ -19,7 +19,14 @@ export function SymbolPalette({
 }) {
   if (ids.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-1" role="group" aria-label="Math symbols">
+    // data-keep-math-keyboard: inserting a symbol must not dismiss the
+    // keyboard the symbol is being inserted with (keyboardDismiss.ts).
+    <div
+      className="flex flex-wrap gap-1"
+      role="group"
+      aria-label="Math symbols"
+      data-keep-math-keyboard=""
+    >
       {ids.map((id) => {
         const symbol = PALETTE_SYMBOLS[id];
         return (

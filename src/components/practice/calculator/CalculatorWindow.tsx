@@ -193,6 +193,9 @@ export function CalculatorWindow({
       ref={rootRef}
       role="dialog"
       aria-label="Calculator"
+      // Working the calculator alongside a focused math field must not put
+      // that field's keyboard away (keyboardDismiss.ts).
+      data-keep-math-keyboard=""
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.stopPropagation();
