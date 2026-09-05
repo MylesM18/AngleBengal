@@ -179,7 +179,7 @@ export function PracticePanel({
           useSketchStore.getState().setGraphStep(next.graphStep ?? 1);
           // A graph answer is drawn on the graph paper, so make sure that
           // paper is up. Other problems respect the paper the user chose
-          // (D-155: Graph lives on the background, not a mode).
+          // (D-154: Graph lives on the background, not a mode).
           if (next.answerType === "graph") {
             useSketchStore.getState().setBackground("graph");
           }

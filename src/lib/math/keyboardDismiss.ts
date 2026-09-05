@@ -1,5 +1,5 @@
 /**
- * Outside-tap dismissal for the MathLive virtual keyboard (D-156).
+ * Outside-tap dismissal for the MathLive virtual keyboard (D-155).
  *
  * The keyboard raises when a math field focuses, but a tap on something that
  * is not focusable (the sketch canvas, the desk, a toolbar chip) moves focus

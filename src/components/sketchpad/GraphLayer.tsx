@@ -95,7 +95,7 @@ export function GraphLayer() {
   const boardHostRef = useRef<HTMLDivElement | null>(null);
   const shadeCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // The layer rides the Graph background (D-155): it exists while the paper
+  // The layer rides the Graph background (D-154): it exists while the paper
   // shows axes and the problem's toolset declares graph tools. Ink and typing
   // stay usable on that paper, so the placement overlay below only takes
   // pointer events while a rail tool is armed.
@@ -248,7 +248,7 @@ export function GraphLayer() {
       {/* Pointer events only while a rail tool is armed: with no tool
           selected the pen and typed lines keep working over graph paper,
           which is what lets Graph live on the background instead of being a
-          third mode (D-155). */}
+          third mode (D-154). */}
       <div
         className={
           armed

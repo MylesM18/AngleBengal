@@ -33,7 +33,7 @@ const GRAPH_STEPS: { value: number; label: string }[] = [
 /**
  * The graph second row (spec Q4): the owner's explicit, scoped bend of the
  * one-strip rule, recorded in docs/06. Renders whenever the paper is set to
- * Graph (D-155), below the kraft strip, which keeps only ink tools. The
+ * Graph (D-154), below the kraft strip, which keeps only ink tools. The
  * placement tools show only when the served problem's toolset declares graph
  * tools; the "1 sq =" scale selector is always present, since the numbered
  * axes are. Snap is always on.

@@ -28,7 +28,7 @@ function appMathLayout(lastKey: Partial<VirtualKeyboardKeycap>): VirtualKeyboard
       ["7", "8", "9", "\\div", "(", ")", { latex: "\\sqrt{#@}", label: "&radic;" }, { latex: "#@^{#?}", label: "x&#8319;" }],
       ["4", "5", "6", "\\times", "x", "n", { latex: "\\frac{#@}{#?}", label: "a/b" }, "="],
       ["1", "2", "3", "-", "<", ">", ",", { label: "[backspace]", width: 1 }],
-      // The bottom-right corner is the close key (D-156): the keyboard also
+      // The bottom-right corner is the close key (D-155): the keyboard also
       // hides on any tap outside it, but an explicit control has to exist.
       [
         { label: "0", width: 1 },
@@ -83,7 +83,7 @@ let dismissInstalled = false;
 
 /**
  * Click-outside puts the keyboard away, on touch and on desktop alike
- * (D-156). Capture phase, so a surface that stops propagation cannot strand
+ * (D-155). Capture phase, so a surface that stops propagation cannot strand
  * the keyboard on screen. Blurring the field matters as much as hiding: with
  * the auto policy a still-focused field would not re-raise the keyboard on
  * the next tap, so hide-without-blur would leave a dead input.

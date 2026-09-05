@@ -37,7 +37,7 @@ export type OcrBlock =
   | { kind: "math"; latex: string }
   | { kind: "text"; text: string };
 
-/** Graph is not a mode: graph tools live with the Graph background (D-155),
+/** Graph is not a mode: graph tools live with the Graph background (D-154),
  *  so ink and typing keep working on graph paper. */
 export type SketchMode = "draw" | "type";
 
