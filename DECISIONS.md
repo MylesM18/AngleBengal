@@ -2593,3 +2593,32 @@ the same reason the header wears the bare mark on paper. The plum plate
 survives where it belongs, on apple-touch-icon.png and icon-512.png, whose
 home-screen tiles need their own ground. favicon-32.png is regenerated from
 the new SVG with alpha, and the icon URLs bump to ?v=3 per D-152.
+
+### D-154. Graph belongs to the paper, not to a third mode
+
+Owner call (2026-09-05): the sketchpad toolbar showed two controls named
+Graph, a mode chip beside Draw and Type and a background chip in the paper
+group, and only one should exist. The paper chip wins. The Graph background
+now carries everything the mode carried: the numbered axes paint whenever
+the paper is set to Graph (previously only in Graph mode), the second-row
+graph rail rides the background, and the placement layer takes pointer
+events only while a rail tool is armed, so pen strokes and typed lines keep
+working on graph paper. On problems whose toolset declares no graph tools
+the rail reduces to the "1 sq =" scale selector, which is the click-the-
+graph layout control the owner asked to keep. Loading a graph-answer
+problem force-sets the paper to Graph, replacing the old mode chip's
+auto-switch. docs/06's "Graph mode" language is superseded by this entry.
+
+### D-155. The math keyboard dismisses on outside tap and by its own close key
+
+Owner call (2026-09-05): the MathLive virtual keyboard could only be put
+away by moving focus to another input, because a tap on a non-focusable
+surface (the canvas, the desk) blurs nothing under the auto policy. Two
+exits now exist on desktop and mobile alike: a capture-phase pointerdown
+anywhere outside keyboard chrome, math fields, and marked keep surfaces
+hides the keyboard and blurs the field (blurring matters: a still-focused
+field would not re-raise the keyboard on its next tap), and both custom
+layouts gain the built-in hide key in the bottom-right corner. Keep
+surfaces carry data-keep-math-keyboard: the symbol palette, the calculator
+window, and the typed-lines paper, whose taps feed the focused field rather
+than leave it.

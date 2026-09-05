@@ -171,8 +171,8 @@ function GraphAnswerCard() {
   }
   return (
     <div className="rounded-input bg-paper-0 px-3 py-2 text-ui text-ink">
-      Draw your answer on the graph paper: switch the sketchpad to Graph mode,
-      place your objects, then submit.
+      Draw your answer on the graph paper: pick a tool from the graph row on
+      the sketchpad, place your objects, then submit.
     </div>
   );
 }

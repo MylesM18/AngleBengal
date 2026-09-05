@@ -37,7 +37,9 @@ export type OcrBlock =
   | { kind: "math"; latex: string }
   | { kind: "text"; text: string };
 
-export type SketchMode = "draw" | "type" | "graph";
+/** Graph is not a mode: graph tools live with the Graph background (D-155),
+ *  so ink and typing keep working on graph paper. */
+export type SketchMode = "draw" | "type";
 
 /** One stacked solution line (spec Q2). Latex only; plain text derives at
  *  submit and composite time via latexToPlain. */

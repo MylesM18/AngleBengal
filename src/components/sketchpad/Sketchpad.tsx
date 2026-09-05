@@ -27,7 +27,7 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
   const [toast, setToast] = useState<{ kind: NoticeKind; message: string } | null>(null);
 
   const blocks = useSketchStore((state) => state.ocrBlocks);
-  const mode = useSketchStore((state) => state.mode);
+  const background = useSketchStore((state) => state.background);
   const setOcrBlocks = useSketchStore((state) => state.setOcrBlocks);
   const setCanvasSize = useSketchStore((state) => state.setCanvasSize);
 
@@ -93,7 +93,7 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
       className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0 outline-none"
     >
       <SketchToolbar cleaning={cleaning} onCleanUp={() => void cleanUp()} />
-      {mode === "graph" && <GraphRail />}
+      {background === "graph" && <GraphRail />}
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <SketchCanvas onSizeChange={setCanvasSize} />
@@ -131,7 +131,7 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
  * the graph layer's SVG through an `Image` load callback.
  */
 export async function snapshotSketch(): Promise<string | null> {
-  const { strokes, background, canvasSize, typedLines, mode, graphStep, graphObjects, graphShades } =
+  const { strokes, background, canvasSize, typedLines, graphStep, graphObjects, graphShades } =
     useSketchStore.getState();
   const typedPlainLines = typedLines
     .filter((line) => line.latex.trim().length > 0)
@@ -144,6 +144,6 @@ export async function snapshotSketch(): Promise<string | null> {
   if (empty) return null;
   return compositeToPng(strokes, background, canvasSize.width, canvasSize.height, {
     typedPlainLines,
-    axisLabels: mode === "graph" || background === "graph" ? { step: graphStep } : null,
+    axisLabels: background === "graph" ? { step: graphStep } : null,
   });
 }

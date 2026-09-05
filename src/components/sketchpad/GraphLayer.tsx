@@ -81,7 +81,8 @@ function boundariesOf(objects: GraphObject[]): RegionBoundary[] {
 }
 
 export function GraphLayer() {
-  const mode = useSketchStore((state) => state.mode);
+  const background = useSketchStore((state) => state.background);
+  const toolset = useSketchStore((state) => state.toolset);
   const canvasSize = useSketchStore((state) => state.canvasSize);
   const graphObjects = useSketchStore((state) => state.graphObjects);
   const graphShades = useSketchStore((state) => state.graphShades);
@@ -94,7 +95,12 @@ export function GraphLayer() {
   const boardHostRef = useRef<HTMLDivElement | null>(null);
   const shadeCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const active = mode === "graph";
+  // The layer rides the Graph background (D-155): it exists while the paper
+  // shows axes and the problem's toolset declares graph tools. Ink and typing
+  // stay usable on that paper, so the placement overlay below only takes
+  // pointer events while a rail tool is armed.
+  const active = background === "graph" && (toolset?.graphTools.length ?? 0) > 0;
+  const armed = active && graphTool !== null && status === "ready";
 
   // Register the composite sources while mounted (render.ts reads them).
   useEffect(() => {
@@ -109,9 +115,9 @@ export function GraphLayer() {
 
   // Rebuild the board whenever the drawn objects change. n is small, and a
   // full rebuild through freeBoard cannot leak stale elements. `active` is a
-  // dependency (not just a guard) so re-entering Graph mode rebuilds
-  // directly, rather than relying on GraphRail's mount incidentally changing
-  // canvasSize through the ResizeObserver.
+  // dependency (not just a guard) so returning to the Graph background
+  // rebuilds directly, rather than relying on GraphRail's mount incidentally
+  // changing canvasSize through the ResizeObserver.
   useEffect(() => {
     const host = boardHostRef.current;
     if (!active || !host || status !== "ready" || canvasSize.width === 0) return;
@@ -236,11 +242,19 @@ export function GraphLayer() {
   if (!active) return null;
 
   return (
-    <div className="absolute inset-0">
+    <div className="pointer-events-none absolute inset-0">
       <canvas ref={shadeCanvasRef} className="absolute inset-0" aria-hidden />
-      <div ref={boardHostRef} className="pointer-events-none absolute inset-0" aria-hidden />
+      <div ref={boardHostRef} className="absolute inset-0" aria-hidden />
+      {/* Pointer events only while a rail tool is armed: with no tool
+          selected the pen and typed lines keep working over graph paper,
+          which is what lets Graph live on the background instead of being a
+          third mode (D-155). */}
       <div
-        className="absolute inset-0 cursor-crosshair"
+        className={
+          armed
+            ? "pointer-events-auto absolute inset-0 cursor-crosshair"
+            : "absolute inset-0"
+        }
         role="application"
         aria-label={`Graph paper. ${graphObjects.length} object${graphObjects.length === 1 ? "" : "s"} placed.`}
         onClick={onPlacementClick}
