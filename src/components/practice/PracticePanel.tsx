@@ -484,7 +484,13 @@ export function PracticePanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline bg-paper-1 px-4 py-2.5">
+      {/* max-lg:gap-y-5: when this header wraps at compact, consecutive rows
+          both carry 44px tap-target overlays (Calculator above, difficulty
+          chips below). D-071's clearance rule applied vertically: two ~24-27px
+          controls need about 19px between rows or the later chip's overlay
+          wins taps aimed at the control above it, and a difficulty mis-tap
+          discards in-progress work. Desktop keeps gap-y-2: no overlays at lg. */}
+      <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline bg-paper-1 px-4 py-2.5 max-lg:gap-y-5">
         <BackButton fallbackHref="/practice" />
         <p className="min-w-0 flex-1 truncate text-meta text-ink">{topicPath.join("  ›  ")}</p>
         {wordProblemsOnly && (

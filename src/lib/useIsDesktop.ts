@@ -2,8 +2,11 @@
 
 import { useSyncExternalStore } from "react";
 
-/** The compact/full seam, the same 1024px `lg` the layout classes use. */
-const QUERY = "(min-width: 1024px)";
+/** The compact/full seam, the same `lg` the layout classes use. In rem, not
+ *  px: Tailwind's `lg` is 64rem, and under user font scaling a px query here
+ *  would flip at a different real width than the CSS, letting CSS paint one
+ *  world while JS mounts the other (mobile fix plan Phase 2, R19). */
+const QUERY = "(min-width: 64rem)";
 
 function subscribe(callback: () => void) {
   const mql = window.matchMedia(QUERY);

@@ -72,14 +72,23 @@ export function AnswerInput({
 
   if (shape.answerType === "multi") {
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 max-lg:gap-4">
         {(shape.parts ?? []).map((part) => {
           const match = resultFor(part.name);
           return (
-            <div key={part.name} className="flex items-center gap-2">
+            // max-lg:flex-wrap + a full-width label: the fixed 150px label
+            // plus 130px input row needs more than the practice panel's
+            // content box at the 360px floor, so at compact the label sits
+            // above and the unit/result spans may wrap; nothing can force a
+            // sideways pan (mobile fix plan Phase 2, R5). Desktop keeps
+            // today's aligned two-column boxes.
+            // Wrapped-row spacing: label hugs its input (gap-y-1) while parts
+            // sit 16px apart (parent max-lg:gap-4), so the grouping stays
+            // legible once the row breaks into lines.
+            <div key={part.name} className="flex items-center gap-2 max-lg:flex-wrap max-lg:gap-y-1">
               <label
                 htmlFor={`answer-${part.name}`}
-                className="w-[150px] shrink-0 text-right text-meta text-ink-soft"
+                className="w-[150px] shrink-0 text-right text-meta text-ink-soft max-lg:w-full max-lg:text-left"
               >
                 {part.label}
               </label>
@@ -134,7 +143,7 @@ export function AnswerInput({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 max-lg:flex-wrap">
       <label htmlFor="answer-single" className="sr-only">
         Your answer
       </label>

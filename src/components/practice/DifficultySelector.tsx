@@ -15,7 +15,10 @@ export function DifficultySelector({
   onChange: (difficulty: number) => void;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
+    // max-lg:flex-wrap: below about 350px the label plus five chips cannot fit
+    // one line, and the chip gaps are D-071 clearance that must not shrink, so
+    // the chip group drops below the label instead (Phase 2, R20).
+    <div className="flex items-center gap-1.5 max-lg:flex-wrap">
       <span className="meta-caps text-ink-soft">Difficulty</span>
       {/* These render 32px wide, and on compact each carries a 44px hit area
           (Chip's `max-lg:tap-target`), which spills (44 - 32) / 2 = 6px past

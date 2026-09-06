@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 export default function SettingsLoading() {
   return (
     <div className="h-full overflow-y-auto overscroll-contain p-2" role="status" aria-label="Loading Settings">
-      <div className="max-w-[860px] pt-8 sm:pt-16">
+      <div className="max-w-[860px] pt-8 lg:pt-16">
         <h1 className="display-cut text-h1 text-ink">Settings</h1>
         <Sheet tone="paper-1" className="mt-6 overflow-hidden">
           <div aria-hidden className="flex flex-col gap-3 p-4">

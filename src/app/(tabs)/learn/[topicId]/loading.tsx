@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 export default function TopicLoading() {
   return (
     <article
-      className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10"
+      className="flex justify-center gap-8 px-3 py-6 sm:px-8 lg:py-10"
       role="status"
       aria-label="Loading topic"
     >
