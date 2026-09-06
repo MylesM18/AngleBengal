@@ -20,6 +20,9 @@ import {
   setActiveProblem,
 } from "@/lib/practiceSession";
 import type { ProblemToolset } from "@/lib/practice/tools";
+import { useCoarsePointer } from "@/lib/useCoarsePointer";
+import { useIsDesktop } from "@/lib/useIsDesktop";
+import { useKeyboardInset } from "@/lib/useKeyboardInset";
 import {
   beginProblemWork,
   noteProblemWork,
@@ -116,6 +119,24 @@ export function PracticePanel({
 }) {
   const [difficulty, setDifficulty] = useState(2);
   const [counts, setCounts] = useState(initialCounts);
+
+  /**
+   * Keyboard clearance for the panel scroller (mobile fix plan Phase 4, R7).
+   * At compact the scroller ends just above the tab bar, well inside the
+   * layout viewport that iOS leaves behind the keyboard, so without this
+   * the last screenful of content (the answer field and Submit) can never
+   * be scrolled above the keyboard. The inset measures obstruction of the
+   * layout viewport's bottom edge, so it overshoots the scroller's own
+   * obstruction by roughly the tab bar's height: deliberate, since
+   * overshoot only adds blank scroll room while a subtraction would couple
+   * this to the tab bar's geometry. Covers both keyboards: the OS one for
+   * plain numeric inputs and MathLive's own for expression fields (D-155).
+   * Active below the seam and on any coarse-pointer device (an lg-width
+   * iPad raises the same keyboards).
+   */
+  const isDesktop = useIsDesktop();
+  const coarsePointer = useCoarsePointer();
+  const keyboardInset = useKeyboardInset(isDesktop === false || coarsePointer);
 
   /**
    * The fetch effect reads difficulty through this ref instead of closing
@@ -542,7 +563,23 @@ export function PracticePanel({
           clearance, not a repair: 80px of padding moves the last content 36px
           clear of the button instead of 1.4px. `lg` and up has no floating
           button and keeps `p-5`. */}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 max-lg:pb-20">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 max-lg:pb-20"
+        // Inline because the value is measured, not designed. The compact
+        // floor is the pb-20 the inline style would otherwise override: 80px
+        // is the floating Sketch button's clearance zone, and a small inset
+        // must never shrink it.
+        style={
+          keyboardInset.bottom > 0
+            ? {
+                paddingBottom: Math.max(
+                  isDesktop === false ? 80 : 0,
+                  keyboardInset.bottom + 20,
+                ),
+              }
+            : undefined
+        }
+      >
         {loading ? (
           <ProblemSkeleton />
         ) : !problem ? (

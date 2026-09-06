@@ -3,9 +3,16 @@
 import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { useCoarsePointer } from "@/lib/useCoarsePointer";
+import { cx } from "@/lib/cx";
 
 /**
- * Multiline composer (docs/06 §5): Enter sends, Shift+Enter inserts a newline.
+ * Multiline composer (docs/06 §5): Enter sends, Shift+Enter inserts a newline,
+ * on a fine pointer. On a coarse pointer the return key adds a line and Send
+ * posts (mobile fix plan Phase 4, R20): a phone keyboard has no practical
+ * Shift+Enter, so Enter-sends turns every attempt at a second line into a
+ * premature send, and the helper copy was hardware-keyboard advice shown to
+ * thumbs.
  *
  * Controlled by the drawer rather than holding its own text, so clicking a
  * starter prompt is a plain state update in the parent instead of an effect
@@ -22,18 +29,27 @@ export function ChatComposer({
   busy,
   /** Bumped when a starter prompt is dropped in, to pull focus to the box. */
   focusKey,
+  keyboardUp = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
   busy: boolean;
   focusKey: number;
+  /** True while the drawer is spending a keyboard inset: the safe-area
+   *  bottom padding then drops, since the measured inset already spans the
+   *  home-indicator strip the env() term exists to clear (Phase 4 review:
+   *  keeping both floated the composer ~34px above the keyboard). */
+  keyboardUp?: boolean;
 }) {
   const box = useRef<HTMLTextAreaElement>(null);
+  const coarsePointer = useCoarsePointer();
 
   // Focusing is a DOM side effect, not a state update, so it belongs here.
+  // preventScroll: Safari's native scroll-into-view on focus is the visual
+  // viewport jump Phase 4 removes; the composer is pinned and visible anyway.
   useEffect(() => {
-    if (focusKey > 0) box.current?.focus();
+    if (focusKey > 0) box.current?.focus({ preventScroll: true });
   }, [focusKey]);
 
   // Grow with the content, up to a ceiling, so long questions stay readable.
@@ -50,7 +66,12 @@ export function ChatComposer({
     // pb-safe alone would replace p-3's bottom padding outright (env()
     // resolves to 0 on any device without an inset), so the home-indicator
     // clearance is added on top of the existing 12px, not swapped in for it.
-    <div className="shrink-0 bg-paper-1 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+    <div
+      className={cx(
+        "shrink-0 bg-paper-1 p-3",
+        !keyboardUp && "pb-[calc(0.75rem+env(safe-area-inset-bottom))]",
+      )}
+    >
       <div className="flex items-end gap-1.5">
         <label htmlFor="tutor-composer" className="sr-only">
           Message the tutor
@@ -63,7 +84,7 @@ export function ChatComposer({
           disabled={busy}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
+            if (event.key === "Enter" && !event.shiftKey && !coarsePointer) {
               event.preventDefault();
               if (canSend) onSend();
             }
@@ -89,7 +110,9 @@ export function ChatComposer({
         </Button>
       </div>
       <p className="mt-1 px-0.5 text-meta text-ink-soft">
-        Enter sends, Shift plus Enter adds a line.
+        {coarsePointer
+          ? "Return adds a line, Send posts it."
+          : "Enter sends, Shift plus Enter adds a line."}
       </p>
     </div>
   );

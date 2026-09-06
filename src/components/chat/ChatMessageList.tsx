@@ -31,10 +31,16 @@ export function ChatMessageList({
   starters: string[];
   onStarter: (prompt: string) => void;
 }) {
-  const bottom = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
 
+  // Scroller-local, never scrollIntoView (mobile fix plan Phase 4, R20):
+  // scrollIntoView walks every scrollable ancestor and, on iOS with the
+  // keyboard up, tugs the visual viewport on every streamed chunk. Setting
+  // this scroller's own scrollTop moves nothing but the conversation.
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "end" });
+    const el = scroller.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
   }, [turns.length, streaming]);
 
   if (turns.length === 0 && streaming === null) {
@@ -67,14 +73,16 @@ export function ChatMessageList({
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4">
+    <div
+      ref={scroller}
+      className="flex flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4"
+    >
       {turns.map((turn) => (
         <Bubble key={turn.id} role={turn.role} content={turn.content} />
       ))}
       {streaming !== null && (
         <Bubble role="assistant" content={streaming} pending={streaming.length === 0} />
       )}
-      <div ref={bottom} />
     </div>
   );
 }

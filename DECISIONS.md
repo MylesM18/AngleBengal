@@ -2720,3 +2720,22 @@ visualViewport, since iOS offers no API to reset page zoom for the user.
 An eraser drag interrupted by a pinch stops but does not restore what it
 already erased: that would spend undo history on an accident, and the
 harm this ruling closes is stray new ink, which an eraser cannot leave.
+
+### D-160. Enter inserts a newline on coarse pointers; Send posts
+
+Mobile fix plan Phase 4 (2026-09-06), R20, recorded here because it
+amends the composer contract in docs/06 section 5, which read "Enter
+sends, Shift+Enter newline" unconditionally. That contract is
+hardware-keyboard advice: a phone keyboard has no practical Shift+Enter,
+so Enter-sends turned every attempt at a second line into a premature
+send, and the helper copy explained a chord the device cannot type. On
+coarse pointers (matchMedia pointer: coarse, live-tracked) the return
+key now inserts a newline, the Send button is the way to post, and the
+helper line says so; fine pointers keep the original behavior verbatim.
+docs/06 is amended to state the split rather than left contradicting
+the code. The same phase's review also standardized the gating
+vocabulary: keyboard-related behavior (auto-focus suppression, keyboard
+inset measurement, Enter handling) gates on pointer coarseness via the
+shared useCoarsePointer hook, while layout keeps gating on the 64rem
+seam, because an iPad in landscape is lg by width yet raises a soft
+keyboard like a phone.

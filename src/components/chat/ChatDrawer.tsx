@@ -6,6 +6,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Chip, chipClasses } from "@/components/ui/Chip";
 import { cx } from "@/lib/cx";
 import { truncateMiddle } from "@/lib/text";
+import { useCoarsePointer } from "@/lib/useCoarsePointer";
+import { useIsDesktop } from "@/lib/useIsDesktop";
+import { useKeyboardInset } from "@/lib/useKeyboardInset";
 
 import { ChatComposer } from "./ChatComposer";
 import { ChatMessageList, type ChatTurn } from "./ChatMessageList";
@@ -36,6 +39,24 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   const [sessionsKey, setSessionsKey] = useState(0);
   const abort = useRef<AbortController | null>(null);
   const panel = useRef<HTMLElement>(null);
+
+  const isDesktop = useIsDesktop();
+  const coarsePointer = useCoarsePointer();
+  /**
+   * The compact drawer is `fixed inset-0`, and fixed elements anchor to the
+   * layout viewport, which iOS never shrinks for its keyboard: without this,
+   * the composer and Send sit exactly behind the keyboard while the user
+   * types (mobile fix plan Phase 4, R7, the spec's "one genuine unknown").
+   * The inset's bottom lands as drawer padding, so the flex column re-lays
+   * out with the composer above the keyboard and the message list shrunk to
+   * the space that is really visible; its top translates the drawer down by
+   * however far iOS panned the visual viewport to reveal the field, so the
+   * header (and its Close, the drawer's only exit while the keyboard is up)
+   * stays on screen. Active on coarse pointers too, not just below the
+   * seam: an iPad in landscape is `lg` by width but raises the same soft
+   * keyboard over the same unshrunk layout viewport.
+   */
+  const keyboardInset = useKeyboardInset(open && (isDesktop === false || coarsePointer));
 
   const busy = streaming !== null;
 
@@ -171,8 +192,6 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   useEffect(() => {
     if (!open) return;
 
-    panel.current?.querySelector<HTMLTextAreaElement>("#tutor-composer")?.focus();
-
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
     }
@@ -180,6 +199,30 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
+
+  /**
+   * Auto-focus, on the OPEN TRANSITION only and only for fine pointers: on
+   * any touch device this focus would summon the soft keyboard the instant
+   * the drawer opens and jump-scroll the page (Phase 4, R7); pointer
+   * coarseness, not width, is what predicts that, since an lg-width iPad
+   * raises the keyboard like a phone. The transition ref keeps a live
+   * isDesktop/coarseness flip (window resize, iPad rotation) from re-running
+   * the focus and stealing it out of whatever the user was typing in. The
+   * starter-prompt focusKey path still works: that is a deliberate tap.
+   * preventScroll because Safari's scroll-into-view on focus is the jump
+   * this phase exists to remove.
+   */
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    const justOpened = open && !wasOpen.current;
+    wasOpen.current = open;
+    if (!justOpened) return;
+    if (isDesktop === true && !coarsePointer) {
+      panel.current
+        ?.querySelector<HTMLTextAreaElement>("#tutor-composer")
+        ?.focus({ preventScroll: true });
+    }
+  }, [open, isDesktop, coarsePointer]);
 
   const contextChip = [
     context.tab === "practice" ? "Practice" : "Learn",
@@ -220,6 +263,18 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
         "fixed inset-0 z-30 flex w-full flex-col bg-paper-1 shadow-lift transition-transform duration-220 ease-paper lg:absolute lg:inset-y-0 lg:left-auto lg:right-0 lg:z-10 lg:w-[min(420px,100vw)]",
         open ? "translate-x-0" : "translate-x-full",
       )}
+      style={
+        keyboardInset.bottom > 0
+          ? {
+              paddingBottom: keyboardInset.bottom,
+              // Overrides the class translate-x while open (x is 0 there);
+              // the closed state never has an inset, so the slide-away
+              // transform is untouched.
+              transform:
+                keyboardInset.top > 0 ? `translateY(${keyboardInset.top}px)` : undefined,
+            }
+          : undefined
+      }
     >
       <div className="flex h-12 shrink-0 items-center gap-2 bg-plum px-3">
         <Image src="/anglebengal-mark-dark.svg" alt="" width={20} height={20} className="shrink-0" />
@@ -271,6 +326,7 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
         onSend={submitDraft}
         busy={busy}
         focusKey={focusKey}
+        keyboardUp={keyboardInset.bottom > 0}
       />
     </aside>
   );
