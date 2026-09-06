@@ -2692,3 +2692,31 @@ unprefixed text-size-adjust, and active: pressed states mirroring
 hover-only feedback; those follow the mobile spec's own conventions and
 D-068's rationale rather than amending any decision, so they ride under
 this entry rather than getting their own numbers.
+
+### D-159. Canvas pinch stays a non-goal, and becomes cleanly inert
+
+Owner ruling (2026-09-06), closing the mobile research report's decision
+conflict 1 with its option (a). The mobile spec's "No pinch-zoom on the
+canvas" non-goal stands; the fix plan's alternative (amending the spec to
+add clamped internal pan/zoom) was declined. What ships instead is the
+gap between the two states the research found: before this, a pinch on
+the canvas neither zoomed nor was rejected, it drew stray ink, because
+the first finger started a stroke, the activePointer guard dropped the
+second, and the mark committed on lift. Now a second touch landing
+within 150ms of a touch-started stroke rolls that stroke back to
+nothing (live canvas cleared, nothing reaches the store) and the pair is
+left to the browser, which the canvas's touch-action: none renders
+fully inert. Later-landing touches are still treated as palms and leave
+the stroke alone; the pen path and D-069's pen lockout are untouched.
+Riding along under the same ruling: pointercancel now discards instead
+of committing (a system interruption mid-stroke leaves zero ink);
+gesturestart is prevented on the compact overlay as belt-and-suspenders
+against pinches straddling the canvas edge; the sketchpad root and the
+compact overlay both carry user-select and touch-callout suppression so
+long-press cannot pop the loupe mid-draw (element-level alone is
+unreliable on iOS); and opening sketch mode while the page is zoomed
+swaps the overlay header's caption for a re-fit hint, cleared live via
+visualViewport, since iOS offers no API to reset page zoom for the user.
+An eraser drag interrupted by a pinch stops but does not restore what it
+already erased: that would spend undo history on an accident, and the
+harm this ruling closes is stray new ink, which an eraser cannot leave.

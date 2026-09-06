@@ -70,6 +70,14 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
    * the pen stroke still being drawn.
    */
   const activePointer = useRef<number | null>(null);
+  /**
+   * When the owning stroke started and whether a touch owns it, for pinch
+   * rollback (mobile fix plan Phase 3, R3; D-159). Only touch+touch pairs can
+   * be a pinch: a pen plus a touch is a palm (handled by penSeen above), and
+   * a mouse never has a second pointer.
+   */
+  const strokeStartedAt = useRef(0);
+  const ownerIsTouch = useRef(false);
 
   /**
    * Measures the panel and keeps the canvases matched to it.
@@ -201,11 +209,32 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
     if (event.pointerType === "pen") penSeen = true;
     if (event.pointerType === "touch" && penSeen) return;
     if (event.button !== 0 && event.pointerType === "mouse") return;
-    // One stroke, one pointer. A second pointer arriving mid-stroke (the
-    // second finger of a pinch, a palm landing before any pen was seen) does
-    // not get to take the stroke over; it is ignored until the owner lifts.
-    if (activePointer.current !== null) return;
+    // One stroke, one pointer. A second pointer arriving mid-stroke does not
+    // get to take the stroke over. But WHICH second pointer matters: two
+    // fingers landing nearly together are a pinch, not intent to draw, so the
+    // first finger's just-started stroke rolls back to nothing and the pair
+    // is left to the browser, which this canvas's touch-action: none renders
+    // cleanly inert: no ink, no zoom (Phase 3, R3; D-159 keeps the mobile
+    // spec's no-canvas-pinch-zoom non-goal). Beyond the window the second
+    // touch is a late-landing palm and is ignored, leaving the stroke alone.
+    // An eraser drag stops the same way, but strokes it already erased stay
+    // erased: restoring them would mean spending undo history on an accident,
+    // and the harm R3 closes is stray NEW ink, which an eraser cannot leave.
+    if (activePointer.current !== null) {
+      if (
+        event.pointerType === "touch" &&
+        ownerIsTouch.current &&
+        performance.now() - strokeStartedAt.current <= GESTURE_WINDOW_MS
+      ) {
+        releasePointer(event.currentTarget, activePointer.current);
+        activePointer.current = null;
+        discardStroke();
+      }
+      return;
+    }
     activePointer.current = event.pointerId;
+    ownerIsTouch.current = event.pointerType === "touch";
+    strokeStartedAt.current = performance.now();
     capturePointer(event.currentTarget, event.pointerId);
     const point = pointFrom(event);
 
@@ -262,6 +291,31 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
     scheduleLivePaint();
   }
 
+  /** Drops the in-progress stroke without committing: live canvas cleared,
+   *  pending paint cancelled, nothing reaches the store. */
+  function discardStroke() {
+    drawing.current = false;
+    current.current = [];
+    if (frame.current !== null) {
+      cancelAnimationFrame(frame.current);
+      frame.current = null;
+    }
+    const context = liveRef.current?.getContext("2d");
+    context?.clearRect(0, 0, size.width, size.height);
+  }
+
+  function cancelStroke(event: React.PointerEvent<HTMLCanvasElement>) {
+    // pointercancel means the system took the gesture (edge swipe,
+    // notification shade, Scribble): the user's intent was not a stroke, so
+    // nothing commits (Phase 3, R10). It used to route to endStroke, which
+    // left a stray mark after every interruption. pointerup and pointerleave
+    // still commit; only cancel discards.
+    if (activePointer.current !== event.pointerId) return;
+    activePointer.current = null;
+    releasePointer(event.currentTarget, event.pointerId);
+    discardStroke();
+  }
+
   function endStroke(event: React.PointerEvent<HTMLCanvasElement>) {
     // Only the owning pointer ends the stroke. A palm lifting used to land
     // here and commit the pen's half-finished stroke; now it is ignored, and
@@ -290,7 +344,7 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endStroke}
-        onPointerCancel={endStroke}
+        onPointerCancel={cancelStroke}
         onPointerLeave={endStroke}
         className="absolute inset-0 touch-none"
         style={{ cursor: tool === "eraser" ? "cell" : "crosshair" }}
@@ -307,6 +361,15 @@ export type Size = { width: number; height: number };
 
 /** Generous enough to feel like an eraser, small enough to be precise. */
 const ERASER_RADIUS = 12;
+
+/**
+ * How long after a touch stroke starts a second touch still reads as "the
+ * other half of a pinch" rather than a late-landing palm (Phase 3, R3). The
+ * briefs' production references (Excalidraw's gesture handling, Android's
+ * palm-rejection guidance) put the human two-finger landing spread under
+ * about 150ms; a palm follows the pen or leading finger by more.
+ */
+const GESTURE_WINDOW_MS = 150;
 
 /**
  * Pointer capture is a convenience, not a precondition for drawing.

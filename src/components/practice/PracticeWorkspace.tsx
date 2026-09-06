@@ -57,6 +57,7 @@ export function PracticeWorkspace({
 
   const isDesktop = useIsDesktop();
   const [sketchOpen, setSketchOpen] = useState(false);
+  const [pageZoomed, setPageZoomed] = useState(false);
   const [statementMd, setStatementMd] = useState<string | null>(null);
   const sketchButtonRef = useRef<HTMLButtonElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -138,6 +139,42 @@ export function PracticeWorkspace({
     returnFocusToSketch.current = false;
     sketchButtonRef.current?.focus();
   }, [sketchOpen]);
+
+  /**
+   * Sketch-mode gesture hardening (mobile fix plan Phase 3, R13; D-159 keeps
+   * canvas pinch a non-goal, cleanly inert).
+   *
+   * gesturestart is Safari's own pinch event and fires even for a pinch that
+   * straddles the canvas edge, where per-element touch-action rules disagree;
+   * preventDefault is the belt-and-suspenders that keeps any such pinch from
+   * zooming the page. It binds to the DRAWING surface ([data-sketchpad]), not
+   * the whole overlay, so the header stays zoomable: that is where the re-fit
+   * pinch below has to land, since the canvas swallows gestures.
+   *
+   * If the page is ALREADY zoomed when sketch mode opens, this fixed overlay
+   * anchors to the layout viewport, so the canvas sits cropped and misaligned
+   * from what the user sees. iOS has no API to reset page zoom, so the header
+   * swaps its caption for a re-fit hint; the visualViewport listener clears
+   * the hint the moment the user re-fits.
+   *
+   * Keyed on isDesktop too: the overlay only exists at compact, so crossing
+   * the lg seam mid-sketch must re-run this to move the listener with it.
+   */
+  useEffect(() => {
+    if (!sketchOpen || isDesktop === true) return;
+    const surface = overlayRef.current?.querySelector("[data-sketchpad]");
+    const preventGesture = (event: Event) => event.preventDefault();
+    surface?.addEventListener("gesturestart", preventGesture);
+    const viewport = window.visualViewport;
+    const check = () => setPageZoomed((viewport?.scale ?? 1) > 1.02);
+    check();
+    viewport?.addEventListener("resize", check);
+    return () => {
+      surface?.removeEventListener("gesturestart", preventGesture);
+      viewport?.removeEventListener("resize", check);
+      setPageZoomed(false);
+    };
+  }, [sketchOpen, isDesktop]);
 
   return (
     <div
@@ -222,6 +259,7 @@ export function PracticeWorkspace({
           role="dialog"
           aria-modal="true"
           aria-label="Sketchpad"
+          data-sketch-overlay
           className="fixed inset-0 z-30 flex flex-col overscroll-contain bg-paper-0 pt-safe pb-safe"
         >
           <header className="flex h-12 shrink-0 items-center gap-2 bg-paper-1 px-2 shadow-sheet">
@@ -229,7 +267,13 @@ export function PracticeWorkspace({
               Done
             </Chip>
             <span className="flex-1" />
-            <span className="text-meta text-ink-soft">Clean copy inserts your answer</span>
+            {pageZoomed ? (
+              <span role="status" className="text-meta font-semibold text-ink">
+                Zoomed in. Pinch this bar to re-fit.
+              </span>
+            ) : (
+              <span className="text-meta text-ink-soft">Clean copy inserts your answer</span>
+            )}
           </header>
           {statementMd && <ProblemRibbon statementMd={statementMd} />}
           <Sketchpad onInsertAnswer={insertAnswer} />
