@@ -87,7 +87,7 @@ Graph mode adds a second contextual tool row below the kraft strip, an owner-app
 
 - Header: "Tutor" + context chip showing what it can currently see ("Practice · Distance-Rate-Time · current problem"), session switcher menu (recent sessions + New chat).
 - Messages via `<MarkdownMath>`; assistant messages stream token-by-token.
-- Composer: multiline input, Enter sends, Shift+Enter newline.
+- Composer: multiline input. Fine pointers: Enter sends, Shift+Enter newline. Coarse pointers: return adds a line, the Send button posts (D-160; a phone keyboard has no practical Shift+Enter).
 - Context object (`{tab, topicId, problemId, lastAttemptId}`) is captured at send time from app state, not stale drawer state.
 - Empty state suggests three starter prompts tied to context, e.g. on a diagnosed miss: "Why did Model 3 apply here?"
 
