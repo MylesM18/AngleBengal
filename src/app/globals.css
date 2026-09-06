@@ -286,6 +286,34 @@ body {
 }
 
 /*
+ * Long-press hardening for sketch surfaces (mobile fix plan Phase 3, R13;
+ * D-159). Element-level suppression alone is unreliable on iOS 15+ (WebKit
+ * bug 231161): the callout or loupe can still pop mid-draw unless BOTH the
+ * container and an ancestor carry these. The sketchpad root and the compact
+ * overlay are that pair. Compact only: on desktop [data-sketchpad] is the
+ * split-pane sketchpad, where mouse selection of the clean-copy output must
+ * keep working and there is no long-press to suppress. Typed lines and the
+ * rail's coordinate inputs get selection and the edit callout back: they are
+ * text editing, not paper.
+ */
+@media (width < 64rem) {
+  [data-sketchpad],
+  [data-sketch-overlay] {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  [data-sketchpad] input,
+  [data-sketchpad] textarea,
+  [data-sketchpad] math-field {
+    user-select: text;
+    -webkit-user-select: text;
+    -webkit-touch-callout: default;
+  }
+}
+
+/*
  * Controls opt out of double-tap zoom and the residual tap delay; scrolling
  * and pinch still work (R2). Element selectors, not html or body: reading
  * text keeps full pinch zoom and double-tap-to-fit. Deliberately no bare `a`
