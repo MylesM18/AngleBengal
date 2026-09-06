@@ -30,7 +30,7 @@ export function DiagnosisCard({
   return (
     <section
       aria-label="Diagnosis"
-      className="relative overflow-hidden rounded-card bg-paper-1 shadow-lift"
+      className="relative overflow-clip rounded-card bg-paper-1 shadow-lift"
     >
       <div className="flex gap-4 p-4">
         {/* The die-cut: a triangle punched through the sheet, showing red

@@ -160,8 +160,8 @@ export function GraphRail() {
           <span id={titleId} className="text-meta text-ink-soft">
             Exact point
           </span>
-          <input ref={xRef} aria-label="X coordinate" placeholder="x" className="w-16 rounded-input border border-ink-faint bg-paper-0 px-2 py-1 font-mono text-meta text-ink" />
-          <input ref={yRef} aria-label="Y coordinate" placeholder="y" className="w-16 rounded-input border border-ink-faint bg-paper-0 px-2 py-1 font-mono text-meta text-ink" />
+          <input ref={xRef} aria-label="X coordinate" placeholder="x" className="w-16 max-lg:w-20 rounded-input border border-ink-faint bg-paper-0 px-2 py-1 font-mono text-meta text-ink" />
+          <input ref={yRef} aria-label="Y coordinate" placeholder="y" className="w-16 max-lg:w-20 rounded-input border border-ink-faint bg-paper-0 px-2 py-1 font-mono text-meta text-ink" />
           <button type="button" onClick={placeExact} className="rounded-chip border border-ink-faint px-2 py-1 text-meta text-ink">
             Place
           </button>

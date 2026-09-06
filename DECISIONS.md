@@ -2665,3 +2665,30 @@ fresh pick and, worse, re-run the problem defaults over freshly hydrated
 work. A pleasant side effect: resuming into a difficulty-5 problem then
 pressing Next serves from the difficulty-5 pool instead of the default
 pool the owner was never looking at.
+
+### D-158. Text controls read 16px below the lg seam
+
+Mobile fix plan Phase 1 (2026-09-06), the R1 quick win. iOS Safari zooms
+the page roughly 115% when a focused control's computed font-size is under
+16px and never zooms back on blur; inside the clip-everything shell that
+leaves the layout cropped with no page scroll to recover through, which is
+the owner's "wonky pinch" report almost verbatim. Every input, select,
+textarea and math-field host now renders 16px (the text-ui-lg size) at
+compact, via one unlayered globals.css rule gated to (width < 64rem).
+Choices worth recording: this extends the docs/08 six-token type scale's
+usage on compact (controls step from text-ui/text-meta up to the
+text-ui-lg size there); D-046 stays intact because no arbitrary text-[
+value exists anywhere in the change; the rule is unlayered on purpose,
+since text-ui and text-meta are @layer utilities classes and an unlayered
+rule outranks any layered one, which is what lets one rule cover controls
+that carry their own type utilities (GraphRail's 12px inputs included)
+without touching a single call site; desktop is pixel-identical because
+the media query caps at the world seam. The banned alternative, capping
+the viewport scale, violates WCAG 1.4.4 and stays banned. The same Phase 1
+change set added touch-action: manipulation to control families (never to
+html, body, or reading prose), overscroll containment on the root and
+inner scrollers, a compact-only self-scroll route for inline KaTeX, the
+unprefixed text-size-adjust, and active: pressed states mirroring
+hover-only feedback; those follow the mobile spec's own conventions and
+D-068's rationale rather than amending any decision, so they ride under
+this entry rather than getting their own numbers.

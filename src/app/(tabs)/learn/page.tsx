@@ -70,7 +70,7 @@ export default async function LearnIndexPage() {
   const visibleRoots = sortFavoritesFirst(shelf.visible);
 
   return (
-    <div className="h-full overflow-y-auto p-2">
+    <div className="h-full overflow-y-auto overscroll-contain p-2">
       <div className="grid grid-cols-1 gap-6 pt-8 sm:pt-16 lg:grid-cols-[minmax(280px,1fr)_2fr]">
         <header>
           <h1 className="display-cut text-display text-ink">Learn</h1>
@@ -135,7 +135,7 @@ export default async function LearnIndexPage() {
                     <li key={doc.id}>
                       <Link
                         href={`/learn/${doc.topic.id}?doc=${doc.id}`}
-                        className="flex items-start gap-3 px-4 py-3 transition-colors duration-150 ease-paper hover:bg-paper-0"
+                        className="flex touch-manipulation items-start gap-3 px-4 py-3 transition-colors duration-150 ease-paper hover:bg-paper-0 active:bg-paper-0"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-meta text-ink-soft">

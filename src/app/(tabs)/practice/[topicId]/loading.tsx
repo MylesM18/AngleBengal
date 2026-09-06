@@ -7,7 +7,7 @@ import { ProblemSkeleton } from "@/components/ui/Skeleton";
  */
 export default function PracticeTopicLoading() {
   return (
-    <div className="h-full overflow-y-auto p-4 sm:p-8" role="status" aria-label="Loading practice">
+    <div className="h-full overflow-y-auto overscroll-contain p-4 sm:p-8" role="status" aria-label="Loading practice">
       <div className="mx-auto max-w-[640px]">
         <ProblemSkeleton />
       </div>

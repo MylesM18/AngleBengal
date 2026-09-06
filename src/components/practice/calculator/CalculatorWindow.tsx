@@ -277,7 +277,7 @@ export function CalculatorWindow({
             key={key.label + ("insert" in key ? key.insert : key.action)}
             type="button"
             onClick={() => onKey(key)}
-            className="rounded-chip border border-ink-faint bg-paper-0 px-2 py-2 font-mono text-ui text-ink hover:border-ink-soft"
+            className="rounded-chip border border-ink-faint bg-paper-0 px-2 py-2 font-mono text-ui text-ink hover:border-ink-soft active:bg-paper-1"
           >
             {key.label}
           </button>

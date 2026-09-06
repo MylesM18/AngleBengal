@@ -91,7 +91,7 @@ export function SessionMenu({
               onNew();
               setOpen(false);
             }}
-            className="w-full px-3 py-2 text-left text-ui font-medium text-ink hover:bg-paper-1"
+            className="w-full px-3 py-2 text-left text-ui font-medium text-ink hover:bg-paper-1 active:bg-paper-1"
           >
             New chat
           </button>
@@ -101,7 +101,7 @@ export function SessionMenu({
           {sessions.length === 0 ? (
             <p className="px-3 py-2 text-meta text-ink-soft">No earlier chats.</p>
           ) : (
-            <ul className="max-h-[280px] overflow-y-auto">
+            <ul className="max-h-[280px] overflow-y-auto overscroll-contain">
               {sessions.map((session) => (
                 <li key={session.id}>
                   <button
@@ -113,7 +113,7 @@ export function SessionMenu({
                     }}
                     aria-current={session.id === currentSessionId ? "true" : undefined}
                     className={cx(
-                      "relative w-full px-3 py-2 text-left text-ui font-medium hover:bg-paper-1",
+                      "relative w-full px-3 py-2 text-left text-ui font-medium hover:bg-paper-1 active:bg-paper-1",
                       session.id === currentSessionId ? "bg-paper-1" : "",
                     )}
                   >

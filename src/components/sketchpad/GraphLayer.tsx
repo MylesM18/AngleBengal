@@ -252,7 +252,9 @@ export function GraphLayer() {
       <div
         className={
           armed
-            ? "pointer-events-auto absolute inset-0 cursor-crosshair"
+            ? // touch-manipulation: placing a graph point is two quick taps in
+              // the same spot, the exact double-tap-zoom trigger (R2).
+              "pointer-events-auto absolute inset-0 touch-manipulation cursor-crosshair"
             : "absolute inset-0"
         }
         role="application"

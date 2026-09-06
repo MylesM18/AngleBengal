@@ -22,7 +22,7 @@ export function Breadcrumb({
 }) {
   return (
     <nav aria-label="Breadcrumb" className="mb-3 flex flex-wrap items-center gap-1.5 text-meta">
-      <Link href="/learn" className="text-ink-soft hover:text-ink hover:underline">
+      <Link href="/learn" className="touch-manipulation text-ink-soft hover:text-ink hover:underline active:text-ink active:underline">
         Learn
       </Link>
       {pathNodes.map((node) => (
@@ -37,7 +37,7 @@ export function Breadcrumb({
           ) : (
             <Link
               href={`/learn/${node.id}`}
-              className="text-ink-soft hover:text-ink hover:underline"
+              className="touch-manipulation text-ink-soft hover:text-ink hover:underline active:text-ink active:underline"
             >
               {node.name}
             </Link>

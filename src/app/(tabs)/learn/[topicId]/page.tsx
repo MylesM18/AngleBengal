@@ -173,7 +173,7 @@ export default async function TopicPage({
             </span>
           </div>
 
-          <Sheet tone="paper-0" className="animate-enter-sheet overflow-hidden">
+          <Sheet tone="paper-0" className="animate-enter-sheet overflow-clip">
             <PerspectiveTabs
               topicId={topic.id}
               perspective={topic.perspective ? { contentMd: topic.perspective.contentMd } : null}
