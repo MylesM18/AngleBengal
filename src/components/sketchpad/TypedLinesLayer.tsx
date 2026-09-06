@@ -33,7 +33,10 @@ export function TypedLinesLayer() {
 
   return (
     <div
-      className={cx("absolute inset-0 overflow-y-auto", typing ? "" : "pointer-events-none")}
+      className={cx(
+        "absolute inset-0 touch-manipulation overflow-y-auto overscroll-contain",
+        typing ? "" : "pointer-events-none",
+      )}
       // In type mode this whole layer is the typing surface: tapping the
       // paper starts or activates a line, so it must not dismiss the math
       // keyboard on the way (keyboardDismiss.ts). Inert in draw mode, where

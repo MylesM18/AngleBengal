@@ -27,7 +27,7 @@ export default async function SettingsPage() {
   const number = (value: number) => value.toLocaleString("en-US");
 
   return (
-    <div className="h-full overflow-y-auto p-2">
+    <div className="h-full overflow-y-auto overscroll-contain p-2">
       {/* `pt-8 sm:pt-16`, the same pass /learn's header got: 64px of dead
           space above the title is most of a phone's first screen. */}
       <div className="max-w-[860px] pt-8 sm:pt-16">

@@ -36,8 +36,8 @@ export function BottomTabBar() {
           href={tab.href}
           aria-current={isActive(tab.href) ? "page" : undefined}
           className={cx(
-            "flex h-14 min-w-0 flex-1 items-center justify-center rounded-chip text-ui font-medium transition-colors duration-150 ease-paper",
-            isActive(tab.href) ? "bg-ink text-paper-0" : "text-ink hover:bg-desk",
+            "flex h-14 min-w-0 flex-1 touch-manipulation items-center justify-center rounded-chip text-ui font-medium transition-colors duration-150 ease-paper",
+            isActive(tab.href) ? "bg-ink text-paper-0" : "text-ink hover:bg-desk active:bg-desk",
           )}
         >
           {tab.label}

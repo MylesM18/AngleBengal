@@ -38,7 +38,7 @@ export function SymbolPalette({
             title={symbol.label}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onInsert(symbol.insert)}
-            className="rounded-chip border border-ink-faint bg-paper-0 px-2 py-1 font-mono text-meta text-ink hover:border-ink-soft disabled:opacity-60 max-lg:py-2"
+            className="rounded-chip border border-ink-faint bg-paper-0 px-2 py-1 font-mono text-meta text-ink hover:border-ink-soft active:bg-paper-1 disabled:opacity-60 max-lg:py-2"
           >
             {symbol.label}
           </button>

@@ -39,7 +39,7 @@ export function ChatMessageList({
 
   if (turns.length === 0 && streaming === null) {
     return (
-      <div className="flex flex-1 flex-col justify-start gap-3 overflow-y-auto p-4">
+      <div className="flex flex-1 flex-col justify-start gap-3 overflow-y-auto overscroll-contain p-4">
         <p className="text-ui text-ink-soft">
           Ask about anything in your library. The tutor answers using your own models, by
           name and number.
@@ -50,7 +50,7 @@ export function ChatMessageList({
               <button
                 type="button"
                 onClick={() => onStarter(prompt)}
-                className="group flex w-full items-center gap-3 px-3 py-2.5 text-left text-ui text-ink transition-colors duration-150 ease-paper hover:font-medium"
+                className="group flex w-full items-center gap-3 px-3 py-2.5 text-left text-ui text-ink transition-colors duration-150 ease-paper hover:font-medium active:font-medium"
               >
                 <span className="min-w-0 flex-1">{prompt}</span>
                 <Icon
@@ -67,7 +67,7 @@ export function ChatMessageList({
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+    <div className="flex flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4">
       {turns.map((turn) => (
         <Bubble key={turn.id} role={turn.role} content={turn.content} />
       ))}

@@ -135,6 +135,18 @@
 html,
 body {
   height: 100%;
+  /* A pull past the top of any scroller must not chain to the root: on
+   * Android Chrome that chain is pull-to-refresh, which reloads mid-problem
+   * (mobile fix plan Phase 1, R9). Inner scrollers carry overscroll-contain;
+   * this stops whatever still reaches the root. */
+  overscroll-behavior-y: contain;
+}
+
+html {
+  /* Tailwind preflight ships only the -webkit- form; Android font boosting
+   * inside KaTeX blocks needs the unprefixed property too (R20). */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -208,6 +220,9 @@ body {
  * a future reader to assume is load bearing. See D-068. */
 @utility tap-target {
   position: relative;
+  /* Everything that grows a hit area is a control: no double-tap zoom, no
+   * tap delay on it (mobile fix plan Phase 1, R2). */
+  touch-action: manipulation;
   &::after {
     content: "";
     position: absolute;
@@ -247,6 +262,41 @@ body {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/*
+ * Compact control text (mobile fix plan Phase 1, R1; D-158). iOS Safari zooms
+ * the page about 115% when a focused control's computed font-size is under
+ * 16px, and never zooms back out on blur; inside the clip-everything shell
+ * that leaves the layout cropped with no page scroll to recover through. So
+ * below the lg seam every text control reads 16px (the `text-ui-lg` size).
+ * Unlayered on purpose: `text-ui`/`text-meta` are @layer utilities classes,
+ * and an unlayered rule outranks any layered one regardless of specificity.
+ * Desktop is pixel-identical; never fix this with a viewport scale cap.
+ */
+@media (width < 64rem) {
+  input,
+  select,
+  textarea,
+  math-field {
+    font-size: var(--text-ui-lg);
+  }
+}
+
+/*
+ * Controls opt out of double-tap zoom and the residual tap delay; scrolling
+ * and pinch still work (R2). Element selectors, not html or body: reading
+ * text keeps full pinch zoom and double-tap-to-fit. Deliberately no bare `a`
+ * here, so links inside .doc-prose stay ordinary text; link-shaped controls
+ * (tab bar, chips, breadcrumbs, list rows) carry `touch-manipulation` in
+ * their own class lists instead.
+ */
+button,
+input,
+select,
+textarea,
+math-field {
+  touch-action: manipulation;
 }
 
 @layer base {
@@ -385,6 +435,7 @@ body {
     line-height: 1.5;
     display: block;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
   }
 
   .doc-prose thead {
@@ -410,6 +461,39 @@ body {
     padding: 8px 0;
     overflow-x: auto;
     overflow-y: hidden;
+    overscroll-behavior-x: contain;
+  }
+
+  /* Inline math gets its own overflow route at compact (mobile fix plan
+     Phase 1, R6): KaTeX never line-breaks inside `\left...\right` or long
+     atoms, and the sheets clip, so an inline expression wider than the
+     column was simply unreadable, with no gesture to recover it (zoom cannot
+     reveal clipped content). Scoped away from display math, which keeps the
+     rule above. Glyphs stay untouched per the note above; the 2px block
+     padding keeps ascenders clear of the scroll box (KaTeX strut guidance),
+     and `vertical-align: middle` re-seats the box on the line, since a
+     scroll container's baseline is its bottom edge. */
+  @media (width < 64rem) {
+    .doc-prose .katex:not(.katex-display *) {
+      display: inline-block;
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      /* A sideways swipe that runs out of formula must stop, not chain into
+         the browser's horizontal history gesture (the R9 harm, x axis). */
+      overscroll-behavior-x: contain;
+      padding: 2px 0;
+      vertical-align: middle;
+    }
+
+    /* Unbreakable plain strings (long URLs, identifiers, inline code) wrap
+       instead of widening the column. `break-word`, not `anywhere`: `anywhere`
+       counts its break points in min-content sizing, and it inherits into
+       th/td, which would let wide tables shrink-to-fit by shattering every
+       cell's words instead of engaging the table's own scroll route. */
+    .doc-prose {
+      overflow-wrap: break-word;
+    }
   }
 
   /* Bad LaTeX renders as subtle mono rather than crashing (docs/06 §7). */

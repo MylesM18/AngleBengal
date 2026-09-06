@@ -43,7 +43,7 @@ export default async function PracticeIndexPage() {
      * `px-8 py-10`; below `sm` it is 8px of side padding and a 32px top, which
      * is what /learn uses at the same breakpoint.
      */
-    <div className="h-full overflow-y-auto p-2 sm:p-0">
+    <div className="h-full overflow-y-auto overscroll-contain p-2 sm:p-0">
       <div className="mx-auto max-w-[760px] py-8 sm:px-8 sm:py-10">
         <h1 className="display-cut text-h1 leading-tight text-ink">Practice</h1>
         <p className="mt-2 max-w-[54ch] text-ui leading-relaxed text-ink-soft">

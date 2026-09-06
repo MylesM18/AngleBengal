@@ -536,7 +536,7 @@ export function PracticePanel({
           clearance, not a repair: 80px of padding moves the last content 36px
           clear of the button instead of 1.4px. `lg` and up has no floating
           button and keeps `p-5`. */}
-      <div className="min-h-0 flex-1 overflow-y-auto p-5 max-lg:pb-20">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 max-lg:pb-20">
         {loading ? (
           <ProblemSkeleton />
         ) : !problem ? (
@@ -580,7 +580,7 @@ export function PracticePanel({
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <Sheet tone="paper-0" className="relative overflow-hidden pb-4">
+            <Sheet tone="paper-0" className="relative overflow-clip pb-4">
               <CornerNumeral n={problem.difficulty} color={accent} size={30} />
               <div className="p-4">
                 <MarkdownMath variant="reading">{problem.statementMd}</MarkdownMath>

@@ -17,7 +17,7 @@ export type ChipVariant = "nav" | "meta" | "action" | "toggle";
  * not just its pixels.
  */
 const BASE =
-  "max-lg:tap-target inline-flex h-6 min-w-8 items-center justify-center gap-1 whitespace-nowrap rounded-chip px-2 text-ui transition-[background-color,color,box-shadow,transform] duration-150 ease-paper";
+  "max-lg:tap-target inline-flex touch-manipulation h-6 min-w-8 items-center justify-center gap-1 whitespace-nowrap rounded-chip px-2 text-ui transition-[background-color,color,box-shadow,transform] duration-150 ease-paper";
 
 const VARIANT: Record<ChipVariant, string> = {
   nav: "font-medium text-ink hover:bg-desk",
@@ -51,6 +51,12 @@ export function chipClasses({
     BASE,
     VARIANT[variant],
     variant !== "meta" && !active && REST_FILL,
+    // Pressed feedback mirrors hover, but only on the rest state: hover styles
+    // are inert on touch under Tailwind v4's (hover: hover) gate, so `active:`
+    // is the only feedback a finger gets (R12). Gated off the inverted chip,
+    // where `active:bg-desk` would outrank `.bg-ink` on specificity and flash
+    // a near-white label on a light fill while pressed.
+    variant === "nav" && !active && "active:bg-desk",
     active && ACTIVE,
     className,
   );

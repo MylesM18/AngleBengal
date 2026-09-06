@@ -29,7 +29,9 @@ export function CopyLinkButton({ anchor, number }: { anchor: string; number: num
       onClick={copyLink}
       aria-label={`Copy link to model ${number}`}
       title={`Copy link to model ${number}`}
-      className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-chip align-middle text-ink-soft opacity-0 hover:text-plum focus:opacity-100 group-hover:opacity-100"
+      // max-lg:opacity-100: hover cannot reveal it on touch, so at compact it
+      // sits visible at rest instead of invisibly intercepting taps (R12).
+      className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-chip align-middle text-ink-soft opacity-0 hover:text-plum focus:opacity-100 group-hover:opacity-100 active:text-plum max-lg:opacity-100"
     >
       <Icon name="copy" size={14} />
     </button>

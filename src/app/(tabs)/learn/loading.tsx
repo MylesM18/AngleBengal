@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
  */
 export default function LearnLoading() {
   return (
-    <div className="h-full overflow-y-auto p-2" role="status" aria-label="Loading Learn">
+    <div className="h-full overflow-y-auto overscroll-contain p-2" role="status" aria-label="Loading Learn">
       <div className="grid grid-cols-1 gap-6 pt-8 sm:pt-16 lg:grid-cols-[minmax(280px,1fr)_2fr]">
         <header>
           <h1 className="display-cut text-display text-ink">Learn</h1>

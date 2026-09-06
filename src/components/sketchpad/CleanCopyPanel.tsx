@@ -47,7 +47,7 @@ export function CleanCopyPanel({
         </Chip>
       </div>
 
-      <ul className="min-h-0 divide-y divide-hairline overflow-y-auto px-3">
+      <ul className="min-h-0 divide-y divide-hairline overflow-y-auto overscroll-contain px-3">
         {blocks.map((block, index) => (
           <li key={index} className="flex items-start gap-2 py-1.5">
             <div className="min-w-0 flex-1">
