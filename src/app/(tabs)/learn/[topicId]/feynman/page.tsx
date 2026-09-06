@@ -36,7 +36,7 @@ export default async function FeynmanPage({
   }
 
   return (
-    <div className="mx-auto max-w-[860px] px-4 pt-8 pb-10 sm:px-8 sm:pt-16">
+    <div className="mx-auto max-w-[860px] px-4 pt-8 pb-10 sm:px-8 lg:pt-16">
       <div className="mb-3 flex flex-wrap items-center gap-2 [&>nav]:mb-0">
         <BackButton fallbackHref={`/learn/${topic.id}`} />
         <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />

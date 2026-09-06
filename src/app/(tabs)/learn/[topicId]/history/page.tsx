@@ -73,7 +73,7 @@ export default async function HistoryPage({
       : "Attempts show up here once you have practised this topic.";
 
   return (
-    <div className="mx-auto max-w-[860px] px-4 pt-8 pb-10 sm:px-8 sm:pt-16">
+    <div className="mx-auto max-w-[860px] px-4 pt-8 pb-10 sm:px-8 lg:pt-16">
       <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />
       <h1 className="display-cut text-h1 text-ink">{title}</h1>
       <p className="mt-2 text-meta text-ink-soft">

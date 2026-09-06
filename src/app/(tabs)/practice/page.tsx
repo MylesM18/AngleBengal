@@ -39,12 +39,13 @@ export default async function PracticeIndexPage() {
      * Same shape as /learn and /settings: an `h-full overflow-y-auto` scroller
      * (the shell's <main> is `overflow-hidden`, so every page brings its own),
      * with the compact padding pass on the inner column. At `sm` and up the
-     * outer padding collapses to nothing and the column keeps today's exact
-     * `px-8 py-10`; below `sm` it is 8px of side padding and a 32px top, which
-     * is what /learn uses at the same breakpoint.
+     * outer padding collapses to nothing and the column gains `px-8`; the
+     * taller `py-10` waits for `lg` (mobile fix plan Phase 2, R14: a landscape
+     * phone is `sm` but must not spend its height on desktop air). Below `sm`
+     * it is 8px of side padding and a 32px top, matching /learn.
      */
     <div className="h-full overflow-y-auto overscroll-contain p-2 sm:p-0">
-      <div className="mx-auto max-w-[760px] py-8 sm:px-8 sm:py-10">
+      <div className="mx-auto max-w-[760px] py-8 sm:px-8 lg:py-10">
         <h1 className="display-cut text-h1 leading-tight text-ink">Practice</h1>
         <p className="mt-2 max-w-[54ch] text-ui leading-relaxed text-ink-soft">
           Verified problems tagged to the models they exercise. A wrong answer is diagnosed

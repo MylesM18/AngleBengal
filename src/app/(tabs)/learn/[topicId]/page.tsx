@@ -243,7 +243,7 @@ export default async function TopicPage({
     );
 
     return (
-      <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 sm:py-10">
+      <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 lg:py-10">
         {/* Keyed per doc so switching tabs re-arms the restore cleanly. */}
         <DocScrollMemory key={doc.id} />
         <ReaderTabProvider hasPerspective={Boolean(topic.perspective)}>
@@ -287,7 +287,7 @@ export default async function TopicPage({
   ].join(" · ");
 
   return (
-    <div className="mx-auto max-w-[860px] px-4 pt-8 pb-10 sm:px-8 sm:pt-16">
+    <div className="mx-auto max-w-[860px] px-4 pt-8 pb-10 sm:px-8 lg:pt-16">
       <div className="mb-3 flex flex-wrap items-center gap-2 [&>nav]:mb-0">
         <BackButton />
         <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />

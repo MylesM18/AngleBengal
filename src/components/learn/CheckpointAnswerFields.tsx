@@ -32,14 +32,16 @@ export function CheckpointAnswerFields({
   if (shape.answerType === "multi") {
     const resultFor = new Map((partResults ?? []).map((part) => [part.name, part.match]));
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 max-lg:gap-4">
         {(shape.parts ?? []).map((part) => {
           const match = resultFor.get(part.name);
           return (
-            <div key={part.name} className="flex items-center gap-2">
+            // Same compact reflow as AnswerInput's multi rows (Phase 2, R5):
+            // label above, spans free to wrap, desktop boxes untouched.
+            <div key={part.name} className="flex items-center gap-2 max-lg:flex-wrap max-lg:gap-y-1">
               <label
                 htmlFor={`checkpoint-${part.name}`}
-                className="w-[150px] shrink-0 text-right text-meta text-ink-soft"
+                className="w-[150px] shrink-0 text-right text-meta text-ink-soft max-lg:w-full max-lg:text-left"
               >
                 {part.label}
               </label>
@@ -72,7 +74,7 @@ export function CheckpointAnswerFields({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 max-lg:flex-wrap">
       <label htmlFor="checkpoint-single" className="sr-only">
         Your answer
       </label>
