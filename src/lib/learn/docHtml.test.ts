@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { MARKDOWN_VARIANT_CLASS, MarkdownMath } from "@/components/shared/MarkdownMath";
+import { MARKDOWN_VARIANT_CLASS, MarkdownBody, MarkdownMath } from "@/components/shared/MarkdownMath";
 import { buildDocHtml, renderMarkdownBodyHtml } from "@/lib/learn/docHtml";
 import type { ModelIndexEntry } from "@/lib/modelIndex";
 
@@ -66,6 +66,36 @@ describe("renderMarkdownBodyHtml", () => {
     expect(html).toContain("katex");
     expect(html).toContain('scope="col"');
     expect(html).toContain('id="model-1"');
+  });
+
+  it("wraps tables in the focusable scroller (Phase 6, R18)", () => {
+    const html = renderMarkdownBodyHtml(FIXTURE);
+
+    // Markup change: paired with the RENDER_VERSION bump in docHtml.ts, or
+    // cached reading HTML would keep serving the unwrapped table forever.
+    expect(html).toContain(
+      '<div class="table-scroll" tabindex="0" aria-label="Scrollable table"><table>',
+    );
+  });
+
+  it("keeps react-markdown's internal node prop out of the cached markup", () => {
+    const html = renderMarkdownBodyHtml(FIXTURE);
+
+    // Spreading the override's props onto a DOM element serialized the hast
+    // node as node="[object Object]" on every h2, th and table.
+    expect(html).not.toContain("node=");
+  });
+
+  it("drops the keyboard affordance for the ui and chat voices", () => {
+    // ProblemRibbon renders the ui voice inside a button, whose content model
+    // forbids a focusable descendant. The overflow wrapper stays either way.
+    const compact = renderToStaticMarkup(
+      // eslint-disable-next-line react/no-children-prop
+      createElement(MarkdownBody, { focusableTables: false, children: FIXTURE }),
+    );
+
+    expect(compact).toContain('<div class="table-scroll"><table>');
+    expect(compact).not.toContain("tabindex");
   });
 });
 

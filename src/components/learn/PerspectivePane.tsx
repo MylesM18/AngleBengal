@@ -79,7 +79,7 @@ export function PerspectivePane({
   }
 
   return (
-    <div className="px-4 py-6 sm:px-8 sm:py-8">
+    <div className="px-3 py-6 sm:px-8 sm:py-8">
       {busy ? (
         <p aria-live="polite" className="text-meta text-ink-soft">
           Writing the perspective: where this mathematics comes from and why
@@ -136,7 +136,7 @@ function PerspectiveReader({ topicId, contentMd }: { topicId: string; contentMd:
   const split = useMemo(() => splitHeadingSections(contentMd), [contentMd]);
 
   return (
-    <div className="px-4 py-6 sm:px-8 sm:py-8">
+    <div className="px-3 py-6 sm:px-8 sm:py-8">
       <RevealScope replayKey={`perspective-${topicId}`}>
         {split.preamble && <MarkdownMath variant="reading">{split.preamble}</MarkdownMath>}
         {split.sections.map((section, i) => (

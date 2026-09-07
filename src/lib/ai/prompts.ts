@@ -226,6 +226,10 @@ RULES:
 - Every claim of "why" must be real: unit analysis, a physical invariant,
   a counting argument, a picture. Never "because that's the rule."
 - All math in LaTeX delimited by $ or $$. All tables in GitHub markdown.
+- Keep inline math short, a few symbols at most. Fractions, multi-term
+  equations, and anything longer than about 25 characters go in display
+  math ($$...$$) on their own line: inline math cannot wrap, so on a phone
+  a long inline expression forces sideways scrolling mid-sentence.
 - Numbers in worked examples must be arithmetically correct. Recompute every
   line before writing it.
 - Voice: direct, second person, confident, plain words. No em-dashes
@@ -648,7 +652,9 @@ WOLFRAM QUERY RULES:
 
 NOTATION: write all mathematics as LaTeX delimited by $ or $$, in the problem
 statement and the solution alike. The document below may write formulas as
-markdown code spans; do not copy that habit.
+markdown code spans; do not copy that habit. Keep inline math short: any
+fraction or multi-term expression goes in display math ($$...$$), which a
+phone can scroll; long inline math cannot wrap.
 
 THE TOPIC'S MENTAL MODEL DOCUMENT:
 

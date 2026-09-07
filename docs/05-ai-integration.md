@@ -66,6 +66,10 @@ RULES:
 - Every claim of "why" must be real: unit analysis, a physical invariant,
   a counting argument, a picture. Never "because that's the rule."
 - All math in LaTeX delimited by $ or $$. All tables in GitHub markdown.
+- Keep inline math short, a few symbols at most. Fractions, multi-term
+  equations, and anything longer than about 25 characters go in display
+  math ($$...$$) on their own line: inline math cannot wrap, so on a phone
+  a long inline expression forces sideways scrolling mid-sentence.
 - Numbers in worked examples must be arithmetically correct. Recompute every
   line before writing it.
 - Voice: direct, second person, confident, plain words. No em-dashes
@@ -254,6 +258,12 @@ WOLFRAM QUERY RULES:
 - One computation per query. For word problems the query is the extracted
   computation, never the prose.
 - Plain ASCII, a single line.
+
+NOTATION: write all mathematics as LaTeX delimited by $ or $$, in the problem
+statement and the solution alike. The document below may write formulas as
+markdown code spans; do not copy that habit. Keep inline math short: any
+fraction or multi-term expression goes in display math ($$...$$), which a
+phone can scroll; long inline math cannot wrap.
 ```
 
 The graph-answers bullet's middle sentence depends on the topic root's graph toolset (`graphTools`, `TOOLS_BY_ROOT` in `src/lib/practice/tools.ts`, Appendix C of the practice tools spec). When the root allows no graph kinds, it reads `This topic does not allow graph answers; never emit type "graph".` Otherwise it reads `Allowed kinds for this topic: {kinds}.` (the root's placeable kinds, comma-separated, dashed and shade excluded from that list), followed by `dashed: true is allowed for boundary style.` when `dashed` is in the toolset or `Never set dashed: true.` when it is not, and `Use shadedPoint (a point inside the correct region) only when the answer is a region; otherwise null.` when `shade` is in the toolset or `shadedPoint must be null.` when it is not.

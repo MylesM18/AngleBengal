@@ -463,15 +463,22 @@ math-field {
     text-decoration: underline;
   }
 
-  /* Tables: GitHub markdown, marigold-tint header row (docs/08). */
+  /* Tables: GitHub markdown, marigold-tint header row (docs/08). Real table
+     layout: the old display-block scroll route stripped table semantics from
+     assistive tech, wasting the th scope="col" work. The .table-scroll
+     wrapper (TableScroller in MarkdownMath.tsx) owns overflow instead
+     (mobile fix plan Phase 6, R18, D-162). Drawn geometry is unchanged: the
+     block hack laid rows out in a shrink-to-fit anonymous table, and a real
+     table with no width set does the same. */
   .doc-prose table {
-    width: 100%;
     border-collapse: collapse;
-    margin: 0 0 1.25rem;
     font-family: var(--font-sans);
     font-size: 14px;
     line-height: 1.5;
-    display: block;
+  }
+
+  .doc-prose .table-scroll {
+    margin: 0 0 1.25rem;
     overflow-x: auto;
     overscroll-behavior-x: contain;
   }
@@ -493,7 +500,10 @@ math-field {
     vertical-align: top;
   }
 
-  /* KaTeX: never restyle the glyphs, only the block breathing room. Color is inherited. */
+  /* KaTeX: never restyle the glyphs, only the block breathing room. Color is
+     inherited. One recorded exception: D-162 sets a compact font-size on
+     .katex (media block below), which scales the whole layout engine
+     uniformly rather than restyling any glyph run. */
   .doc-prose .katex-display {
     margin: 0.5rem 0;
     padding: 8px 0;
@@ -531,6 +541,68 @@ math-field {
        cell's words instead of engaging the table's own scroll route. */
     .doc-prose {
       overflow-wrap: break-word;
+    }
+
+    /* Compact math scale (mobile fix plan Phase 6, R15, D-162, owner ruling
+       3): default KaTeX is 1.21em, 20.6px over the 17px serif, widening
+       every equation at phone widths. 1.1em keeps subscripts legible while
+       pulling most equations back under the column. Uniform across the
+       prose voices so math never changes scale between surfaces. */
+    .doc-prose .katex {
+      font-size: 1.1em;
+    }
+
+    /* Compact measure (R16): the serif column at 360px sits under the 45ch
+       floor and every indent narrows it further. 12px keeps disc and
+       single-digit ordinal markers clear of the gutter. */
+    .doc-prose ul,
+    .doc-prose ol {
+      padding-left: 0.75rem;
+    }
+
+    .doc-prose blockquote {
+      padding-left: 0.75rem;
+    }
+
+    /* Overflow affordance (R17): overlay scrollbars are invisible until
+       mid-scroll, so a clipped equation or table reads as truncated, and
+       zoom cannot reveal it. Two background layers make the cue exact. The
+       ink scrim is pinned to the box's right edge (attachment scroll); the
+       opaque cover rides the scrollable content (attachment local), so it
+       sits exactly over the scrim whenever the content's right end meets
+       the box: nothing overflowing, or scrolled to the end, shows no cue.
+       A static fade cannot be exact here: a table wider than the column
+       wraps to fill it edge to edge, parking its right border in the fade
+       zone with nothing to scroll. The cover must match the surface behind
+       the content, and the reading voice renders on more than one: the doc
+       sheet is paper-0, checkpoint statements and solutions and the model
+       card gist are paper-1. So the color comes from `--cue-cover`, which
+       each surface class sets below and inner surfaces re-set, rather than
+       from an assumption. The cover's opaque run (12px) outreaches the
+       scrim's strong half so an aligned cover leaves no visible residue.
+       The ui and chat voices keep no cue, as today: they sit on surfaces
+       with no single tone to match. Inline math likewise: its box
+       shrink-wraps, so any static treatment would mark every fitting
+       expression. */
+    .bg-paper-0 {
+      --cue-cover: var(--color-paper-0);
+    }
+
+    .bg-paper-1 {
+      --cue-cover: var(--color-paper-1);
+    }
+
+    .doc-prose:not(.ui-prose):not(.chat-prose) .katex-display,
+    .doc-prose:not(.ui-prose):not(.chat-prose) .table-scroll {
+      background:
+        linear-gradient(to left, var(--cue-cover, var(--color-paper-0)) 12px, transparent 36px)
+          right center / 36px 100% no-repeat local,
+        linear-gradient(
+            to left,
+            color-mix(in srgb, var(--color-ink) 14%, transparent),
+            transparent 24px
+          )
+          right center / 24px 100% no-repeat scroll;
     }
   }
 

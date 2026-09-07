@@ -2767,3 +2767,54 @@ full-bleed: the chrome around it carries the insets, the drawing
 surface does not shrink. The `pt-safe` wrappers added to TopBar and the
 tutor drawer header are spec section 7 catching up, not part of this
 decision.
+
+### D-162. Compact reading comfort: KaTeX scale, measure, overflow cues, real tables
+
+Mobile fix plan Phase 6 (report R15 to R18), owner ruling 3.
+
+1. Compact KaTeX scale. The globals.css KaTeX comment says never restyle
+   the glyphs. New evidence: at phone widths the default 1.21em over the
+   17px serif renders 20.6px math and pushes equations past the column
+   (R15). Below 64rem, `.doc-prose .katex` is set to 1.1em, a uniform
+   engine scale rather than a per-glyph restyle, applied across all three
+   prose voices so math keeps one scale everywhere. The comment now
+   carries the exception. Owner ruling 3 made this a deliberate recorded
+   amendment: ship it, never silently.
+2. Real tables behind a scroller (R18). The `display: block` scroll route
+   stripped table semantics from assistive tech, wasting the
+   `scope="col"` work. Tables return to real table layout; a wrapper div
+   in MarkdownMath owns the overflow. The reading voice's wrapper is
+   focusable (tabindex 0, `aria-label`, no role, per the report); the ui
+   and chat voices get the same wrapper without those, because
+   ProblemRibbon renders the ui voice inside a `button`, whose content
+   model forbids a focusable descendant, and neither voice had a
+   focusable scroller before this phase. Markup changed, so
+   RENDER_VERSION bumped to 2 and the docHtml seam test pins both forms.
+   Drawn geometry is unchanged: the block hack already laid rows out
+   shrink-to-fit. The overrides now also drop react-markdown's internal
+   `node` prop, which had been serializing as `node="[object Object]"`
+   on every heading and header cell in the cached HTML.
+3. Overflow cue (R17), compact only, on display math and the table
+   scroller in the reading voice. Not the report's suggested static mask:
+   live probing showed a table wider than the column wraps to fill it
+   edge to edge, so a static fade marks 6 of the exemplar doc's 9 tables
+   as truncated when nothing overflows, the exact harm R17 names.
+   Instead, two background layers: an ink scrim pinned to the box edge
+   under an opaque cover that rides the scrollable content, so the cue
+   shows exactly while there is more to scroll to and clears at the
+   scroll end. The cover's color comes from `--cue-cover`, set by the
+   `bg-paper-0` and `bg-paper-1` surface classes, because the reading
+   voice renders on both (the doc sheet is paper-0; checkpoint
+   statements and solutions and the model card gist are paper-1) and
+   nested surfaces must re-set it. Its opaque run outreaches the scrim's
+   strong half, so an aligned cover leaves no visible residue. The ui
+   and chat voices sit on surfaces with no single tone to match, and
+   inline math shrink-wraps; both keep no cue.
+4. Compact measure (R16). The reader article's px-3 gutter layer is
+   removed below sm (the sheet goes edge to edge and keeps its own inner
+   gutter, trimmed 16px to 12px in both of its panes, Models and
+   Perspective, along with the title and meta bars); list
+   indents go 1.35rem to 0.75rem and blockquote 1rem to 0.75rem below
+   64rem. The doc and problem generator prompts gain an inline-math
+   length habit (docs/05 updated in step) so new content stops producing
+   unwrappable inline runs.
