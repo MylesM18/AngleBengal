@@ -2818,3 +2818,91 @@ Mobile fix plan Phase 6 (report R15 to R18), owner ruling 3.
    64rem. The doc and problem generator prompts gain an inline-math
    length habit (docs/05 updated in step) so new content stops producing
    unwrappable inline runs.
+
+### D-163. The regression rig signs its own session, and the axe allowlist is a safety net, not a filter
+
+Mobile fix plan Phase 7, owner ruling 5 plus one measurement that contradicted
+the plan.
+
+1. **Playwright gets past the login wall by minting a cookie, not by logging
+   in.** Four options were on the table; the owner chose this one. `e2e/global-setup.ts`
+   reads `SESSION_SECRET` at run time and calls `createSessionValue()` from
+   `src/lib/auth/session.ts`, writing the result as a Playwright storage state.
+   No username and no password exist anywhere in the rig. This works because
+   `src/proxy.ts` verifies only the HMAC and the 12 hour age of the cookie and
+   never touches the database (D-105 to D-107), so a validly signed value for
+   any username string passes the wall. The username stamped in is `e2e-rig`.
+   The alternative of committing a storage state file was rejected on the
+   arithmetic: `SESSION_MAX_AGE_MS` is 12 hours, so a checked in cookie would
+   rot twice a day and the rig would fail as a wall of redirects. The minted
+   file is gitignored, and the setup throws with a named remedy when the secret
+   is absent rather than producing a silently unauthenticated run.
+2. **The overflow walk reads the class attribute, because computed style cannot
+   tell the two scrollers apart.** CSS resolves `overflow-x: visible` to `auto`
+   whenever the other axis is not visible, so a vertical panel scroller
+   (`overflow-y-auto`) and a deliberate sideways scroller (`overflow-x-auto`)
+   both compute to `auto auto`. Only the class token still carries the author's
+   intent. The rig exempts an element when a class token ends in
+   `overflow-x-auto` or `overflow-x-scroll` AND the computed value agrees,
+   which also stops a responsive variant from exempting an element at a width
+   where it does not apply. Scrollers declared in globals.css with no class to
+   read (`.table-scroll`, `.katex-display`, compact inline `.katex`,
+   `.doc-prose pre`) are listed separately and reported when they go stale.
+   Further exclusions are recorded because each one was a false positive the
+   rig produced against real pages: content parked entirely off canvas (a
+   closed drawer is `fixed inset-0` translated past the edge), and content
+   clipped out of sight on purpose (KaTeX ships a full MathML mirror of every
+   formula inside a `clip: rect(1px,1px,1px,1px)` box, and Tailwind's
+   `sr-only` does the same). The hit area probe adds two of its own: a control
+   whose own centre answers with something else is behind an overlay rather
+   than losing a D-071 collision, and a control whose centre lies outside the
+   viewport is scrolled out of view, where the only part of its 44px box still
+   on screen is a sliver overlapping the tab bar. Probing that sliver tests the
+   tab bar, not a collision, and it was doing exactly that on the practice
+   panel's Submit row until the gate was widened.
+3. **The axe `target-size` allowlist ships, and it currently matches nothing.**
+   The plan (R22) assumed the rule would flag D-076's named exceptions and that
+   the allowlist would be load bearing. Measured on /learn at 390px: 26 nodes
+   pass, zero violations, zero incomplete. The reason is a threshold mismatch.
+   `target-size` enforces the WCAG 2.2 AA minimum of 24 by 24; D-076 is about
+   this app's stricter 44px house floor, and every exception it names is 24px
+   or larger (the shelf input and its Create button are `h-8`, the tertiary
+   link-buttons are `h-6`, and breadcrumb links are inline text, which the rule
+   exempts outright). Owner ruling 5 stands and the allowlist ships anyway, as
+   a documented safety net for a future icon-only control under 24px, and it
+   fails on any node not on it. Because an allowlist that matches nothing
+   cannot be the evidence that the scan works, the axe spec injects an
+   undersized control and asserts the gate reports it, and the run warns about
+   allowlist entries that matched nothing so the list can be trimmed in a
+   later amendment rather than by a red gate.
+4. **Two ports, deliberately.** The rig's `webServer` runs on 3011. Port 3010
+   belongs to the `anglebengal-dev` server the Browser pane drives, and the two
+   would fight over the same `.next` directory. The rig runs against `next dev`
+   rather than a production build: Tailwind emits the same CSS either way, so
+   layout is identical, and a `next build` inside the loop would make the rig
+   too slow to get run. It drives `localhost` rather than `127.0.0.1`, because
+   Next 16's dev origin allowlist covers `localhost` and the configured
+   hostname but not the loopback literal, so the second one gets its HMR
+   websocket upgrade refused and logs a cross origin warning per request.
+   Static chunks still load and the page still hydrates, so the cost is a
+   noisy, half connected dev server rather than a broken one. Using the
+   allowlisted host is free.
+5. **D-074 is gated twice, at the source and at 1280.** The runtime gate can
+   only judge what a route renders, and the routes it can reach hold a minority
+   of the call sites: most live behind a served problem, an open calculator, a
+   graph background or a Feynman session. D-074's failure mode is per call site
+   (a bare `tap-target` written where `max-lg:tap-target` was meant, which is
+   what D-077 caught on TopBar), so the rig also scans `src/` and asserts every
+   call site carries the `max-lg:` variant, with comments stripped so prose
+   about the utility is not mistaken for a use of it. The desktop project also
+   visits the practice route, which is the one place it sees PracticePanel,
+   CalculatorChip and SketchToolbar, because at lg the workspace renders the
+   sketchpad beside the panel.
+6. **The practice route is measured with a problem on screen.** The panel opens
+   on difficulty 2, `/api/problems/next` has no cross difficulty fallback, and
+   this app's verified pool sits at difficulty 5, so the default view is the
+   empty state: no problem statement, no display math, no answer row, no
+   Calculator chip, no Submit row. Measuring that proves close to nothing, so
+   the rig clicks 5, waits for either a problem or the empty state, and prints
+   which one it measured. A green run that quietly measured the empty state
+   would otherwise be indistinguishable from a real one.
