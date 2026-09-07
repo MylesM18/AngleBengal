@@ -35,7 +35,7 @@ export function ProblemRibbon({ statementMd }: { statementMd: string }) {
       type="button"
       onClick={() => setExpanded((value) => !value)}
       aria-expanded={expanded}
-      className="shrink-0 border-b border-hairline bg-paper-1 px-3 py-2 text-left shadow-sheet"
+      className="shrink-0 border-b border-hairline bg-paper-1 py-2 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] text-left shadow-sheet"
     >
       <span className="sr-only">
         {expanded ? "Collapse problem statement" : "Expand problem statement"}

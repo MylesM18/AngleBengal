@@ -47,12 +47,12 @@ export function CoverActions({
   }
 
   const buttonClass =
-    "flex h-7 w-7 items-center justify-center rounded-input border border-hairline " +
+    "max-lg:tap-target flex h-7 w-7 items-center justify-center rounded-input border border-hairline " +
     "bg-paper-0/90 shadow-sheet transition-colors duration-150 ease-paper " +
     "disabled:opacity-60";
 
   return (
-    <span className="absolute right-2 top-2 z-10 flex gap-1">
+    <span className="absolute right-2 top-2 z-10 flex gap-1 max-lg:gap-4">
       <button
         type="button"
         disabled={saving}

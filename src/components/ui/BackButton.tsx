@@ -21,7 +21,14 @@ export function BackButton({ fallbackHref = "/learn" }: { fallbackHref?: string 
   };
 
   return (
-    <Button type="button" variant="tertiary" size="sm" onClick={goBack} aria-label="Go back">
+    <Button
+      type="button"
+      variant="tertiary"
+      size="sm"
+      onClick={goBack}
+      aria-label="Go back"
+      className="max-lg:tap-target"
+    >
       <Icon name="chevron" className="rotate-180" />
       Back
     </Button>

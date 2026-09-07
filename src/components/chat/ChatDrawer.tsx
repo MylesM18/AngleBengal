@@ -276,7 +276,10 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           : undefined
       }
     >
-      <div className="flex h-12 shrink-0 items-center gap-2 bg-plum px-3">
+      {/* max-lg only: at lg the drawer sits inside the content row below the
+          TopBar, which owns the top inset; ungated this would double-inset. */}
+      <div className="shrink-0 bg-plum max-lg:pt-safe">
+      <div className="flex h-12 shrink-0 items-center gap-2 bg-plum pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]">
         <Image src="/anglebengal-mark-dark.svg" alt="" width={20} height={20} className="shrink-0" />
         <span className="font-expanded text-ui-lg text-paper-0">Tutor</span>
         {/*
@@ -311,6 +314,7 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             className="bg-paper-0 text-ink focus-visible:outline-paper-0"
           />
         </div>
+      </div>
       </div>
 
       <ChatMessageList

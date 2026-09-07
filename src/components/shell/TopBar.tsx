@@ -34,7 +34,8 @@ export function TopBar({ chatOpen, onToggleChat, tutorRef }: TopBarProps) {
     // `relative` for the same reason as BottomTabBar: `z-20` is inert on a
     // static element, so the header's sheet shadow had no guaranteed place in
     // the paint order over the page below it.
-    <header className="relative z-20 flex h-12 shrink-0 items-center gap-3 bg-paper-1 px-2 shadow-sheet">
+    <header className="relative z-20 shrink-0 bg-paper-1 pt-safe shadow-sheet">
+      <div className="flex h-12 items-center gap-3 pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))]">
       <Link
         href="/learn"
         className="flex items-center gap-2 rounded-chip px-1 max-lg:tap-target"
@@ -94,6 +95,7 @@ export function TopBar({ chatOpen, onToggleChat, tutorRef }: TopBarProps) {
         <Image src="/anglebengal-mark-dark.svg" alt="" width={16} height={16} className="shrink-0" />
         Tutor
       </button>
+      </div>
     </header>
   );
 }

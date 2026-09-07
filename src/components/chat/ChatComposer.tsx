@@ -68,7 +68,7 @@ export function ChatComposer({
     // clearance is added on top of the existing 12px, not swapped in for it.
     <div
       className={cx(
-        "shrink-0 bg-paper-1 p-3",
+        "shrink-0 bg-paper-1 p-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]",
         !keyboardUp && "pb-[calc(0.75rem+env(safe-area-inset-bottom))]",
       )}
     >

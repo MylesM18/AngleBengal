@@ -262,7 +262,7 @@ export function PracticeWorkspace({
           data-sketch-overlay
           className="fixed inset-0 z-30 flex flex-col overscroll-contain bg-paper-0 pt-safe pb-safe"
         >
-          <header className="flex h-12 shrink-0 items-center gap-2 bg-paper-1 px-2 shadow-sheet">
+          <header className="flex h-12 shrink-0 items-center gap-2 bg-paper-1 pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] shadow-sheet">
             <Chip variant="action" icon="close" onClick={closeSketch}>
               Done
             </Chip>
