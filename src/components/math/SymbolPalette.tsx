@@ -22,7 +22,7 @@ export function SymbolPalette({
     // data-keep-math-keyboard: inserting a symbol must not dismiss the
     // keyboard the symbol is being inserted with (keyboardDismiss.ts).
     <div
-      className="flex flex-wrap gap-1"
+      className="flex flex-wrap gap-1 max-lg:gap-x-4 max-lg:gap-y-3"
       role="group"
       aria-label="Math symbols"
       data-keep-math-keyboard=""
@@ -38,7 +38,7 @@ export function SymbolPalette({
             title={symbol.label}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onInsert(symbol.insert)}
-            className="rounded-chip border border-ink-faint bg-paper-0 px-2 py-1 font-mono text-meta text-ink hover:border-ink-soft active:bg-paper-1 disabled:opacity-60 max-lg:py-2"
+            className="rounded-chip border border-ink-faint bg-paper-0 px-2 py-1 font-mono text-meta text-ink hover:border-ink-soft active:bg-paper-1 disabled:opacity-60 max-lg:tap-target max-lg:px-3 max-lg:py-2"
           >
             {symbol.label}
           </button>

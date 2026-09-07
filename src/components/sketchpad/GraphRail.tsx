@@ -70,7 +70,7 @@ export function GraphRail() {
   }
 
   return (
-    <div className="stock-textured relative flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft px-3 py-2">
+    <div className="stock-textured relative flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] py-2 max-lg:gap-5">
       {allowed.map((tool) => (
         <button
           key={tool}
@@ -79,7 +79,7 @@ export function GraphRail() {
           aria-pressed={graphTool === tool}
           onClick={() => setGraphTool(graphTool === tool ? null : tool)}
           className={cx(
-            "rounded-chip border px-2 py-1 text-meta disabled:opacity-60",
+            "max-lg:tap-target rounded-chip border px-2 py-1 text-meta disabled:opacity-60",
             graphTool === tool ? "border-ink bg-paper-0 text-ink" : "border-ink-faint text-ink",
           )}
         >
@@ -93,20 +93,20 @@ export function GraphRail() {
             disabled={disabled}
             onClick={() => setCoordsOpen((open) => !open)}
             aria-expanded={coordsOpen}
-            className="rounded-chip border border-ink-faint px-2 py-1 font-mono text-meta text-ink disabled:opacity-60"
+            className="max-lg:tap-target rounded-chip border border-ink-faint px-2 py-1 font-mono text-meta text-ink disabled:opacity-60"
           >
             x,y
           </button>
           <button
             type="button"
             onClick={undo}
-            className="rounded-chip border border-ink-faint px-2 py-1 text-meta text-ink"
+            className="max-lg:tap-target rounded-chip border border-ink-faint px-2 py-1 text-meta text-ink"
           >
             Undo
           </button>
         </>
       )}
-      <div className="flex items-center gap-1" role="group" aria-label="Units per grid square">
+      <div className="flex items-center gap-1 max-lg:gap-5" role="group" aria-label="Units per grid square">
         <span className="select-none font-mono text-meta text-ink-soft">1 sq =</span>
         {GRAPH_STEPS.map(({ value, label }) => (
           <button
@@ -115,7 +115,7 @@ export function GraphRail() {
             aria-pressed={graphStep === value}
             onClick={() => setGraphStep(value)}
             className={cx(
-              "rounded-chip border px-2 py-1 font-mono text-meta",
+              "max-lg:tap-target rounded-chip border px-2 py-1 font-mono text-meta",
               graphStep === value ? "border-ink bg-paper-0 text-ink" : "border-ink-faint text-ink",
             )}
           >
@@ -155,14 +155,14 @@ export function GraphRail() {
               placeExact();
             }
           }}
-          className="absolute left-3 top-full z-20 mt-1 flex items-center gap-2 rounded-card bg-paper-1 p-2 shadow-lift"
+          className="absolute left-[max(0.75rem,env(safe-area-inset-left))] top-full z-20 mt-1 flex items-center gap-2 rounded-card bg-paper-1 p-2 shadow-lift"
         >
           <span id={titleId} className="text-meta text-ink-soft">
             Exact point
           </span>
           <input ref={xRef} aria-label="X coordinate" placeholder="x" className="w-16 max-lg:w-20 rounded-input border border-ink-faint bg-paper-0 px-2 py-1 font-mono text-meta text-ink" />
           <input ref={yRef} aria-label="Y coordinate" placeholder="y" className="w-16 max-lg:w-20 rounded-input border border-ink-faint bg-paper-0 px-2 py-1 font-mono text-meta text-ink" />
-          <button type="button" onClick={placeExact} className="rounded-chip border border-ink-faint px-2 py-1 text-meta text-ink">
+          <button type="button" onClick={placeExact} className="max-lg:tap-target rounded-chip border border-ink-faint px-2 py-1 text-meta text-ink">
             Place
           </button>
         </div>

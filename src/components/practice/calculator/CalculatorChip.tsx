@@ -20,7 +20,7 @@ export function CalculatorChip({
       aria-pressed={active}
       title={disabled ? "Loads with the problem" : "Calculator"}
       onClick={onToggle}
-      className="tap-target rounded-chip border border-ink-faint bg-paper-0 px-2.5 py-1 text-meta text-ink hover:border-ink-soft disabled:opacity-60 aria-pressed:border-ink aria-pressed:bg-kraft"
+      className="max-lg:tap-target rounded-chip border border-ink-faint bg-paper-0 px-2.5 py-1 text-meta text-ink hover:border-ink-soft disabled:opacity-60 aria-pressed:border-ink aria-pressed:bg-kraft"
     >
       Calculator
     </button>

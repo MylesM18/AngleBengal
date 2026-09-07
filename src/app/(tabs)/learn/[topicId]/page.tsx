@@ -158,7 +158,7 @@ export default async function TopicPage({
       >
         <div className="min-w-0 max-w-[68ch] flex-1">
           <div className="focus-hide mb-4 flex items-center justify-between gap-4">
-            <span className="flex min-w-0 flex-wrap items-center gap-2 [&>nav]:mb-0">
+            <span className="flex min-w-0 flex-wrap items-center gap-2 max-lg:gap-y-3 [&>nav]:mb-0">
               <BackButton />
               <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={topic.docCount > 1} />
             </span>
@@ -288,7 +288,7 @@ export default async function TopicPage({
 
   return (
     <div className="mx-auto max-w-[860px] px-4 pt-8 pb-10 sm:px-8 lg:pt-16">
-      <div className="mb-3 flex flex-wrap items-center gap-2 [&>nav]:mb-0">
+      <div className="mb-3 flex flex-wrap items-center gap-2 max-lg:gap-y-3 [&>nav]:mb-0">
         <BackButton />
         <Breadcrumb pathNodes={topic.pathNodes} topicId={topic.id} hasSiblings={false} />
       </div>

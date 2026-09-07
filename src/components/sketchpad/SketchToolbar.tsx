@@ -195,7 +195,7 @@ export function SketchToolbar({
       // width. Gated to `max-lg` like every other touch fix in this file,
       // even though an unconditional `relative` would be inert at `lg` and
       // up too: `clearWrapRef` stays the nearer positioned ancestor there.
-      className="stock-textured flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft px-3 py-2 max-lg:relative max-lg:gap-5"
+      className="stock-textured flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] py-2 max-lg:relative max-lg:gap-5"
     >
       <div className="flex gap-1 max-lg:gap-3" role="group" aria-label="Mode">
         {MODES.map(({ value, label }) => (

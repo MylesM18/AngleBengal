@@ -2739,3 +2739,31 @@ inset measurement, Enter handling) gates on pointer coarseness via the
 shared useCoarsePointer hook, while layout keeps gating on the 64rem
 seam, because an iPad in landscape is lg by width yet raises a soft
 keyboard like a phone.
+
+### D-161. Horizontal safe-area insets reinstated on edge surfaces (landscape evidence)
+
+D-068's amendment deleted `pl-safe` and `pr-safe` on the grounds that no
+chrome is pinned left or right. That reasoning was portrait-only: with
+`viewport-fit=cover`, a notched iPhone in landscape places every
+full-bleed edge surface (TopBar, the tab bar labels, the sketch
+overlay's header and toolbars, the tutor takeover's header and
+composer, the calculator sheet) about 59px into the notch ear, and the
+owner checklist records landscape as untested. This entry reinstates
+horizontal inset handling on those surfaces as new evidence, not a
+relitigation of D-068.
+
+Two forms, per D-070's trap (the bare utilities replace that side's
+padding): `pl-safe` and `pr-safe` return to globals.css and go only on
+wrappers with no competing horizontal padding (BottomTabBar's nav);
+surfaces that already carry horizontal padding compose with `max()`,
+for example `pl-[max(0.75rem,env(safe-area-inset-left))]`, so padding
+is unchanged wherever the inset is zero (TopBar row, sketch overlay
+header, SketchToolbar, GraphRail, tutor drawer header, ChatComposer,
+calculator header, display and keypad, the problem ribbon, and the
+graph rail's exact point dialog, which anchors with its own max()
+because absolute offsets resolve against the rail's padding box, not
+inside its padding). The sketch canvas itself stays
+full-bleed: the chrome around it carries the insets, the drawing
+surface does not shrink. The `pt-safe` wrappers added to TopBar and the
+tutor drawer header are spec section 7 catching up, not part of this
+decision.

@@ -219,7 +219,7 @@ export function CalculatorWindow({
         onPointerUp={onDragEnd}
         onPointerCancel={onDragEnd}
         className={cx(
-          "flex items-center justify-between rounded-t-card bg-kraft px-3 py-2",
+          "flex items-center justify-between rounded-t-card bg-kraft pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] py-2",
           isDesktop === true ? "cursor-move touch-none" : "",
         )}
       >
@@ -233,7 +233,7 @@ export function CalculatorWindow({
                 setAngleMode((mode) => (mode === "DEG" ? "RAD" : "DEG"));
               }}
               aria-label={`Angle mode ${angleMode}, tap to switch`}
-              className="rounded-chip border border-ink-faint px-2 py-0.5 font-mono text-meta text-ink"
+              className="max-lg:tap-target rounded-chip border border-ink-faint px-2 py-0.5 font-mono text-meta text-ink"
             >
               {angleMode}
             </button>
@@ -242,14 +242,14 @@ export function CalculatorWindow({
             type="button"
             onClick={onClose}
             aria-label="Close calculator"
-            className="rounded-chip px-2 py-0.5 font-mono text-meta text-ink hover:bg-paper-0"
+            className="max-lg:tap-target rounded-chip px-2 py-0.5 font-mono text-meta text-ink hover:bg-paper-0"
           >
             close
           </button>
         </div>
       </div>
 
-      <div className="flex flex-col gap-1 px-3 pt-2">
+      <div className="flex flex-col gap-1 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-2">
         <input
           ref={inputRef}
           type="text"
@@ -268,7 +268,7 @@ export function CalculatorWindow({
 
       <div
         className={cx(
-          "grid gap-1 p-3",
+          "grid gap-1 p-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]",
           variant === "basic" ? "grid-cols-4" : "grid-cols-5",
         )}
       >
@@ -277,7 +277,7 @@ export function CalculatorWindow({
             key={key.label + ("insert" in key ? key.insert : key.action)}
             type="button"
             onClick={() => onKey(key)}
-            className="rounded-chip border border-ink-faint bg-paper-0 px-2 py-2 font-mono text-ui text-ink hover:border-ink-soft active:bg-paper-1"
+            className="rounded-chip border border-ink-faint bg-paper-0 px-2 py-2 font-mono text-ui text-ink hover:border-ink-soft active:bg-paper-1 max-lg:py-3"
           >
             {key.label}
           </button>
