@@ -183,9 +183,9 @@ export default async function TopicPage({
                 <DocTabStrip topicId={topic.id} tabs={tabLabels} activeId={doc.id} />
               </div>
 
-              <h1 className="display-cut px-4 pb-5 pt-6 text-h1 text-ink sm:px-8 sm:pt-8">{doc.title}</h1>
+              <h1 className="display-cut px-3 pb-5 pt-6 text-h1 text-ink sm:px-8 sm:pt-8">{doc.title}</h1>
 
-              <div className="stock-textured flex flex-wrap items-center gap-3 border-y border-hairline bg-kraft px-4 py-2.5 text-meta text-ink sm:px-8">
+              <div className="stock-textured flex flex-wrap items-center gap-3 border-y border-hairline bg-kraft px-3 py-2.5 text-meta text-ink sm:px-8">
                 {doc.isExemplar && (
                   <span className="inline-flex h-6 items-center rounded-chip bg-paper-0 px-2 text-ui font-medium text-ink">
                     Exemplar
@@ -200,7 +200,7 @@ export default async function TopicPage({
                 </span>
               </div>
 
-              <div className="px-4 py-6 sm:px-8 sm:py-8">
+              <div className="px-3 py-6 sm:px-8 sm:py-8">
                 <RevealScope replayKey={doc.id}>
                   <ModelMissList misses={misses} />
                   <FeynmanGapLine session={newestFeynman} topicId={topic.id} />
@@ -243,7 +243,10 @@ export default async function TopicPage({
     );
 
     return (
-      <article className="flex justify-center gap-8 px-3 py-6 sm:px-8 lg:py-10">
+      // No horizontal gutter below sm: the reading measure at 360px sits
+      // under the 45ch floor, so the sheet goes edge to edge and keeps its
+      // own inner gutter (mobile fix plan Phase 6, R16, D-162).
+      <article className="flex justify-center gap-8 py-6 sm:px-8 lg:py-10">
         {/* Keyed per doc so switching tabs re-arms the restore cleanly. */}
         <DocScrollMemory key={doc.id} />
         <ReaderTabProvider hasPerspective={Boolean(topic.perspective)}>

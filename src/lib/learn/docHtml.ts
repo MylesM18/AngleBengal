@@ -53,7 +53,7 @@ export function buildDocHtml(contentMd: string, models: ModelIndexEntry[]): Rend
  * wrapper below is part of the default key, but the pipeline it calls into is
  * not.
  */
-const RENDER_VERSION = "1";
+const RENDER_VERSION = "3";
 
 /**
  * The rendered document, cached indefinitely in the Vercel Data Cache.
