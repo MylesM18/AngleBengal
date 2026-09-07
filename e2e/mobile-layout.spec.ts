@@ -14,6 +14,7 @@ import {
   type Route,
 } from "./helpers/routes";
 import { servePracticeProblem } from "./helpers/practice";
+import { openSketchMode, setSketchBackground } from "./helpers/sketch";
 import { settle } from "./helpers/settle";
 
 /**
@@ -122,6 +123,41 @@ for (const width of COMPACT_WIDTHS) {
       await expectNoOverflow(
         page,
         { ...route, name: `${route.name}, ${state.detail}` },
+        width,
+      );
+    });
+
+    test("compact sketch mode has no horizontal overflow", async ({ page }) => {
+      test.skip(
+        discovered.practice === null,
+        `SKIPPED, EMPTY LIBRARY: no practice topic. ${discovered.notes.join(" ")}`,
+      );
+      const route = discovered.practice as Route;
+      await page.goto(route.path);
+      await settle(page);
+
+      // With a problem served, the overlay also carries the ProblemRibbon,
+      // which is where the statement's inline math ends up.
+      const state = await servePracticeProblem(page);
+      await openSketchMode(page);
+
+      // The toolbar alone first. `graph` is the store default, so Plain has to
+      // be chosen explicitly to see the strip without the rail under it.
+      await setSketchBackground(page, "Plain");
+      await settle(page);
+      await expectNoOverflow(
+        page,
+        { ...route, name: `sketch mode, plain background, ${state.detail}` },
+        width,
+      );
+
+      // Then the crowded case: the graph background is the only thing that
+      // mounts GraphRail, another full row of chips and number inputs.
+      await setSketchBackground(page, "Graph");
+      await settle(page);
+      await expectNoOverflow(
+        page,
+        { ...route, name: "sketch mode, graph background (GraphRail mounted)" },
         width,
       );
     });

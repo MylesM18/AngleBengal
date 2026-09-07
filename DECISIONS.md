@@ -2906,3 +2906,37 @@ the plan.
    the rig clicks 5, waits for either a problem or the empty state, and prints
    which one it measured. A green run that quietly measured the empty state
    would otherwise be indistinguishable from a real one.
+
+### D-164. The gap between the sketch toolbar and the graph rail is a D-071 surface too
+
+Found by the Phase 7 rig (D-163) when compact sketch mode was added to its
+route list, which is the first time anything measured that overlay.
+
+Phase 5's D-071 audit worked within each control strip: the sketch toolbar
+carries `max-lg:gap-3` and `max-lg:gap-5` sized to the worst case inside a row
+and between its own wrapped rows, and the graph rail carries `max-lg:gap-5`
+for the same reason. Neither audit looked at the boundary BETWEEN the two
+sections, because each was reviewed as a unit.
+
+At 390px the toolbar wraps so its 24px "Clean up" button sits directly above
+the rail's first chip. Measured: Clean up's hit area runs to y=264.0 (10px of
+spillover below a 24px control, `(44 - 24) / 2`) and the chip's runs from
+y=263.4 (8.6px above a 26.8px one), so the two overlapped by 0.6px, and the
+chip, later in DOM order, won the band. A tap just under Clean up fired Shade.
+This is D-071's exact failure mode, on a pair of controls that live in
+different components, which is why neither component's own audit could see it.
+It does not reproduce at 360px, where the toolbar wraps differently and Clean
+up lands over the rail's background instead.
+
+`py-2` gave 18px of clearance where 18.6px was needed. The rail takes
+`max-lg:pt-3`, making it 22px, with `lg` and up untouched like every other
+touch fix in these files. The rig now holds it: sketch mode is probed at both
+widths with the graph background on, and again with it off.
+
+The rig also distinguishes two outcomes that used to look alike, which is what
+made this legible. A probe point that leaves a control's box and lands on
+another CONTROL is a failure, because the tap fires the wrong thing, which is
+the harm D-071 names. A point that lands on a plain container is reported as a
+shortened hit area and does not fail, because the tap does nothing rather than
+something wrong. Clean up still spills its last few pixels onto the rail's
+background or the canvas, and that is the reported, non failing case.

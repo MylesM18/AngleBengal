@@ -2,8 +2,10 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 import { COMPACT_HEIGHT, COMPACT_WIDTHS, STORAGE_STATE } from "./constants";
+import { servePracticeProblem } from "./helpers/practice";
 import { LOGIN_ROUTE, STATIC_ROUTES, discoverRoutes, type DiscoveredRoutes } from "./helpers/routes";
 import { settle } from "./helpers/settle";
+import { openSketchMode, setSketchBackground } from "./helpers/sketch";
 
 /**
  * The accessibility half of the rig (mobile fix plan Phase 7, R22 and R23),
@@ -194,6 +196,22 @@ for (const width of COMPACT_WIDTHS) {
       await expect(page.locator("#pane-models")).toBeVisible();
       await settle(page);
       await expectOnlyAllowlisted(page, `the reader's Models tab at ${width}px`);
+    });
+
+    test("compact sketch mode, with the graph rail", async ({ page }) => {
+      test.skip(
+        discovered.practice === null,
+        `SKIPPED, EMPTY LIBRARY: no practice topic. ${discovered.notes.join(" ")}`,
+      );
+      // The densest control surface in the app: five toolbar groups plus the
+      // graph rail, roughly 55 hit area carriers on one overlay.
+      await page.goto((discovered.practice as { path: string }).path);
+      await settle(page);
+      await servePracticeProblem(page);
+      await openSketchMode(page);
+      await setSketchBackground(page, "Graph");
+      await settle(page);
+      await expectOnlyAllowlisted(page, `compact sketch mode at ${width}px`);
     });
 
     test.describe("signed out", () => {
