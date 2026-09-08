@@ -8,6 +8,7 @@ import { cx } from "@/lib/cx";
 import {
   condensedLayoutActive,
   PEEK_STRIP_PX,
+  swapCondensedPanes,
 } from "@/lib/sketch/condense";
 import { latexToPlain } from "@/lib/sketch/latexToPlain";
 import { compositeToPng, getGraphLayerSource } from "@/lib/sketch/render";
@@ -339,14 +340,17 @@ function gridClasses(count: number): string {
 function SketchPane({
   pageId,
   paneIndex,
+  peek,
 }: {
   pageId: string;
   paneIndex: number;
-  /** PR 1 condensed state: this pane renders as the top peek strip. Accepted
-   *  here as an optional, type-only prop (not destructured, so lint sees no
-   *  unused binding) purely so Task 4's gates pass standalone; Task 5
-   *  destructures it, tightens it to required, and implements the behavior. */
-  peek?: boolean;
+  /** PR 1 condensed state: this pane is the top peek strip. The whole pane
+   *  carries data-keep-math-keyboard while peek (header page select
+   *  included); the header keeps its functional page select; the layer area
+   *  is covered by the swap button, and the fit scale ignores the strip's
+   *  height so a natural-scale sliver of the TOP of the page shows instead
+   *  of the whole page shrunk into 36px (spec section 4). */
+  peek: boolean;
 }) {
   const page = usePage(pageId);
   const isActive = useSketchStore((state) => state.activePageId === pageId);
@@ -384,7 +388,10 @@ function SketchPane({
   const refSize = page.refSize;
   const r =
     refSize && refSize.width > 0 && refSize.height > 0 && paneSize.width > 0
-      ? Math.min(paneSize.width / refSize.width, paneSize.height / refSize.height, 1)
+      ? peek
+        ? // Width-fit only: the strip's height must clip, not shrink.
+          Math.min(paneSize.width / refSize.width, 1)
+        : Math.min(paneSize.width / refSize.width, paneSize.height / refSize.height, 1)
       : 1;
   const scaled = refSize !== null && r < 1;
   const pane = useMemo<PaneInfo>(
@@ -408,7 +415,21 @@ function SketchPane({
   return (
     <PaneContext.Provider value={pane}>
       <div
+        // Spec section 4: the WHOLE peek strip carries data-keep-math-keyboard,
+        // header page select included. The global dismiss listener
+        // (installKeyboardDismiss, MathField.tsx) hides the keyboard and blurs
+        // the field on any pointerdown whose composed path lacks the marker;
+        // a marker on the sliver button alone would leave the header's page
+        // select dismissing the keyboard and collapsing the condensed layout
+        // under the finger (device checklist item 3).
+        {...(peek ? { "data-keep-math-keyboard": "" } : {})}
         onPointerDownCapture={() => {
+          // The peek strip must NOT activate its page on pointerdown:
+          // activation would make the top pane active, end the condensed
+          // state mid-tap, and move the swap button out from under the
+          // finger. The swap activates through setPanePage instead
+          // (swapCondensedPanes).
+          if (peek) return;
           const state = useSketchStore.getState();
           if (state.activePageId !== pageId) state.setActivePage(pageId);
         }}
@@ -466,6 +487,18 @@ function SketchPane({
             </div>
           ) : (
             layers
+          )}
+          {peek && (
+            <button
+              type="button"
+              // No keep marker here: the pane CONTAINER carries
+              // data-keep-math-keyboard for the whole strip while peek
+              // (header select included), so this tap's composed path
+              // already keeps the math keyboard up.
+              aria-label={`Switch to ${page.name}`}
+              onClick={swapCondensedPanes}
+              className="absolute inset-0 z-10"
+            />
           )}
         </div>
       </div>
