@@ -149,6 +149,17 @@ export type SketchState = {
   /** Measured canvas CSS pixel size by pageId. Not persisted; stale keys for
    *  removed pages are garbage but harmless. */
   canvasSizes: Record<string, { width: number; height: number }>;
+  /**
+   * Problem-identity marker for in-flight async work. Bumped by BOTH
+   * resetForNewProblem and hydrateForProblem, never persisted. Page ids are
+   * not enough to route a multi-second await (the OCR call) back to the
+   * problem it started on: ids recur across problems, because hydrate
+   * restores saved ids and a fresh session restarts the module counter. A
+   * caller captures the epoch before its await and silently discards the
+   * result when the epoch has moved on, so a Skip mid-call can never land
+   * problem A's transcription in problem B's page and autosave it there.
+   */
+  epoch: number;
 
   // Page management.
   /** Returns the new page id, or null at the 8-page cap. Does not change the
@@ -183,12 +194,23 @@ export type SketchState = {
   /** Inserts an empty line after afterId (null appends at the end), activates
    *  it, and returns the new id. */
   addTypedLineAfter: (pageId: string, afterId: string | null) => string;
-  /** Ordered append used by the handwriting conversion (spec §5). */
-  appendTypedLines: (pageId: string, latexes: string[]) => void;
+  /**
+   * Ordered append used by the handwriting conversion (spec §5). The
+   * optional trailing surface pins the write to THAT surface document; when
+   * omitted it falls back to the page's active surface at call time. The
+   * OCR flow resolves seconds after it read the ink, and the user can switch
+   * surface during the call, so resolving the surface at completion time
+   * would land the transcription on a surface whose ink it never came from
+   * (the exact R2 bleed per-surface content exists to remove).
+   */
+  appendTypedLines: (pageId: string, latexes: string[], surface?: Background) => void;
   updateTypedLine: (pageId: string, id: string, latex: string) => void;
   removeTypedLine: (pageId: string, id: string) => void;
   setActiveLine: (id: string | null) => void;
-  setOcrBlocks: (pageId: string, blocks: OcrBlock[] | null) => void;
+  /** Same explicit-surface contract as appendTypedLines: the OCR completion
+   *  passes the surface it read ink from; omitted means the page's active
+   *  surface at call time. */
+  setOcrBlocks: (pageId: string, blocks: OcrBlock[] | null, surface?: Background) => void;
   addGraphObject: (
     pageId: string,
     kind: GraphKind,
@@ -318,18 +340,35 @@ function withPage(
   return { pages: { ...state.pages, [pageId]: next } };
 }
 
+/**
+ * Same, scoped to one explicit surface document. Passing undefined targets
+ * the page's ACTIVE surface at call time; a concrete surface pins the write
+ * regardless of where the page has moved since, which is what lets a
+ * completion handler (the OCR call) write to the surface whose ink it
+ * actually read instead of whatever surface is up when it resolves.
+ */
+function withSurface(
+  state: SketchState,
+  pageId: string,
+  surface: Background | undefined,
+  patch: (content: SurfaceContent, page: SketchPage) => SurfaceContent,
+): Partial<SketchState> {
+  return withPage(state, pageId, (page) => {
+    const target = surface ?? page.surface;
+    const content = page.content[target];
+    const next = patch(content, page);
+    if (next === content) return page;
+    return { ...page, content: { ...page.content, [target]: next } };
+  });
+}
+
 /** Same, scoped to the page's ACTIVE surface document. */
 function withActiveSurface(
   state: SketchState,
   pageId: string,
   patch: (content: SurfaceContent, page: SketchPage) => SurfaceContent,
 ): Partial<SketchState> {
-  return withPage(state, pageId, (page) => {
-    const content = page.content[page.surface];
-    const next = patch(content, page);
-    if (next === content) return page;
-    return { ...page, content: { ...page.content, [page.surface]: next } };
-  });
+  return withSurface(state, pageId, undefined, patch);
 }
 
 export const useSketchStore = create<SketchState>((set) => {
@@ -349,6 +388,7 @@ export const useSketchStore = create<SketchState>((set) => {
     graphTool: null,
     pendingGraphPoints: [],
     canvasSizes: {},
+    epoch: 0,
 
     addPage: () => {
       let created: string | null = null;
@@ -613,14 +653,14 @@ export const useSketchStore = create<SketchState>((set) => {
       return id;
     },
 
-    appendTypedLines: (pageId, latexes) =>
+    appendTypedLines: (pageId, latexes, surface) =>
       set((state) => {
         if (latexes.length === 0) return state;
         const appended = latexes.map((latex) => {
           typedLineCounter += 1;
           return { id: `t${typedLineCounter}`, latex };
         });
-        return withActiveSurface(state, pageId, (content) => ({
+        return withSurface(state, pageId, surface, (content) => ({
           ...content,
           typedLines: [...content.typedLines, ...appended],
         }));
@@ -664,9 +704,9 @@ export const useSketchStore = create<SketchState>((set) => {
 
     setActiveLine: (activeLineId) => set({ activeLineId }),
 
-    setOcrBlocks: (pageId, blocks) =>
+    setOcrBlocks: (pageId, blocks, surface) =>
       set((state) =>
-        withActiveSurface(state, pageId, (content) => ({ ...content, ocrBlocks: blocks })),
+        withSurface(state, pageId, surface, (content) => ({ ...content, ocrBlocks: blocks })),
       ),
 
     addGraphObject: (pageId, kind, points, dashed) => {
@@ -757,11 +797,24 @@ export const useSketchStore = create<SketchState>((set) => {
           | undefined;
         const sizeChanged =
           !existing || existing.width !== size.width || existing.height !== size.height;
-        // A15: refSize updates only while the page renders unsplit (a split
-        // pane reports a scaled viewport, never a new reference size).
+        // Invariant: refSize always equals the LARGEST layout the page's
+        // current strokes could have been drawn at, so composites never
+        // crop. Unsplit, the live measurement is authoritative and
+        // overwrites in either direction (A15). Split, a pane at least as
+        // large as refSize in both dimensions renders UNSCALED (r === 1),
+        // so its canvas lays out at pane size and new strokes land in pane
+        // space: the reported size must grow refSize (and a null refSize
+        // adopts it), or snapshotSketch and cleanUp would composite at the
+        // stale smaller refSize and silently crop the attempt PNG and the
+        // OCR image. A smaller pane is only a scaled viewport of the
+        // existing reference space and never shrinks it.
         const page: SketchPage | undefined = state.pages[pageId];
+        const refAdoptable =
+          state.splitPageIds.length === 0 ||
+          page?.refSize == null ||
+          (size.width >= page.refSize.width && size.height >= page.refSize.height);
         const refStale =
-          state.splitPageIds.length === 0 &&
+          refAdoptable &&
           page !== undefined &&
           (!page.refSize ||
             page.refSize.width !== size.width ||
@@ -801,6 +854,10 @@ export const useSketchStore = create<SketchState>((set) => {
           activeLineId: null,
           pendingGraphPoints: [],
           graphTool: null,
+          // The problem identity moved: any await still in flight (the OCR
+          // call) captured the old epoch and must discard its result rather
+          // than write into this fresh problem's pages.
+          epoch: state.epoch + 1,
           canvasSizes: outgoingSize
             ? { ...state.canvasSizes, [page.id]: outgoingSize }
             : state.canvasSizes,
@@ -880,6 +937,11 @@ export const useSketchStore = create<SketchState>((set) => {
           activeLineId: null,
           graphTool: null,
           pendingGraphPoints: [],
+          // Hydrate is a problem transition just like reset, and it is the
+          // path that RESTORES page ids a stale await may still be holding,
+          // so it must bump the epoch too or the id check alone would let
+          // the old problem's OCR result through.
+          epoch: state.epoch + 1,
           canvasSizes,
         };
       }),

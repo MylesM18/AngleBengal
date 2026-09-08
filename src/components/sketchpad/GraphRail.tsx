@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { commitGraphPoint, useJsxGraph } from "@/components/sketchpad/GraphLayer";
 import { parseCoordinate } from "@/lib/sketch/graphCoords";
@@ -67,6 +67,25 @@ export function GraphRail() {
   // A13: single-pane view only shows the rail when the active page is on
   // graph paper, so this is false there and nothing changes.
   const placementDisabled = !activeIsGraph;
+
+  // The dialog below renders only while coordsOpen AND placement is enabled,
+  // but the opener's aria-expanded reflects coordsOpen alone. Without this
+  // reset, activating a non-graph pane would leave the disabled opener
+  // claiming aria-expanded="true" with no dialog in the DOM, and the dialog
+  // would pop back unbidden the moment placement re-enabled. Closing on the
+  // disable transition keeps the attribute, the DOM, and the user's intent
+  // (they never reopened it) in agreement (A13). A store subscription, not
+  // a placementDisabled-dependent effect body: the flip IS store state (the
+  // active page or its surface changing), and the hooks lint bans a
+  // synchronous setState in an effect while endorsing exactly this
+  // subscribe-then-set-in-callback shape (PracticePanel's dirty watcher is
+  // the in-repo precedent). Re-closing an already-closed dialog is a
+  // no-op React bails out of.
+  useEffect(() => {
+    return useSketchStore.subscribe((state) => {
+      if (activePage(state).surface !== "graph") setCoordsOpen(false);
+    });
+  }, []);
 
   function placeExact(): void {
     const x = parseCoordinate(xRef.current?.value ?? "");

@@ -60,8 +60,25 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
   // set on desktop. This instance's world is fixed by where PracticeWorkspace
   // mounted it, so the JS gate and the CSS breakpoint always agree.
   const isDesktop = useIsDesktop();
-  const paneIds = isDesktop === false ? splitPageIds.slice(0, 2) : splitPageIds;
+  const paneIds = useMemo(
+    () => (isDesktop === false ? splitPageIds.slice(0, 2) : splitPageIds),
+    [isDesktop, splitPageIds],
+  );
   const split = paneIds.length >= 2;
+
+  // A5's active-visible invariant has to hold across the lg seam, not just
+  // across store actions: a 3-4 pane split set on desktop keeps its full
+  // splitPageIds when the viewport shrinks, but compact renders only the
+  // first two panes, so activePageId can point at a pane that is no longer
+  // on screen. Every global control (toolbar, GraphRail, Clear, submit,
+  // grading) targets the active page, and all of them would silently act on
+  // invisible content. Whenever the active page is not among the RENDERED
+  // panes, activation falls back to the first rendered pane.
+  useEffect(() => {
+    if (paneIds.length < 2) return;
+    if (paneIds.includes(activePageId)) return;
+    useSketchStore.getState().setActivePage(paneIds[0]);
+  }, [paneIds, activePageId]);
 
   // A13: single-pane, the rail shows for the active page's surface; split,
   // it shows when ANY rendered pane is on graph paper, so activating a pane
@@ -97,6 +114,14 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     const state = useSketchStore.getState();
     const page = activePage(state);
     const content = page.content[page.surface];
+    // Captured BEFORE the await: the vision call spans seconds, and by the
+    // time it resolves the user may have skipped to another problem (page
+    // ids recur across problems, so page.id alone cannot detect that) or
+    // switched this page to another surface (whose ink the result did not
+    // come from). The epoch gates the whole completion; the surface pins
+    // the writes to the document the composite actually read (R2).
+    const epoch = state.epoch;
+    const surface = page.surface;
 
     // An empty canvas is a no-op with a gentle nudge, not an error and not a
     // wasted vision call (docs/06 §4).
@@ -126,6 +151,14 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
       });
       const payload = await response.json();
 
+      // The problem moved on while the reader was thinking (Skip resets or
+      // hydrates, either bumps the epoch): the result belongs to a problem
+      // that is no longer on screen, so it is discarded outright. No store
+      // writes (the restored problem may reuse this very page id, and a
+      // write would be autosaved into the wrong problem's work) and no
+      // toast (the message would read as being about the problem now up).
+      if (useSketchStore.getState().epoch !== epoch) return;
+
       if (!response.ok) {
         const message =
           (payload as { error?: { message?: string } }).error?.message ??
@@ -135,15 +168,23 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
       }
 
       const blocks = (payload as { blocks: OcrBlock[] }).blocks;
-      // Results land on the page the OCR ran on, even if the user switched
-      // pages while the reader was thinking.
-      useSketchStore.getState().setOcrBlocks(page.id, blocks);
+      // Results land on the page AND surface the OCR read its ink from,
+      // even if the user switched pages or surfaces while the reader was
+      // thinking. Landing on a switched-to surface would be the exact
+      // cross-surface bleed R2 exists to remove; the cost is that the
+      // clean-copy slip (which follows the active page's active surface)
+      // may not show this result until the user switches back, which is
+      // correct per-surface isolation.
+      useSketchStore.getState().setOcrBlocks(page.id, blocks, surface);
       const mathLatexes = blocks
         .filter((block): block is Extract<OcrBlock, { kind: "math" }> => block.kind === "math")
         .map((block) => block.latex)
         .filter((latex) => latex.trim().length > 0);
-      useSketchStore.getState().appendTypedLines(page.id, mathLatexes);
+      useSketchStore.getState().appendTypedLines(page.id, mathLatexes, surface);
     } catch {
+      // Same stale-completion rule as above: a network failure for a
+      // problem the user already left produces no toast.
+      if (useSketchStore.getState().epoch !== epoch) return;
       flash("Could not reach the reader. Try again in a moment.", "error");
     } finally {
       setCleaning(false);
@@ -319,8 +360,15 @@ function SketchPane({ pageId, paneIndex }: { pageId: string; paneIndex: number }
             // and the graph board all stay in one space per page (A15). The
             // wrapper sits ABOVE SketchCanvas's own wrapper: offsetWidth
             // reports layout size, so the canvas keeps measuring refSize.
+            // flex-none matters: this wrapper is a flex child of the pane's
+            // measured column, and the default flex-shrink:1 would collapse
+            // its layout height to the pane height whenever refH exceeds it,
+            // laying the stack out at refW x paneH instead of refSize and
+            // making the bottom of the page unreachable. It must lay out at
+            // exactly refSize; the pane's overflow-hidden plus the transform
+            // do the clipping (A15).
             <div
-              className="flex flex-col"
+              className="flex flex-none flex-col"
               style={{
                 width: refSize.width,
                 height: refSize.height,

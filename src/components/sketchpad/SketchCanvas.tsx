@@ -223,6 +223,14 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
   }
 
   function onPointerDown(event: React.PointerEvent<HTMLCanvasElement>) {
+    // The canvas never draws in type mode, on any page. Read from the store
+    // at event time, not the subscribed `page`: in a non-active split pane
+    // whose page is in type mode, the typed layer is pointer-events-none
+    // (A14), so the activation tap falls THROUGH to this canvas, and without
+    // the gate it would commit a one-point stroke (or erase with the eraser)
+    // on a surface the user only meant to activate. Draw-mode panes keep
+    // draw-on-first-touch; that is designed behavior (A14).
+    if (useSketchStore.getState().pages[pageId]?.mode === "type") return;
     // A real pen locks out touch for the rest of the session: once the
     // student is known to have a Pencil, an incoming touch pointer while
     // they are writing is the palm resting on the glass, not a second hand

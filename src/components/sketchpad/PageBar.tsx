@@ -52,9 +52,19 @@ export function PageBar() {
   // Below lg the split control offers only Off and 2 panes (A12, D-171): a
   // phone's 2x2 grid leaves each canvas too small to handwrite math. The
   // popover can only open after hydration, so isDesktop is resolved by the
-  // time this list is read.
+  // time this list is read. One exception: a 3-4 pane split set on desktop
+  // survives a viewport shrink (A12 keeps splitPageIds, compact just renders
+  // two panes), and a radiogroup with no checked member breaks both the
+  // radio semantics and the arrow-key math below, so the CURRENT count joins
+  // the compact list whenever it is 3 or 4. It cannot be chosen into
+  // existence on compact; it only reflects a state desktop created.
   const isDesktop = useIsDesktop();
-  const splitOptions = isDesktop === false ? SPLIT_OPTIONS.slice(0, 2) : SPLIT_OPTIONS;
+  const splitOptions =
+    isDesktop === false
+      ? SPLIT_OPTIONS.filter(
+          (option) => option.value <= 2 || option.value === splitCount,
+        )
+      : SPLIT_OPTIONS;
 
   const renameTriggerRef = useRef<HTMLButtonElement | null>(null);
   const renamePopoverRef = useRef<HTMLDivElement | null>(null);
@@ -163,6 +173,18 @@ export function PageBar() {
     if (delta === 0) return;
     event.preventDefault();
     const index = splitOptions.findIndex((option) => option.value === splitCount);
+    // Defensive: with no checked member, (-1 + delta) arithmetic would land
+    // on an arbitrary option and a single arrow press would CHANGE the
+    // split (historically to Off, destroying a 3-4 pane split the moment a
+    // keyboard touched the compact popover). The current-count option above
+    // should make this unreachable, but if it ever happens the first arrow
+    // only moves focus to the first option and changes nothing.
+    if (index === -1) {
+      event.currentTarget
+        .querySelectorAll<HTMLButtonElement>('[role="radio"]')[0]
+        ?.focus();
+      return;
+    }
     const nextIndex = (index + delta + splitOptions.length) % splitOptions.length;
     useSketchStore.getState().setSplit(splitOptions[nextIndex].value);
     event.currentTarget

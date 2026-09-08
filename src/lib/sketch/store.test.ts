@@ -523,6 +523,93 @@ describe("setCanvasSize and refSize (A15)", () => {
     expect(store().canvasSizes[id]).toEqual({ width: 160, height: 240 });
     expect(page(id).refSize).toEqual({ width: 320, height: 480 });
   });
+
+  it("grows refSize from an unscaled split pane, and never shrinks it", () => {
+    const id = activeId();
+    store().setCanvasSize(id, { width: 320, height: 480 });
+    store().setSplit(2);
+    // A pane at least as large as refSize in both dimensions renders
+    // unscaled, so the canvas lays out at PANE size and strokes land in
+    // pane space: refSize must grow to match, or snapshotSketch and
+    // cleanUp would composite at the stale smaller size and crop them.
+    store().setCanvasSize(id, { width: 400, height: 500 });
+    expect(page(id).refSize).toEqual({ width: 400, height: 500 });
+    // A smaller pane is only a scaled viewport of the existing reference
+    // space; the reference size stands.
+    store().setCanvasSize(id, { width: 200, height: 300 });
+    expect(page(id).refSize).toEqual({ width: 400, height: 500 });
+  });
+
+  it("adopts the first reported size while split when refSize is null", () => {
+    store().setSplit(2);
+    const created = store().splitPageIds[1];
+    expect(page(created).refSize).toBeNull();
+    store().setCanvasSize(created, { width: 250, height: 350 });
+    expect(page(created).refSize).toEqual({ width: 250, height: 350 });
+  });
+});
+
+describe("explicit-surface OCR writes", () => {
+  it("pins setOcrBlocks and appendTypedLines to the surface passed, not the active one", () => {
+    const id = activeId();
+    expect(page(id).surface).toBe("graph");
+    // The user switches surface while the vision call is in flight; the
+    // completion still writes to the graph document it read ink from (R2).
+    store().setSurface(id, "blank");
+    store().setOcrBlocks(id, [{ kind: "math", latex: "x" }], "graph");
+    store().appendTypedLines(id, ["x = 1"], "graph");
+    expect(page(id).content.graph.ocrBlocks).toEqual([{ kind: "math", latex: "x" }]);
+    expect(page(id).content.graph.typedLines.map((line) => line.latex)).toEqual(["x = 1"]);
+    // The surface now on screen stays untouched.
+    expect(surface(id).ocrBlocks).toBeNull();
+    expect(surface(id).typedLines).toEqual([]);
+  });
+
+  it("falls back to the page's active surface when no surface is passed", () => {
+    const id = activeId();
+    store().setSurface(id, "grid");
+    store().setOcrBlocks(id, [{ kind: "text", text: "carry the 2" }]);
+    store().appendTypedLines(id, ["y = 2"]);
+    expect(page(id).content.grid.ocrBlocks).toEqual([{ kind: "text", text: "carry the 2" }]);
+    expect(page(id).content.grid.typedLines.map((line) => line.latex)).toEqual(["y = 2"]);
+  });
+});
+
+describe("epoch (problem identity for in-flight async work)", () => {
+  const emptyContent = {
+    strokes: [],
+    typedLines: [],
+    graphObjects: [],
+    graphShades: [],
+    ocrBlocks: null,
+  };
+  const minimalSaved: ProblemWorkState = {
+    version: 2,
+    activePageId: "p800",
+    pages: [
+      {
+        id: "p800",
+        name: "Page 1",
+        surface: "graph",
+        mode: "draw",
+        graphStep: 1,
+        refSize: null,
+        content: { blank: emptyContent, grid: emptyContent, graph: emptyContent },
+      },
+    ],
+    answer: { single: "", parts: {} },
+  };
+
+  it("increments on resetForNewProblem and on hydrateForProblem", () => {
+    // Both problem-transition paths must bump: hydrate is the one that
+    // RESTORES page ids a stale await may still hold, so a reset-only
+    // epoch would let an old problem's OCR result through on resume.
+    const before = store().epoch;
+    store().resetForNewProblem();
+    expect(store().epoch).toBe(before + 1);
+    store().hydrateForProblem(minimalSaved);
+    expect(store().epoch).toBe(before + 2);
+  });
 });
 
 describe("resetForNewProblem (A21)", () => {
