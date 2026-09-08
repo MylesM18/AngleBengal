@@ -5,6 +5,8 @@
  * pattern as src/lib/practice/splitRatio.ts.
  */
 
+import { useSketchStore, type TypedLine } from "./store";
+
 /** Total height of the condensed top pane: its 44px header plus a clipped
  *  sliver of the top of the page ("roughly 80px" in the spec). */
 export const PEEK_STRIP_PX = 80;
@@ -54,4 +56,45 @@ export function typedLinesScrollTop(args: {
   if (lineBottom - args.scrollTop > visible) return lineBottom - visible;
   if (args.lineTop < args.scrollTop) return args.lineTop;
   return args.scrollTop;
+}
+
+/**
+ * The peek-strip swap (spec section 4): the peeked (top) page drops into the
+ * editing position, the edited page becomes the peek, and the incoming
+ * page's trailing typed line receives focus so typing continues without the
+ * keyboard dropping. Routed through setPanePage(1, incoming), whose existing
+ * A5 contract both swaps the two entries and activates the incoming page
+ * (because pane 1 held the active page while condensed).
+ *
+ * Two spec ambiguities resolved as the smallest choices that keep the
+ * unconditional focus sentence satisfiable (D-173): a draw-mode incoming
+ * page flips to type mode, and a page with no typed lines gets one empty
+ * trailing line created and activated. Guarded on the same geometry the
+ * TRIGGER derives (condensedLayoutActive over the RENDERED panes): at least
+ * 2 splitPageIds entries, with entry 1 active. Not a strict length === 2: a
+ * 3-4 entry split set on desktop keeps its full splitPageIds when the
+ * viewport shrinks to mobile, where only the first two panes render
+ * (Sketchpad slices below lg), and a strict guard would leave the visible
+ * swap button silently dead in exactly that carryover state.
+ * setPanePage(1, incoming) swaps entries 0 and 1 correctly at any length.
+ * Anything outside the geometry is a silent no-op, because the peek strip
+ * only renders while condensed and a stale call must not shuffle panes.
+ */
+export function swapCondensedPanes(): void {
+  const state = useSketchStore.getState();
+  if (state.splitPageIds.length < 2) return;
+  const incomingId: string | undefined = state.splitPageIds[0];
+  if (incomingId === undefined) return;
+  if (state.activePageId !== state.splitPageIds[1]) return;
+
+  state.setPanePage(1, incomingId);
+
+  const after = useSketchStore.getState();
+  const page = after.pages[incomingId];
+  if (!page) return;
+  if (page.mode !== "type") after.setMode(incomingId, "type");
+  const lines = page.content[page.surface].typedLines;
+  const last: TypedLine | undefined = lines[lines.length - 1];
+  if (last) after.setActiveLine(last.id);
+  else after.addTypedLineAfter(incomingId, null);
 }
