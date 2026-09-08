@@ -18,6 +18,34 @@ export const PEEK_STRIP_PX = 80;
  * the top pane triggers nothing: the keyboard covers only the idle bottom
  * pane. isDesktop === null (SSR/hydration) counts as not condensed so the
  * first client paint never flashes the condensed chrome.
+ *
+ * Deliberate exception to "condensed implies type mode" (D-173), not an
+ * oversight: this predicate is keyboard-inset driven, not mode driven.
+ * insetBottom is the only timing-sensitive input and `mode` is never read
+ * here at all. CondensedToolbar's Draw button (CondensedToolbar.tsx) sets
+ * `mode` to "draw" synchronously, then dismisses the math keyboard in the
+ * same click handler. Sketchpad does not subscribe to `mode`, so nothing
+ * re-renders off that click; `condensed` only flips back once insetBottom
+ * itself reads zero, and useKeyboardInset's onFocusOut (useKeyboardInset.ts)
+ * re-measures on a 250ms setTimeout after blur (its own comment: "the
+ * dismiss animates and an immediate read still sees the keyboard up"), not
+ * immediately. So for up to about 250ms after Draw is tapped, mode is
+ * "draw" while this predicate, and the condensed strip, are still true:
+ * `mode` leads, `condensed` lags.
+ *
+ * The window is narrow (only reachable if the More popover is already open
+ * when Draw is tapped) and benign: the only things it briefly re-enables
+ * are CondensedToolbar's Tool, Stroke width, and Ink controls inside that
+ * popover (each guarded by disabled={mode !== "draw"}), and those only
+ * write session-global tool preferences that are about to apply once
+ * `mode` settles anyway. Nothing drawn or already committed is at risk.
+ *
+ * The alternative, gating this predicate on mode === "type" so it always
+ * agrees with `mode`, was raised in review and rejected: it contradicts the
+ * trigger formula fixed above (isDesktop, paneIds, activePageId,
+ * insetBottom only, nothing else), and it trades this sub-250ms transient
+ * for a more visible one, the pane grid snapping back to 50/50 while the
+ * keyboard is still visually mid-dismiss.
  */
 export function condensedLayoutActive(args: {
   isDesktop: boolean | null;
