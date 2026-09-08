@@ -61,23 +61,38 @@ export function TypedLinesLayer() {
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-  // Runs when the active line changes (Enter creates and activates the new
-  // line, so growth is covered) and when the keyboard's height changes
-  // (including its initial rise). Instant assignment, not smooth scrolling:
-  // deterministic for the e2e rig and never fights the user's own scroll.
+  // Runs when the active line changes, when the keyboard's height changes
+  // (including its initial rise), and when the active line's own rendered
+  // height grows while it stays active (a fraction, root, or summation
+  // typed into it pushes past the 38px row floor). The first two triggers
+  // are the effect's own dependencies; the third comes from a ResizeObserver
+  // on the active line element, set up below and torn down on cleanup so it
+  // is re-attached whenever the active line changes. Observing the line
+  // rather than the scroller means this cannot feed back on itself:
+  // scrolling only changes the scroller's scrollTop, never any element's
+  // size. Instant assignment, not smooth scrolling: deterministic for the
+  // e2e rig and never fights the user's own scroll.
   useEffect(() => {
     if (!activeLineId) return;
     const scroller = scrollerRef.current;
     const line = scroller?.querySelector<HTMLElement>("[data-active-line]");
     if (!scroller || !line) return;
-    const next = typedLinesScrollTop({
-      scrollTop: scroller.scrollTop,
-      clientHeight: scroller.clientHeight,
-      insetBottom: inset.bottom,
-      lineTop: line.offsetTop,
-      lineHeight: line.offsetHeight,
-    });
-    if (next !== scroller.scrollTop) scroller.scrollTop = next;
+
+    const sync = () => {
+      const next = typedLinesScrollTop({
+        scrollTop: scroller.scrollTop,
+        clientHeight: scroller.clientHeight,
+        insetBottom: inset.bottom,
+        lineTop: line.offsetTop,
+        lineHeight: line.offsetHeight,
+      });
+      if (next !== scroller.scrollTop) scroller.scrollTop = next;
+    };
+
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(line);
+    return () => observer.disconnect();
   }, [activeLineId, inset.bottom]);
 
   return (
