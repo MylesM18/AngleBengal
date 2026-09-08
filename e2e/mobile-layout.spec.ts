@@ -14,6 +14,8 @@ import {
   type Route,
 } from "./helpers/routes";
 import { servePracticeProblem } from "./helpers/practice";
+import { openSketchMode, setSketchBackground } from "./helpers/sketch";
+import { openTutorDrawer } from "./helpers/tutor";
 import { settle } from "./helpers/settle";
 
 /**
@@ -122,6 +124,80 @@ for (const width of COMPACT_WIDTHS) {
       await expectNoOverflow(
         page,
         { ...route, name: `${route.name}, ${state.detail}` },
+        width,
+      );
+    });
+
+    test("compact sketch mode has no horizontal overflow", async ({ page }) => {
+      test.skip(
+        discovered.practice === null,
+        `SKIPPED, EMPTY LIBRARY: no practice topic. ${discovered.notes.join(" ")}`,
+      );
+      const route = discovered.practice as Route;
+      await page.goto(route.path);
+      await settle(page);
+
+      // With a problem served, the overlay also carries the ProblemRibbon,
+      // which is where the statement's inline math ends up.
+      const state = await servePracticeProblem(page);
+      await openSketchMode(page);
+
+      // The toolbar alone first. `graph` is the store default, so Plain has to
+      // be chosen explicitly to see the strip without the rail under it.
+      await setSketchBackground(page, "Plain");
+      await settle(page);
+      await expectNoOverflow(
+        page,
+        { ...route, name: `sketch mode, plain background, ${state.detail}` },
+        width,
+      );
+
+      // Then the crowded case: the graph background is the only thing that
+      // mounts GraphRail, another full row of chips and number inputs.
+      await setSketchBackground(page, "Graph");
+      await settle(page);
+      await expectNoOverflow(
+        page,
+        { ...route, name: "sketch mode, graph background (GraphRail mounted)" },
+        width,
+      );
+    });
+
+    test("the open tutor drawer has no horizontal overflow", async ({ page }) => {
+      await page.goto("/learn");
+      await settle(page);
+      await openTutorDrawer(page);
+      await settle(page);
+      await expectNoOverflow(
+        page,
+        { path: "/learn", name: "tutor drawer over the learn shelf" },
+        width,
+      );
+    });
+
+    test("the tutor drawer over practice, where its context chip is longest", async ({
+      page,
+    }) => {
+      test.skip(
+        discovered.practice === null,
+        `SKIPPED, EMPTY LIBRARY: no practice topic. ${discovered.notes.join(" ")}`,
+      );
+      const route = discovered.practice as Route;
+      await page.goto(route.path);
+      await settle(page);
+
+      /*
+       * Worth a second route: the drawer's context chip is built from the tab,
+       * the topic name and whether a problem is open, so "Practice, topic,
+       * current problem" is the longest it ever gets, and the starter prompts
+       * become the topic specific ones, which are longer than the generic set.
+       */
+      const state = await servePracticeProblem(page);
+      await openTutorDrawer(page);
+      await settle(page);
+      await expectNoOverflow(
+        page,
+        { ...route, name: `tutor drawer over practice, ${state.detail}` },
         width,
       );
     });

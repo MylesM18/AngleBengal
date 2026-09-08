@@ -5,8 +5,11 @@ import {
   TAP_TARGET_SELECTOR,
   formatHitFailures,
   probeHitAreas,
+  reportShortened,
 } from "./helpers/hitArea";
 import { servePracticeProblem } from "./helpers/practice";
+import { graphRailVisible, openSketchMode, setSketchBackground } from "./helpers/sketch";
+import { openTutorDrawer } from "./helpers/tutor";
 import { STATIC_ROUTES, discoverRoutes, type DiscoveredRoutes } from "./helpers/routes";
 import { settle } from "./helpers/settle";
 
@@ -74,11 +77,10 @@ for (const width of COMPACT_WIDTHS) {
       await settle(page);
 
       // The composer's Send sits next to the drawer's own controls, which is
-      // exactly the tight pairing D-071 is about.
-      const tutor = page.getByRole("button", { name: /tutor/i });
-      test.skip((await tutor.count()) === 0, "SKIPPED: no tutor control on this screen.");
-      await tutor.first().click();
-      await expect(page.locator("#tutor-drawer")).toBeVisible();
+      // exactly the tight pairing D-071 is about. Opened through the shared
+      // helper so this waits for the slide to settle too: probing a drawer
+      // that is still animating measures hit areas at a transient position.
+      await openTutorDrawer(page);
       await settle(page);
 
       const report = await probeHitAreas(page);
@@ -86,6 +88,64 @@ for (const width of COMPACT_WIDTHS) {
       expect(
         report.failures,
         formatHitFailures(report, `the open tutor drawer at ${width}px`),
+      ).toEqual([]);
+    });
+
+    test("compact sketch mode: the toolbar and graph rail own their hit areas", async ({
+      page,
+    }) => {
+      test.skip(
+        discovered.practice === null,
+        `SKIPPED, EMPTY LIBRARY: no practice topic. ${discovered.notes.join(" ")}`,
+      );
+      await page.goto((discovered.practice as { path: string }).path);
+      await settle(page);
+      await servePracticeProblem(page);
+      await openSketchMode(page);
+      await settle(page);
+
+      /*
+       * The reason sketch mode is worth its own probe: the toolbar packs five
+       * control groups into one bar and carries `max-lg:gap-3` / `max-lg:gap-5`
+       * specifically so the 44px overlays stop overlapping (D-071). Those gaps
+       * are the tightest spacing in the app, so this is where a regression
+       * would land, and no other route renders any of it at compact.
+       */
+      await setSketchBackground(page, "Graph");
+      await settle(page);
+      expect(
+        await graphRailVisible(page),
+        "The graph background did not mount GraphRail, so its five carriers " +
+          "were never probed.",
+      ).toBe(true);
+
+      const withRail = await probeHitAreas(page);
+      expect(
+        withRail.probed,
+        `No hit points probed in sketch mode. ${withRail.carriers} carriers, all skipped: ` +
+          withRail.skips.map((s) => `${s.selector} (${s.reason})`).join("; "),
+      ).toBeGreaterThan(0);
+      reportShortened(withRail, `sketch mode with the graph rail at ${width}px`);
+      expect(
+        withRail.failures,
+        formatHitFailures(withRail, `sketch mode, graph rail, at ${width}px`),
+      ).toEqual([]);
+
+      // The toolbar on its own. Fewer carriers is the proof that the rail was
+      // genuinely contributing to the run above, not that the probe found the
+      // same set twice.
+      await setSketchBackground(page, "Plain");
+      await settle(page);
+      const plain = await probeHitAreas(page);
+      expect(
+        plain.carriers,
+        "Switching off the graph background removed no carriers, so GraphRail " +
+          "was never in the measured set.",
+      ).toBeLessThan(withRail.carriers);
+      reportShortened(plain, `sketch mode, toolbar only, at ${width}px`);
+      expect(
+        plain.failures,
+        formatHitFailures(plain, `sketch mode, toolbar only, at ${width}px`),
       ).toEqual([]);
     });
 

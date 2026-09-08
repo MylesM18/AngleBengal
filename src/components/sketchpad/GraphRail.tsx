@@ -70,7 +70,22 @@ export function GraphRail() {
   }
 
   return (
-    <div className="stock-textured relative flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] py-2 max-lg:gap-5">
+    <div
+      /*
+       * `max-lg:pt-3` closes a D-071 collision the Phase 7 rig found between
+       * this rail and the toolbar above it. Phase 5 audited the gaps WITHIN
+       * each strip and within each row, but not the gap BETWEEN the two
+       * sections. At 390px the toolbar wraps so that its 24px "Clean up"
+       * button sits directly above this rail's first chip: Clean up's hit area
+       * runs to y=264.0 (10px of spillover below a 24px control) and the
+       * chip's runs from y=263.4 (8.6px above a 26.8px one), so the two
+       * overlapped by 0.6px and the chip, being later in DOM order, won the
+       * band. `py-2` left 18px of clearance where 18.6px was needed; 12px of
+       * top padding on compact makes it 22px. `lg` and up is untouched, like
+       * every other touch fix in this file's neighbours.
+       */
+      className="stock-textured relative flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline bg-kraft pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] py-2 max-lg:gap-5 max-lg:pt-3"
+    >
       {allowed.map((tool) => (
         <button
           key={tool}

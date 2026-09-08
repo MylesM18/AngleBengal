@@ -44,12 +44,54 @@ export type HitFailure = {
 
 export type HitSkip = { selector: string; reason: string };
 
+/**
+ * A probe point that left the control's own box and landed on a non
+ * interactive container. The hit area is shorter than 44px there, but no
+ * control was stolen, so a tap in that band does nothing rather than doing the
+ * wrong thing. Reported, not failed: see the note on `INTERACTIVE` below.
+ */
+export type HitShortened = { selector: string; point: string; landedOn: string };
+
 export type HitReport = {
   carriers: number;
   probed: number;
   failures: HitFailure[];
+  shortened: HitShortened[];
   skips: HitSkip[];
 };
+
+/**
+ * What counts as a control for the purpose of D-071.
+ *
+ * D-071 states the harm precisely, and SketchToolbar repeats it at the call
+ * site: the `::after` has no `pointer-events: none` because it needs the input
+ * to make the hit area exist, so "a tight gap silently steals the edge of the
+ * NEXT CONTROL's taps". The defect is a tap that fires the wrong control, and
+ * that requires a control on the other side.
+ *
+ * When the winner is a plain container instead, the region is merely dead: the
+ * sketch toolbar's Clean up button spills its last 6px past the toolbar's
+ * bottom border into the graph rail's background, which is a positioned later
+ * sibling and paints over it. Nothing fires. That is a shorter hit area, not a
+ * misdirected tap, and it is a different decision from the one this gate
+ * enforces, so it is reported rather than failed.
+ */
+const INTERACTIVE = [
+  "button",
+  "a[href]",
+  "input",
+  "select",
+  "textarea",
+  "summary",
+  '[role="button"]',
+  '[role="link"]',
+  '[role="radio"]',
+  '[role="checkbox"]',
+  '[role="tab"]',
+  '[role="menuitem"]',
+  '[role="switch"]',
+  '[role="option"]',
+].join(",");
 
 /**
  * Every `tap-target` carrier with the computed `content` of its `::after`.
@@ -94,7 +136,7 @@ export async function tapTargetAfterContent(page: Page): Promise<AfterSample[]> 
  */
 export async function probeHitAreas(page: Page): Promise<HitReport> {
   return page.evaluate(
-    ({ selector, inset }) => {
+    ({ selector, inset, interactive }) => {
       /* Inlined rather than shared: `page.evaluate` serialises this callback,
          so it cannot close over a helper defined in this module. */
       const describe = (el: Element | null): string | null => {
@@ -137,6 +179,7 @@ export async function probeHitAreas(page: Page): Promise<HitReport> {
       };
 
       const failures: HitFailure[] = [];
+      const shortened: HitShortened[] = [];
       const skips: HitSkip[] = [];
       let probed = 0;
 
@@ -240,20 +283,30 @@ export async function probeHitAreas(page: Page): Promise<HitReport> {
               });
               continue;
             }
+            // Only another CONTROL winning the region is the D-071 defect.
+            const thief = hit === null ? null : hit.closest(interactive);
+            if (thief === null || el.contains(thief)) {
+              shortened.push({
+                selector: name,
+                point: p.point,
+                landedOn: describe(hit) ?? "nothing",
+              });
+              continue;
+            }
             failures.push({
               selector: name,
               point: p.point,
               x: Math.round(p.x),
               y: Math.round(p.y),
-              hit: describe(hit),
+              hit: describe(thief),
             });
           }
         }
       }
 
-      return { carriers: carriers.length, probed, failures, skips };
+      return { carriers: carriers.length, probed, failures, shortened, skips };
     },
-    { selector: TAP_TARGET_SELECTOR, inset: INSET_PX },
+    { selector: TAP_TARGET_SELECTOR, inset: INSET_PX, interactive: INTERACTIVE },
   );
 }
 
@@ -265,7 +318,24 @@ export function formatHitFailures(report: HitReport, where: string): string {
   return [
     `${report.failures.length} hit area failure(s) at ${where} ` +
       `(${report.carriers} carriers, ${report.probed} points probed, ` +
-      `${report.skips.length} skipped):`,
+      `${report.skips.length} skipped, ${report.shortened.length} shortened):`,
     ...lines,
   ].join("\n");
+}
+
+/**
+ * Prints the shortened hit areas. They are not failures, but they are the kind
+ * of thing that should stay visible rather than disappearing into a green run.
+ */
+export function reportShortened(report: HitReport, where: string): void {
+  if (report.shortened.length === 0) return;
+  const unique = new Map<string, HitShortened>();
+  for (const entry of report.shortened) unique.set(entry.selector + entry.point, entry);
+  console.log(
+    `  ${unique.size} hit area(s) shortened at ${where} ` +
+      "(spillover crosses into a container, no control steals the tap):\n" +
+      [...unique.values()]
+        .map((entry) => `    ${entry.selector} ${entry.point} -> ${entry.landedOn}`)
+        .join("\n"),
+  );
 }
