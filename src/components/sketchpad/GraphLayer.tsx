@@ -10,8 +10,19 @@ import {
   type WorldPoint,
 } from "@/lib/sketch/graphCoords";
 import { sameRegion, type RegionBoundary } from "@/lib/sketch/graphRegion";
-import { GRID_PX, graphLayerSource } from "@/lib/sketch/render";
-import { useSketchStore, type GraphObject } from "@/lib/sketch/store";
+import { usePane } from "@/components/sketchpad/PaneContext";
+import {
+  GRID_PX,
+  registerGraphLayerSource,
+  unregisterGraphLayerSource,
+  type GraphLayerSource,
+} from "@/lib/sketch/render";
+import {
+  usePage,
+  useSketchStore,
+  useSurfaceContent,
+  type GraphObject,
+} from "@/lib/sketch/store";
 
 /** Same cached-import pattern as MathLive (spec §8): failure disables the
  *  rail with a retry, ink is unaffected. */
@@ -80,38 +91,63 @@ function boundariesOf(objects: GraphObject[]): RegionBoundary[] {
   return boundaries;
 }
 
+/** Stable zero fallbacks so selectors below can return module constants
+ *  instead of allocating per call (zustand compares by reference). */
+const ZERO_SIZE = { width: 0, height: 0 };
+const NO_PENDING: WorldPoint[] = [];
+
 export function GraphLayer() {
-  const background = useSketchStore((state) => state.background);
+  // Which page this layer renders (D-168) and the A15 pane render scale.
+  const { pageId, scale } = usePane();
+  const page = usePage(pageId);
   const toolset = useSketchStore((state) => state.toolset);
-  const canvasSize = useSketchStore((state) => state.canvasSize);
-  const graphObjects = useSketchStore((state) => state.graphObjects);
-  const graphShades = useSketchStore((state) => state.graphShades);
-  const graphStep = useSketchStore((state) => state.graphStep);
+  const measured: { width: number; height: number } | undefined = useSketchStore(
+    (state) => state.canvasSizes[pageId],
+  );
+  const canvasSize = measured ?? ZERO_SIZE;
+  const content = useSurfaceContent(pageId);
+  const graphObjects = content.graphObjects;
+  const graphShades = content.graphShades;
+  const graphStep = page.graphStep;
   const graphTool = useSketchStore((state) => state.graphTool);
-  const pendingGraphPoints = useSketchStore((state) => state.pendingGraphPoints);
+  // pendingGraphPoints belong to the active page (A4): a non-active pane
+  // must not preview another page's half-placed object.
+  const pendingGraphPoints = useSketchStore((state) =>
+    state.activePageId === pageId ? state.pendingGraphPoints : NO_PENDING,
+  );
   const { status } = useJsxGraph();
   const [hint, setHint] = useState<string | null>(null);
 
   const boardHostRef = useRef<HTMLDivElement | null>(null);
   const shadeCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // The layer rides the Graph background (D-154): it exists while the paper
-  // shows axes and the problem's toolset declares graph tools. Ink and typing
-  // stay usable on that paper, so the placement overlay below only takes
-  // pointer events while a rail tool is armed.
-  const active = background === "graph" && (toolset?.graphTools.length ?? 0) > 0;
+  // The layer rides the Graph background (D-154): it exists while this page's
+  // paper shows axes and the problem's toolset declares graph tools. Ink and
+  // typing stay usable on that paper, so the placement overlay below only
+  // takes pointer events while a rail tool is armed. Arming is deliberately
+  // NOT gated on the active page: a placement click in a non-active pane
+  // must land on this overlay (not fall through and ink the canvas), and by
+  // click time the pane container's capture handler has already made this
+  // page active and cleared the previous page's pending points (A14, A4), so
+  // the click starts a fresh placement here. Placing implies intent.
+  const active = page.surface === "graph" && (toolset?.graphTools.length ?? 0) > 0;
   const armed = active && graphTool !== null && status === "ready";
 
-  // Register the composite sources while mounted (render.ts reads them).
+  // Register the composite source under this page's id while mounted
+  // (render.ts hands it to compositeToPng callers). The effect depends on
+  // pageId (A7): when a pane switches pages, the old key unregisters and the
+  // new one registers, so the Map never carries a source for a page this
+  // layer no longer renders.
   useEffect(() => {
-    graphLayerSource.current = {
+    const source: GraphLayerSource = {
       svg: () => boardHostRef.current?.querySelector("svg")?.outerHTML ?? null,
       shadeCanvas: () => shadeCanvasRef.current,
     };
+    registerGraphLayerSource(pageId, source);
     return () => {
-      graphLayerSource.current = null;
+      unregisterGraphLayerSource(pageId, source);
     };
-  }, []);
+  }, [pageId]);
 
   // Rebuild the board whenever the drawn objects change. n is small, and a
   // full rebuild through freeBoard cannot leak stale elements. `active` is a
@@ -202,21 +238,26 @@ export function GraphLayer() {
 
   function onPlacementClick(event: React.MouseEvent<HTMLDivElement>): void {
     if (!active || !graphTool || status !== "ready") return;
+    // The rect is the visual (possibly transform-scaled) box, so the offsets
+    // divide by the pane scale to land in the page's reference space before
+    // the world conversion (A15). Scale is 1 outside split.
     const rect = event.currentTarget.getBoundingClientRect();
     const world = pxToWorld(
-      event.clientX - rect.left,
-      event.clientY - rect.top,
+      (event.clientX - rect.left) / scale,
+      (event.clientY - rect.top) / scale,
       canvasSize.width,
       canvasSize.height,
       graphStep,
     );
     const state = useSketchStore.getState();
+    const statePage = state.pages[pageId];
+    if (!statePage) return;
 
     if (graphTool === "eraser" || graphTool === "dashed") {
       const tolerance = (12 / GRID_PX) * graphStep;
       let bestId: string | null = null;
       let bestDistance = tolerance;
-      for (const object of state.graphObjects) {
+      for (const object of statePage.content[statePage.surface].graphObjects) {
         const distance = distanceToObject(object, world);
         if (distance <= bestDistance) {
           bestDistance = distance;
@@ -224,19 +265,19 @@ export function GraphLayer() {
         }
       }
       if (bestId) {
-        if (graphTool === "eraser") state.removeGraphObject(bestId);
-        else state.toggleGraphObjectDashed(bestId);
+        if (graphTool === "eraser") state.removeGraphObject(pageId, bestId);
+        else state.toggleGraphObjectDashed(pageId, bestId);
       }
       return;
     }
 
     if (graphTool === "shade") {
-      state.addGraphShade(world);
+      state.addGraphShade(pageId, world);
       return;
     }
 
     const snapped = snapToWorldGrid(world, graphStep);
-    commitGraphPoint(snapped, setHint);
+    commitGraphPoint(pageId, snapped, setHint);
   }
 
   if (!active) return null;
@@ -274,8 +315,18 @@ const POINTS_NEEDED: Record<string, number> = {
   point: 1, line: 2, ray: 2, segment: 2, circle: 2, parabola: 2,
 };
 
-/** Shared by canvas clicks and the exact-coords dialog (GraphRail). */
-export function commitGraphPoint(world: WorldPoint, setHint: (hint: string | null) => void): void {
+/**
+ * Shared by pane clicks and the exact-coords dialog (GraphRail passes the
+ * active page). pendingGraphPoints are global session state belonging to the
+ * active page (A4), so callers hand in a pageId that IS active by the time
+ * this runs: the rail reads activePageId, and a pane click arrives after the
+ * pane container's capture handler has activated that pane's page.
+ */
+export function commitGraphPoint(
+  pageId: string,
+  world: WorldPoint,
+  setHint: (hint: string | null) => void,
+): void {
   const state = useSketchStore.getState();
   const tool = state.graphTool;
   if (!tool || !(tool in POINTS_NEEDED)) return;
@@ -288,7 +339,7 @@ export function commitGraphPoint(world: WorldPoint, setHint: (hint: string | nul
   }
   setHint(null);
   if (points.length >= POINTS_NEEDED[kind]) {
-    state.addGraphObject(kind, points, false);
+    state.addGraphObject(pageId, kind, points, false);
   } else {
     state.pushPendingGraphPoint(world);
   }

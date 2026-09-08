@@ -29,9 +29,14 @@ import {
   reportDetail,
   suspendProblemWork,
 } from "@/lib/resume/client";
-import { parseWorkState, type ProblemWorkState } from "@/lib/resume/workState";
+import {
+  parseWorkState,
+  roundStrokes,
+  type ProblemWorkState,
+  type WorkStateSurfaceContent,
+} from "@/lib/resume/workState";
 import { latexToPlain } from "@/lib/sketch/latexToPlain";
-import { useSketchStore } from "@/lib/sketch/store";
+import { useSketchStore, type SurfaceContent } from "@/lib/sketch/store";
 import { ACCENT_VAR, accentForRoot } from "@/lib/topicColors";
 
 import {
@@ -75,6 +80,48 @@ type Outcome = {
   parts: { name: string; label: string; match: boolean }[] | null;
   nudge: FeynmanNudgeData | null;
 };
+
+/** One (page, surface) document as saved: the store's per-surface opLog is
+ *  dropped (undo history is never persisted) and stroke points round to two
+ *  decimals (A11) so a full 8-page state stays well under the work route's
+ *  4MB cap. */
+function serializeSurface(content: SurfaceContent): WorkStateSurfaceContent {
+  return {
+    strokes: roundStrokes(content.strokes),
+    typedLines: content.typedLines,
+    graphObjects: content.graphObjects,
+    graphShades: content.graphShades,
+    ocrBlocks: content.ocrBlocks,
+  };
+}
+
+/** Serializes the sketch store into the v2 saved-work shape (D-169): the
+ *  whole page list plus the active page id, so reopening the problem puts
+ *  back every page exactly as left, on the page that was on screen. */
+function buildWorkState(answer: AnswerValue): ProblemWorkState {
+  const state = useSketchStore.getState();
+  return {
+    version: 2,
+    activePageId: state.activePageId,
+    pages: state.pageOrder.map((id) => {
+      const page = state.pages[id];
+      return {
+        id: page.id,
+        name: page.name,
+        surface: page.surface,
+        mode: page.mode,
+        graphStep: page.graphStep,
+        refSize: page.refSize,
+        content: {
+          blank: serializeSurface(page.content.blank),
+          grid: serializeSurface(page.content.grid),
+          graph: serializeSurface(page.content.graph),
+        },
+      };
+    }),
+    answer,
+  };
+}
 
 export function PracticePanel({
   topicId,
@@ -269,12 +316,16 @@ export function PracticePanel({
           prevProblemIdRef.current = next.id;
           setActiveProblem(next.id, next.answerType);
           store.setToolset(next.toolset);
-          store.setGraphStep(next.graphStep ?? 1);
+          // Per-problem defaults apply to the ACTIVE page (D-170), which the
+          // reset above may just have replaced: read the id fresh, not from
+          // the pre-reset snapshot.
+          const defaultPageId = useSketchStore.getState().activePageId;
+          store.setGraphStep(defaultPageId, next.graphStep ?? 1);
           // A graph answer is drawn on the graph paper, so make sure that
-          // paper is up. Other problems respect the paper the user chose
-          // (D-154: Graph lives on the background, not a mode).
+          // paper is up on the active page. Other problems respect the paper
+          // the user chose (D-154: Graph lives on the surface, not a mode).
           if (next.answerType === "graph") {
-            store.setBackground("graph");
+            store.setSurface(defaultPageId, "graph");
           }
           if (saved) {
             // Restored on top of the problem defaults, so what the owner
@@ -285,20 +336,7 @@ export function PracticePanel({
             onAnswerChange(saved.answer);
           }
           reportDetail({ problemId: next.id });
-          beginProblemWork(next.id, () => {
-            const current = useSketchStore.getState();
-            return {
-              strokes: current.strokes,
-              typedLines: current.typedLines,
-              graphObjects: current.graphObjects,
-              graphShades: current.graphShades,
-              graphStep: current.graphStep,
-              background: current.background,
-              mode: current.mode,
-              ocrBlocks: current.ocrBlocks,
-              answer: answerRef.current,
-            };
-          });
+          beginProblemWork(next.id, () => buildWorkState(answerRef.current));
         } else {
           suspendProblemWork();
           prevProblemIdRef.current = null;
@@ -339,16 +377,15 @@ export function PracticePanel({
   // overwrite the outgoing problem's save.
   useEffect(() => {
     return useSketchStore.subscribe((state, previous) => {
-      if (
-        state.strokes !== previous.strokes ||
-        state.typedLines !== previous.typedLines ||
-        state.graphObjects !== previous.graphObjects ||
-        state.graphShades !== previous.graphShades ||
-        state.graphStep !== previous.graphStep ||
-        state.background !== previous.background ||
-        state.mode !== previous.mode ||
-        state.ocrBlocks !== previous.ocrBlocks
-      ) {
+      // A3: every content mutation replaces `pages` immutably, so one
+      // reference check covers strokes, typed lines, graph objects, shades,
+      // OCR blocks, surface, mode, step, and refSize on every page, and
+      // activePageId is saved state too (which page reopens on top).
+      // splitPageIds is session-only view state (D-169), deliberately
+      // excluded. The first canvas measure after a problem loads writes
+      // refSize through `pages` and so triggers one autosave of an otherwise
+      // untouched state; harmless, blank states save by design.
+      if (state.pages !== previous.pages || state.activePageId !== previous.activePageId) {
         noteProblemWork();
       }
     });
@@ -377,13 +414,31 @@ export function PracticePanel({
   async function submit() {
     if (!problem || submitting || outcome?.correct) return;
     const shape = problem;
-    // Graph problems have no answer input: the sketchpad's graph layer IS
-    // the answer, so "empty" means no objects were placed on it (spec §7.4).
+    // Graph problems have no answer input: the ACTIVE page's graph surface IS
+    // the answer (D-170/A1), so "empty" means no objects were placed on it
+    // (spec §7.4).
+    const emptyState = useSketchStore.getState();
+    const emptyPage = emptyState.pages[emptyState.activePageId];
     const empty =
       shape.answerType === "graph"
-        ? useSketchStore.getState().graphObjects.length === 0
+        ? emptyPage.content.graph.graphObjects.length === 0
         : answerIsEmpty(shape, answer);
     if (empty) {
+      if (shape.answerType === "graph") {
+        // A1: grading only ever reads the active page, so a graph drawn on
+        // another page must not be silently ignored (or worse, an empty one
+        // graded). Name the first such page in page order and refuse.
+        const elsewhere = emptyState.pageOrder
+          .map((id) => emptyState.pages[id])
+          .find(
+            (page) =>
+              page.id !== emptyPage.id && page.content.graph.graphObjects.length > 0,
+          );
+        if (elsewhere) {
+          setError(`Your graph is on ${elsewhere.name}. Switch to it to submit.`);
+          return;
+        }
+      }
       setError("Enter an answer first.");
       return;
     }
@@ -392,14 +447,20 @@ export function PracticePanel({
     setError(null);
     try {
       const sketchState = useSketchStore.getState();
+      const sketchPage = sketchState.pages[sketchState.activePageId];
+      // Grading reads the active page's GRAPH surface; typed lines and OCR
+      // blocks ride from its ACTIVE surface, matching what the snapshot
+      // composites and what Clean up read (A1).
+      const graphContent = sketchPage.content.graph;
+      const activeContent = sketchPage.content[sketchPage.surface];
       const submittedAnswer =
         problem.answerType === "graph"
           ? JSON.stringify({
-              objects: sketchState.graphObjects.map(({ kind, dashed, points }) => ({ kind, dashed, points })),
-              shadedPoint: sketchState.graphShades[0]?.testPoint ?? null,
+              objects: graphContent.graphObjects.map(({ kind, dashed, points }) => ({ kind, dashed, points })),
+              shadedPoint: graphContent.graphShades[0]?.testPoint ?? null,
             })
           : serializeAnswer(shape, answer);
-      const typedLinesState = useSketchStore.getState().typedLines
+      const typedLinesState = activeContent.typedLines
         .filter((line) => line.latex.trim().length > 0)
         .map((line) => ({ latex: line.latex, plain: latexToPlain(line.latex) }));
       const response = await fetch(`/api/problems/${problem.id}/attempt`, {
@@ -411,7 +472,7 @@ export function PracticePanel({
           // untouched (docs/06 §4). The OCR blocks ride along so the
           // diagnostic can see the student's written work.
           sketchPngBase64: await snapshotSketch(),
-          ocrBlocks: useSketchStore.getState().ocrBlocks,
+          ocrBlocks: activeContent.ocrBlocks,
           typedLines: typedLinesState.length > 0 ? typedLinesState : null,
         }),
       });

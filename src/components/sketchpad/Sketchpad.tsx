@@ -1,35 +1,90 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { NoticeKind } from "@/components/ui/Notice";
 import { Toast } from "@/components/ui/Toast";
+import { cx } from "@/lib/cx";
 import { latexToPlain } from "@/lib/sketch/latexToPlain";
-import { compositeToPng } from "@/lib/sketch/render";
-import { useSketchStore, type OcrBlock } from "@/lib/sketch/store";
+import { compositeToPng, getGraphLayerSource } from "@/lib/sketch/render";
+import {
+  activePage,
+  usePage,
+  useSketchStore,
+  type OcrBlock,
+} from "@/lib/sketch/store";
+import { useIsDesktop } from "@/lib/useIsDesktop";
 
 import { CleanCopyPanel } from "./CleanCopyPanel";
 import { GraphLayer } from "./GraphLayer";
 import { GraphRail } from "./GraphRail";
-import { SketchCanvas } from "./SketchCanvas";
+import { PageBar } from "./PageBar";
+import { PaneContext, type PaneInfo } from "./PaneContext";
+import { SketchCanvas, type Size } from "./SketchCanvas";
 import { SketchToolbar } from "./SketchToolbar";
 import { TypedLinesLayer } from "./TypedLinesLayer";
 
 /**
- * The sketchpad panel: toolbar, canvas stack, and the clean-copy slip
- * (docs/06 §4).
+ * The sketchpad panel: toolbar, graph rail, page bar, and either one page's
+ * layer stack or the 2-4 pane split grid (docs/06 §4, D-172), with the
+ * clean-copy slip over the bottom.
  *
- * The canvas size is tracked here because compositing for OCR and for the
- * attempt snapshot both need it, and only the canvas knows it.
+ * Clean up, the attempt snapshot, and the clean-copy slip all follow the
+ * ACTIVE page's active surface (D-170/A1). The composite size comes from the
+ * page's reference size when it has one, else from its live measurement
+ * (A15), because a split pane's canvas backing store is laid out at the
+ * reference size and only visually scaled down.
  */
 export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) => void }) {
   const [cleaning, setCleaning] = useState(false);
   const [toast, setToast] = useState<{ kind: NoticeKind; message: string } | null>(null);
 
-  const blocks = useSketchStore((state) => state.ocrBlocks);
-  const background = useSketchStore((state) => state.background);
-  const setOcrBlocks = useSketchStore((state) => state.setOcrBlocks);
+  const activePageId = useSketchStore((state) => state.activePageId);
+  const blocks = useSketchStore((state) => {
+    const page = activePage(state);
+    return page.content[page.surface].ocrBlocks;
+  });
+  const activeSurfaceIsGraph = useSketchStore(
+    (state) => activePage(state).surface === "graph",
+  );
+  const splitPageIds = useSketchStore((state) => state.splitPageIds);
+  const splitGraphAll = useSketchStore((state) =>
+    state.splitPageIds.some((id) => state.pages[id]?.surface === "graph"),
+  );
+  const splitGraphFirstTwo = useSketchStore((state) =>
+    state.splitPageIds.slice(0, 2).some((id) => state.pages[id]?.surface === "graph"),
+  );
+
+  // A12: below lg only the first two panes render (a phone's 2x2 grid leaves
+  // canvases too small to write on), though splitPageIds may still hold 3-4
+  // set on desktop. This instance's world is fixed by where PracticeWorkspace
+  // mounted it, so the JS gate and the CSS breakpoint always agree.
+  const isDesktop = useIsDesktop();
+  const paneIds = isDesktop === false ? splitPageIds.slice(0, 2) : splitPageIds;
+  const split = paneIds.length >= 2;
+
+  // A13: single-pane, the rail shows for the active page's surface; split,
+  // it shows when ANY rendered pane is on graph paper, so activating a pane
+  // never adds or removes a whole strip mid-gesture. GraphRail itself
+  // disables its controls when the active page is not on graph paper.
+  const railVisible = split
+    ? isDesktop === false
+      ? splitGraphFirstTwo
+      : splitGraphAll
+    : activeSurfaceIsGraph;
+
+  const singlePane = useMemo<PaneInfo>(
+    () => ({ pageId: activePageId, scale: 1 }),
+    [activePageId],
+  );
   const setCanvasSize = useSketchStore((state) => state.setCanvasSize);
+  // pageId-bound size reporter for the single-pane canvas: when the active
+  // page changes (reset, hydrate, chip tap) the new callback identity makes
+  // SketchCanvas re-measure and file the size under the new page id.
+  const reportActiveSize = useCallback(
+    (size: Size) => setCanvasSize(activePageId, size),
+    [setCanvasSize, activePageId],
+  );
 
   // One entry point for every sketchpad message. The Toast primitive owns the
   // timer: it calls `dismissToast` after its default 3200ms.
@@ -39,17 +94,24 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
   const dismissToast = useCallback(() => setToast(null), []);
 
   const cleanUp = useCallback(async () => {
-    const { strokes, background } = useSketchStore.getState();
+    const state = useSketchStore.getState();
+    const page = activePage(state);
+    const content = page.content[page.surface];
 
     // An empty canvas is a no-op with a gentle nudge, not an error and not a
     // wasted vision call (docs/06 §4).
-    if (strokes.length === 0) {
+    if (content.strokes.length === 0) {
       flash("Nothing to read yet. Write something first.");
       return;
     }
 
-    const { canvasSize } = useSketchStore.getState();
-    const png = await compositeToPng(strokes, background, canvasSize.width, canvasSize.height);
+    const size = page.refSize ?? state.canvasSizes[page.id] ?? { width: 0, height: 0 };
+    const png = await compositeToPng(content.strokes, page.surface, size.width, size.height, {
+      // Explicit per-page graph source (A7): with one GraphLayer per pane the
+      // composite has to be told which page it is reading, or it silently
+      // renders without the graph layer.
+      graphSource: getGraphLayerSource(page.id),
+    });
     if (!png) {
       flash("Could not capture the canvas.");
       return;
@@ -73,18 +135,25 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
       }
 
       const blocks = (payload as { blocks: OcrBlock[] }).blocks;
-      setOcrBlocks(blocks);
+      // Results land on the page the OCR ran on, even if the user switched
+      // pages while the reader was thinking.
+      useSketchStore.getState().setOcrBlocks(page.id, blocks);
       const mathLatexes = blocks
         .filter((block): block is Extract<OcrBlock, { kind: "math" }> => block.kind === "math")
         .map((block) => block.latex)
         .filter((latex) => latex.trim().length > 0);
-      useSketchStore.getState().appendTypedLines(mathLatexes);
+      useSketchStore.getState().appendTypedLines(page.id, mathLatexes);
     } catch {
       flash("Could not reach the reader. Try again in a moment.", "error");
     } finally {
       setCleaning(false);
     }
-  }, [flash, setOcrBlocks]);
+  }, [flash]);
+
+  const dismissBlocks = useCallback(() => {
+    const state = useSketchStore.getState();
+    state.setOcrBlocks(state.activePageId, null);
+  }, []);
 
   return (
     <div
@@ -93,19 +162,32 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
       className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0 outline-none"
     >
       <SketchToolbar cleaning={cleaning} onCleanUp={() => void cleanUp()} />
-      {background === "graph" && <GraphRail />}
+      {railVisible && <GraphRail />}
+      <PageBar />
 
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        <SketchCanvas onSizeChange={setCanvasSize} />
-        <TypedLinesLayer />
-        <GraphLayer />
-      </div>
+      {split ? (
+        <div className={cx("grid min-h-0 flex-1 gap-0.5", gridClasses(paneIds.length))}>
+          {paneIds.map((pageId, index) => (
+            // Keyed by page: setPanePage's pane swap moves the subtree with
+            // its page instead of remounting two canvases.
+            <SketchPane key={pageId} pageId={pageId} paneIndex={index} />
+          ))}
+        </div>
+      ) : (
+        <PaneContext.Provider value={singlePane}>
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <SketchCanvas onSizeChange={reportActiveSize} />
+            <TypedLinesLayer />
+            <GraphLayer />
+          </div>
+        </PaneContext.Provider>
+      )}
 
       {blocks && blocks.length > 0 && (
         <CleanCopyPanel
           blocks={blocks}
           onInsert={onInsertAnswer}
-          onClose={() => setOcrBlocks(null)}
+          onClose={dismissBlocks}
           onCopied={() => flash("Copied", "success")}
         />
       )}
@@ -122,28 +204,167 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
   );
 }
 
+/** A12 pane layouts. Tailwind's grid-cols/rows templates are minmax(0, 1fr),
+ *  which is what lets a pane shrink below its canvas instead of collapsing
+ *  the grid. Compact only ever receives 2 panes (the list is sliced first). */
+function gridClasses(count: number): string {
+  if (count === 4) return "grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-2";
+  if (count === 3) return "grid-cols-1 grid-rows-2 lg:grid-cols-3 lg:grid-rows-1";
+  return "grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-1";
+}
+
+/**
+ * One split pane: header with the page picker, then the page's full layer
+ * stack, scaled down to fit when the page has a reference size (A15). The
+ * pane CONTAINER carries pointerdown-capture activation (A14) so canvas,
+ * typed layer, and graph layer all inherit it: the first tap in a non-active
+ * pane activates its page before any layer handler runs.
+ */
+function SketchPane({ pageId, paneIndex }: { pageId: string; paneIndex: number }) {
+  const page = usePage(pageId);
+  const isActive = useSketchStore((state) => state.activePageId === pageId);
+  const pages = useSketchStore((state) => state.pages);
+  const pageOrder = useSketchStore((state) => state.pageOrder);
+  const setCanvasSize = useSketchStore((state) => state.setCanvasSize);
+
+  // Measure the pane's layer area (below the header) the same defensive way
+  // SketchCanvas measures itself: a callback ref for the mount measurement
+  // plus a ResizeObserver for later changes.
+  const [paneSize, setPaneSize] = useState<Size>({ width: 0, height: 0 });
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const measureRef = useCallback((element: HTMLDivElement | null) => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+    if (!element) return;
+    const apply = () => {
+      const next = { width: element.offsetWidth, height: element.offsetHeight };
+      if (next.width === 0 || next.height === 0) return;
+      setPaneSize((previous) =>
+        previous.width === next.width && previous.height === next.height ? previous : next,
+      );
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(element);
+    cleanupRef.current = () => observer.disconnect();
+  }, []);
+  useEffect(() => () => cleanupRef.current?.(), []);
+
+  // A15: r = min(paneW/refW, paneH/refH, 1). With no reference size (a page
+  // never yet rendered unsplit) the layers simply size to the pane and the
+  // scale must stay 1, or pointer math would divide by a scale that no
+  // transform applied.
+  const refSize = page.refSize;
+  const r =
+    refSize && refSize.width > 0 && refSize.height > 0 && paneSize.width > 0
+      ? Math.min(paneSize.width / refSize.width, paneSize.height / refSize.height, 1)
+      : 1;
+  const scaled = refSize !== null && r < 1;
+  const pane = useMemo<PaneInfo>(
+    () => ({ pageId, scale: scaled ? r : 1 }),
+    [pageId, scaled, r],
+  );
+
+  const reportSize = useCallback(
+    (size: Size) => setCanvasSize(pageId, size),
+    [setCanvasSize, pageId],
+  );
+
+  const layers = (
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <SketchCanvas onSizeChange={reportSize} />
+      <TypedLinesLayer />
+      <GraphLayer />
+    </div>
+  );
+
+  return (
+    <PaneContext.Provider value={pane}>
+      <div
+        onPointerDownCapture={() => {
+          const state = useSketchStore.getState();
+          if (state.activePageId !== pageId) state.setActivePage(pageId);
+        }}
+        // A19: a constant 2px border on every pane so activation recolors
+        // without reflowing; the cobalt ring stays the :focus-visible
+        // indicator and nothing else.
+        className={cx(
+          "relative flex min-h-0 min-w-0 flex-col overflow-hidden border-2",
+          isActive ? "border-ink" : "border-hairline",
+        )}
+      >
+        {/* A20: the picker fills the header, so the whole strip is the tap
+            target; D-158 already gives the select 16px text below lg, and
+            tap-target cannot help a replaced element (no ::after). */}
+        <div className="h-11 shrink-0 border-b border-hairline bg-paper-1 lg:h-8">
+          <select
+            aria-label="Pane page"
+            value={pageId}
+            onChange={(event) =>
+              useSketchStore.getState().setPanePage(paneIndex, event.target.value)
+            }
+            className="h-full w-full bg-transparent pl-2 pr-6 text-ui text-ink"
+          >
+            {pageOrder.map((id) => (
+              <option key={id} value={id}>
+                {pages[id]?.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div ref={measureRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          {scaled && refSize ? (
+            // The layer stack lays out at the page's reference size and is
+            // scaled visually, so canvas backing stores, stroke coordinates,
+            // and the graph board all stay in one space per page (A15). The
+            // wrapper sits ABOVE SketchCanvas's own wrapper: offsetWidth
+            // reports layout size, so the canvas keeps measuring refSize.
+            <div
+              className="flex flex-col"
+              style={{
+                width: refSize.width,
+                height: refSize.height,
+                transform: `scale(${r})`,
+                transformOrigin: "top left",
+              }}
+            >
+              {layers}
+            </div>
+          ) : (
+            layers
+          )}
+        </div>
+      </div>
+    </PaneContext.Provider>
+  );
+}
+
 /**
  * Snapshot helper for the attempt submitter (docs/06 §4: "On submit: silently
- * composite and attach... skip if canvas is empty"). Empty now means no ink,
- * no typed lines, AND no graph objects or shading, so a typed-only or
- * graph-only attempt still gets a composite while a genuinely untouched
- * sketchpad still attaches nothing. Async because `compositeToPng` rasterizes
- * the graph layer's SVG through an `Image` load callback.
+ * composite and attach... skip if canvas is empty"). Empty means the ACTIVE
+ * page's active surface has no ink, no typed lines, AND no graph objects or
+ * shading (D-170), so a typed-only or graph-only attempt still gets a
+ * composite while a genuinely untouched surface attaches nothing. Async
+ * because `compositeToPng` rasterizes the graph layer's SVG through an
+ * `Image` load callback.
  */
 export async function snapshotSketch(): Promise<string | null> {
-  const { strokes, background, canvasSize, typedLines, graphStep, graphObjects, graphShades } =
-    useSketchStore.getState();
-  const typedPlainLines = typedLines
+  const state = useSketchStore.getState();
+  const page = activePage(state);
+  const content = page.content[page.surface];
+  const typedPlainLines = content.typedLines
     .filter((line) => line.latex.trim().length > 0)
     .map((line) => latexToPlain(line.latex));
   const empty =
-    strokes.length === 0 &&
+    content.strokes.length === 0 &&
     typedPlainLines.length === 0 &&
-    graphObjects.length === 0 &&
-    graphShades.length === 0;
+    content.graphObjects.length === 0 &&
+    content.graphShades.length === 0;
   if (empty) return null;
-  return compositeToPng(strokes, background, canvasSize.width, canvasSize.height, {
+  const size = page.refSize ?? state.canvasSizes[page.id] ?? { width: 0, height: 0 };
+  return compositeToPng(content.strokes, page.surface, size.width, size.height, {
     typedPlainLines,
-    axisLabels: background === "graph" ? { step: graphStep } : null,
+    axisLabels: page.surface === "graph" ? { step: page.graphStep } : null,
+    graphSource: getGraphLayerSource(page.id),
   });
 }

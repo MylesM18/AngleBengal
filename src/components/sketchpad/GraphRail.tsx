@@ -4,7 +4,7 @@ import { useId, useRef, useState } from "react";
 
 import { commitGraphPoint, useJsxGraph } from "@/components/sketchpad/GraphLayer";
 import { parseCoordinate } from "@/lib/sketch/graphCoords";
-import { useSketchStore, type GraphRailTool } from "@/lib/sketch/store";
+import { activePage, useSketchStore, type GraphRailTool } from "@/lib/sketch/store";
 import { cx } from "@/lib/cx";
 
 const TOOL_LABELS: Record<GraphRailTool, string> = {
@@ -37,12 +37,20 @@ const GRAPH_STEPS: { value: number; label: string }[] = [
  * placement tools show only when the served problem's toolset declares graph
  * tools; the "1 sq =" scale selector is always present, since the numbered
  * axes are. Snap is always on.
+ *
+ * Every control drives the ACTIVE page (D-172). In split view the rail is
+ * shown when ANY rendered pane's page is on graph paper (A13, Sketchpad wires
+ * that visibility), so the active page's surface can be something else while
+ * the rail is on screen; the controls then disable rather than write a step,
+ * a placement, or an undo onto a page whose graph paper is not showing.
  */
 export function GraphRail() {
   const toolset = useSketchStore((state) => state.toolset);
   const graphTool = useSketchStore((state) => state.graphTool);
   const setGraphTool = useSketchStore((state) => state.setGraphTool);
-  const graphStep = useSketchStore((state) => state.graphStep);
+  const activePageId = useSketchStore((state) => state.activePageId);
+  const graphStep = useSketchStore((state) => activePage(state).graphStep);
+  const activeIsGraph = useSketchStore((state) => activePage(state).surface === "graph");
   const setGraphStep = useSketchStore((state) => state.setGraphStep);
   const pendingCount = useSketchStore((state) => state.pendingGraphPoints.length);
   const undo = useSketchStore((state) => state.undo);
@@ -56,6 +64,9 @@ export function GraphRail() {
   const hasTools = (toolset?.graphTools.length ?? 0) > 0;
   const allowed: GraphRailTool[] = hasTools ? [...(toolset?.graphTools ?? []), "eraser"] : [];
   const disabled = status !== "ready";
+  // A13: single-pane view only shows the rail when the active page is on
+  // graph paper, so this is false there and nothing changes.
+  const placementDisabled = !activeIsGraph;
 
   function placeExact(): void {
     const x = parseCoordinate(xRef.current?.value ?? "");
@@ -64,7 +75,7 @@ export function GraphRail() {
       setHint("Enter numbers, fractions like 3/2 work too.");
       return;
     }
-    commitGraphPoint([x, y], setHint);
+    commitGraphPoint(activePageId, [x, y], setHint);
     if (xRef.current) xRef.current.value = "";
     if (yRef.current) yRef.current.value = "";
   }
@@ -90,7 +101,7 @@ export function GraphRail() {
         <button
           key={tool}
           type="button"
-          disabled={disabled}
+          disabled={disabled || placementDisabled}
           aria-pressed={graphTool === tool}
           onClick={() => setGraphTool(graphTool === tool ? null : tool)}
           className={cx(
@@ -105,7 +116,7 @@ export function GraphRail() {
         <>
           <button
             type="button"
-            disabled={disabled}
+            disabled={disabled || placementDisabled}
             onClick={() => setCoordsOpen((open) => !open)}
             aria-expanded={coordsOpen}
             className="max-lg:tap-target rounded-chip border border-ink-faint px-2 py-1 font-mono text-meta text-ink disabled:opacity-60"
@@ -114,8 +125,12 @@ export function GraphRail() {
           </button>
           <button
             type="button"
-            onClick={undo}
-            className="max-lg:tap-target rounded-chip border border-ink-faint px-2 py-1 text-meta text-ink"
+            // Undo pops the active page's ACTIVE surface history, so with the
+            // active page off graph paper this button would silently eat an
+            // ink stroke on another surface: disabled with the rest (A13).
+            disabled={placementDisabled}
+            onClick={() => undo(activePageId)}
+            className="max-lg:tap-target rounded-chip border border-ink-faint px-2 py-1 text-meta text-ink disabled:opacity-60"
           >
             Undo
           </button>
@@ -127,10 +142,14 @@ export function GraphRail() {
           <button
             key={value}
             type="button"
+            // Same wrong-target guard as Undo: the step writes to the active
+            // page, which is not the graph pane the user is looking at when
+            // the active page's surface is something else (A13).
+            disabled={placementDisabled}
             aria-pressed={graphStep === value}
-            onClick={() => setGraphStep(value)}
+            onClick={() => setGraphStep(activePageId, value)}
             className={cx(
-              "max-lg:tap-target rounded-chip border px-2 py-1 font-mono text-meta",
+              "max-lg:tap-target rounded-chip border px-2 py-1 font-mono text-meta disabled:opacity-60",
               graphStep === value ? "border-ink bg-paper-0 text-ink" : "border-ink-faint text-ink",
             )}
           >
@@ -156,7 +175,10 @@ export function GraphRail() {
           </button>
         </span>
       )}
-      {coordsOpen && (
+      {/* !placementDisabled: the opener is disabled in that state, and hiding
+          a dialog left open when pane activation moves off graph paper keeps
+          Place from writing to a page whose graph is not showing (A13). */}
+      {coordsOpen && !placementDisabled && (
         <div
           role="dialog"
           aria-labelledby={titleId}
