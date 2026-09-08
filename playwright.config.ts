@@ -46,7 +46,14 @@ export default defineConfig({
     {
       name: "iphone-webkit",
       use: { ...devices["iPhone 13"] },
-      testIgnore: /desktop-.*\.spec\.ts/,
+      /*
+       * `.chromium.spec.ts` is ignored rather than skipped at run time. Those
+       * files drive the Chrome DevTools Protocol, which WebKit has no
+       * equivalent for, and a permanent skip would erode the rule that makes
+       * this rig's output readable: a skip here means something is genuinely
+       * missing, so there should never be a standing one.
+       */
+      testIgnore: [/desktop-.*\.spec\.ts/, /\.chromium\.spec\.ts$/],
     },
     {
       name: "pixel-chromium",
