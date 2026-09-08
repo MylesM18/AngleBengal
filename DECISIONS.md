@@ -2976,3 +2976,27 @@ run time, because this rig's output is only readable while a skip means
 something is genuinely missing (an empty library, no generated document). A
 standing skip for a permanent engine limitation would erode that, and the next
 real skip would be read as noise.
+
+### D-166. The 200 percent font scale check stays a device item, deliberately
+
+Owner ruling, closing the Phase 7 gap list. Appendix A rung 1 lists a 200
+percent browser font scale probe alongside the overflow, viewport meta and
+`visualViewport` checks, and every other item on that list is now automated
+(D-163, D-165). This one is not, and that is a decision rather than an
+omission, recorded here so the next reader of Appendix A does not take it for
+unfinished work and build it.
+
+The reason is that automating it would produce weaker evidence than the checks
+beside it. `page.setViewportSize` does not emulate a font size change, so the
+rig would have to reach for Chromium's `Page.setFontSizeMultiplier`, which
+makes the check single engine on the platform that is not the primary target,
+and which emulates a browser preference rather than the iOS and Android
+accessibility settings people actually use. The risk it exists to cover is
+Phase 2's acceptance criterion, that the JS and CSS worlds agree at 200
+percent font scaling, and that is exercised properly by a person changing the
+setting on a real phone.
+
+So it sits on the owner's real-device checklist beside the pinch survey and
+the double tap re-fit, which are there for the same reason: emulation cannot
+produce the input. If a future change makes a faithful emulation available,
+reopening this is a new decision, not a bug fix.
