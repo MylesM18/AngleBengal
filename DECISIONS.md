@@ -3000,3 +3000,91 @@ So it sits on the owner's real-device checklist beside the pinch survey and
 the double tap re-fit, which are there for the same reason: emulation cannot
 produce the input. If a future change makes a faithful emulation available,
 reopening this is a new decision, not a bug fix.
+
+### D-167. A sketchpad page owns three independent surface documents
+
+The multi-page feature needed a data model, and the two candidates were a page
+bound to exactly one paper type or a page that carries all three. The second
+won: a page is a named entity holding an independent content document per
+surface (blank, grid, graph), and it remembers which surface it is showing.
+Strokes, typed lines, graph objects, shades, OCR blocks, and the undo log all
+live per (page, surface). Switching paper inside a page therefore swaps to
+that surface's own content, which is the fix for the long-standing bleed where
+flipping Plain to Grid kept the same ink on screen. The old behavior was
+deliberate ("Background changes must not touch strokes") and is deliberately
+reversed here: surfaces are now different sheets, not different lighting on
+one sheet. One page can appear in at most one split pane at a time; the pane
+picker swaps rather than duplicates.
+
+### D-168. The store stays a singleton; panes get their page through context
+
+Split view needs 2 to 4 canvases showing different pages at once, which read
+naturally as "make the Zustand store a per-page factory". Rejected: the
+singleton is bound in roughly fourteen places in PracticePanel alone
+(getState, subscribe, the D-156 choreography), two module functions
+(snapshotSketch, commitGraphPoint) reach it directly, and every store test
+drives the module singleton. Instead the one store now keys content under
+`pages`, and a small PaneContext supplies { pageId, scale } to the component
+subtree inside each pane. Content actions take an explicit pageId. This keeps
+the locked "Zustand only for the practice-session sketchpad" decision intact
+and leaves the persistence and submit paths pointed at one store.
+
+### D-169. Pages are per-problem work, saved as a versioned v2 stateJson
+
+Pages persist inside the existing ProblemWork row (D-156), not in a new table
+and not in localStorage: the sketchpad only mounts in Practice, work is
+already keyed by problem, and the flush-before-reset choreography already
+exists. The saved shape becomes version 2: { version: 2, activePageId, pages
+[1..8], answer }, with per-surface content per page. Old v1 rows (flat,
+versionless) migrate in memory on read: strokes, typed lines, and OCR blocks
+become Page 1 content on the surface the row saved as `background`, while
+graph objects and shades go to Page 1's graph surface unconditionally, because
+that is the only surface that renders or grades them and a v1 row could have
+been saved while parked on any background. Nothing is dropped; both parses
+failing still degrades to a fresh canvas. Stroke points round to 2 decimals on
+serialize so a full 8-page problem stays far from the route's 4MB cap. Split
+layout is session view state: never persisted, cleared on problem change.
+
+### D-170. The active page is the single authority for submit, OCR, and grading
+
+With multiple pages, "the canvas" is ambiguous for the attempt snapshot, Clean
+up, and graph grading. The rule: the active page answers. The snapshot
+composites the active page's active surface; Clean up reads the active page's
+active surface ink; typed lines and OCR blocks ride the attempt from the
+active page's active surface; graph grading reads the active page's graph
+surface, and D-154's force-to-graph now sets the active page's surface. One
+guarded edge: on a graph-answer problem, if the active page's graph surface is
+empty while another page's graph surface has objects, submit refuses with copy
+naming that page ("Your graph is on Page 1. Switch to it to submit.") instead
+of silently grading an empty or wrong surface. What is visible on the active
+page is what is submitted, with no silent surprises.
+
+### D-171. Caps: 8 pages, unchanged per-surface limits
+
+Eight pages per problem, enforced in the store and the v2 zod schema. The
+existing per-surface caps (200 strokes, 200 typed lines, 100 graph objects, 4
+shades) apply per (page, surface), and the 4MB stateJson cap stays as the
+backstop. Split view caps at 4 panes by requirement, and at 2 rendered panes
+below lg, where measurement showed a 2x2 grid leaves each canvas around 120 to
+190px tall on a phone: too small to handwrite math. Compact split is two
+full-width panes stacked vertically; 3 and 4 panes are desktop layouts
+(columns for 3, a 2x2 grid for 4).
+
+### D-172. Split panes are scaled views; chrome never reflows mid-gesture
+
+Two rules keep split view honest. First, a pane is a scaled live view of its
+page, not a crop: each page records the canvas size it was last shown at
+unsplit (refSize, persisted, nullable), and a split pane renders the full
+layer stack at that size inside a scale(min(paneW/refW, paneH/refH, 1))
+transform, so ink drawn full-screen stays visible and attached to the graph
+objects it annotates. Manual pointer math divides by the scale. Second, chrome
+height is stable while split: the GraphRail row shows whenever any rendered
+pane is on graph paper (placement controls disable unless the active page is),
+because keying it to the active page made tapping a graph pane reflow every
+canvas under the user's finger. Pane activation rides pointerdown capture on
+the pane container so draw, type, and graph layers all inherit it; the page
+bar, toolbar, rail, undo, and Clean up always target the active page. The page
+bar itself is a paper strip (the kraft rule stays: toolbar and rail only),
+ordered toolbar, rail, page bar, canvases, with rename and split controls in a
+fixed right cluster anchored to the bar so the scrolling chip row never moves
+them.
