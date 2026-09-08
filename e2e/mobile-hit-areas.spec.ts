@@ -9,6 +9,7 @@ import {
 } from "./helpers/hitArea";
 import { servePracticeProblem } from "./helpers/practice";
 import { graphRailVisible, openSketchMode, setSketchBackground } from "./helpers/sketch";
+import { openTutorDrawer } from "./helpers/tutor";
 import { STATIC_ROUTES, discoverRoutes, type DiscoveredRoutes } from "./helpers/routes";
 import { settle } from "./helpers/settle";
 
@@ -76,11 +77,10 @@ for (const width of COMPACT_WIDTHS) {
       await settle(page);
 
       // The composer's Send sits next to the drawer's own controls, which is
-      // exactly the tight pairing D-071 is about.
-      const tutor = page.getByRole("button", { name: /tutor/i });
-      test.skip((await tutor.count()) === 0, "SKIPPED: no tutor control on this screen.");
-      await tutor.first().click();
-      await expect(page.locator("#tutor-drawer")).toBeVisible();
+      // exactly the tight pairing D-071 is about. Opened through the shared
+      // helper so this waits for the slide to settle too: probing a drawer
+      // that is still animating measures hit areas at a transient position.
+      await openTutorDrawer(page);
       await settle(page);
 
       const report = await probeHitAreas(page);
