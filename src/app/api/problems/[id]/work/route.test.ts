@@ -29,15 +29,41 @@ const post = (body: unknown) =>
     params,
   );
 
-const state: ProblemWorkState = {
-  strokes: [{ id: "s1", points: [[1, 2, 0.5]], width: "M", color: "ink" }],
+// Field order matches the zod schema's shape order, so the POST assertion's
+// JSON.stringify(state) is byte-identical to what the route stores after
+// parsing.
+const emptySurface: ProblemWorkState["pages"][number]["content"]["blank"] = {
+  strokes: [],
   typedLines: [],
   graphObjects: [],
   graphShades: [],
-  graphStep: 1,
-  background: "graph",
-  mode: "draw",
   ocrBlocks: null,
+};
+
+const state: ProblemWorkState = {
+  version: 2,
+  activePageId: "p1",
+  pages: [
+    {
+      id: "p1",
+      name: "Page 1",
+      surface: "graph",
+      mode: "draw",
+      graphStep: 1,
+      refSize: null,
+      content: {
+        blank: { ...emptySurface },
+        grid: { ...emptySurface },
+        graph: {
+          strokes: [{ id: "s1", points: [[1, 2, 0.5]], width: "M", color: "ink" }],
+          typedLines: [],
+          graphObjects: [],
+          graphShades: [],
+          ocrBlocks: null,
+        },
+      },
+    },
+  ],
   answer: { single: "", parts: {} },
 };
 

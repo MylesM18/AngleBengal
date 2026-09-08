@@ -41,11 +41,34 @@ export function axisLabelInterval(step: number): number {
   return GRID_PX / step >= 30 ? 1 : 5;
 }
 
-/** Set by GraphLayer while mounted, so the composite can read the live board
+/** What a mounted GraphLayer exposes so the composite can read the live board
  *  SVG and the shading canvas without a dependency cycle. */
-export const graphLayerSource: {
-  current: { svg: () => string | null; shadeCanvas: () => HTMLCanvasElement | null } | null;
-} = { current: null };
+export type GraphLayerSource = {
+  svg: () => string | null;
+  shadeCanvas: () => HTMLCanvasElement | null;
+};
+
+/**
+ * One source per page, registered by that page's GraphLayer while mounted.
+ * Split view mounts several GraphLayers at once (D-172), so the old one-slot
+ * singleton would have let the last pane to mount overwrite every other
+ * page's source; the Map keeps them apart, keyed by pageId (A7).
+ */
+const graphLayerSources = new Map<string, GraphLayerSource>();
+
+export function registerGraphLayerSource(pageId: string, source: GraphLayerSource): void {
+  graphLayerSources.set(pageId, source);
+}
+
+/** Identity-guarded: a stale layer unmounting must not clobber a fresh
+ *  registration another mount already made under the same page id. */
+export function unregisterGraphLayerSource(pageId: string, source: GraphLayerSource): void {
+  if (graphLayerSources.get(pageId) === source) graphLayerSources.delete(pageId);
+}
+
+export function getGraphLayerSource(pageId: string): GraphLayerSource | null {
+  return graphLayerSources.get(pageId) ?? null;
+}
 
 /** Sets up a devicePixelRatio-aware backing store and returns the context. */
 export function prepareCanvas(
@@ -269,9 +292,19 @@ export async function compositeToPng(
     typedPlainLines?: string[];
     maxWidth?: number;
     axisLabels?: { step: number } | null;
+    /** The page's graph layer source, from getGraphLayerSource. Explicit so
+     *  this function stays pure over its inputs: with split view mounting one
+     *  GraphLayer per pane, only the caller knows which page it is
+     *  compositing. */
+    graphSource?: GraphLayerSource | null;
   } = {},
 ): Promise<string | null> {
-  const { typedPlainLines = [], maxWidth = 1600, axisLabels = null } = options;
+  const {
+    typedPlainLines = [],
+    maxWidth = 1600,
+    axisLabels = null,
+    graphSource = null,
+  } = options;
   if (cssWidth <= 0 || cssHeight <= 0) return null;
 
   const scale = Math.min(1, maxWidth / cssWidth) * (window.devicePixelRatio || 1);
@@ -285,10 +318,9 @@ export async function compositeToPng(
 
   paintBackground(context, background, cssWidth, cssHeight, axisLabels);
 
-  // Graph mode's shading and drawn objects sit between the background and
-  // the ink, so a student's pen marks always sit on top (registered by
-  // GraphLayer while mounted; null outside Graph mode or before it mounts).
-  const graphSource = graphLayerSource.current;
+  // Graph paper's shading and drawn objects sit between the background and
+  // the ink, so a student's pen marks always sit on top (passed by the caller
+  // via options.graphSource; null off graph paper or before the layer mounts).
   if (graphSource) {
     try {
       const shadeCanvas = graphSource.shadeCanvas();

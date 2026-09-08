@@ -8,16 +8,26 @@ import { SymbolPalette } from "@/components/math/SymbolPalette";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { cx } from "@/lib/cx";
 import { TYPED_LINE_HEIGHT } from "@/lib/sketch/render";
-import { useSketchStore } from "@/lib/sketch/store";
+import { usePanePageId } from "@/components/sketchpad/PaneContext";
+import { usePage, useSketchStore, useSurfaceContent } from "@/lib/sketch/store";
 
 /**
  * The stacked typed-solution layer (spec Q2). Only the active line is a live
  * MathField; inactive lines render as static KaTeX. In draw mode the layer is
  * pointer-transparent so ink lands beneath it.
+ *
+ * The layer is interactive only when its page is the ACTIVE page (A14):
+ * MathLive's machinery (virtual keyboard, document-level pointerdown
+ * listener) is global, so exactly one pane may host a live math field at a
+ * time. A non-active split pane renders every line as static KaTeX with
+ * pointer events disabled; the first tap activates the pane through the pane
+ * container's capture handler, the second tap edits.
  */
 export function TypedLinesLayer() {
-  const mode = useSketchStore((state) => state.mode);
-  const typedLines = useSketchStore((state) => state.typedLines);
+  const pageId = usePanePageId();
+  const page = usePage(pageId);
+  const typedLines = useSurfaceContent(pageId).typedLines;
+  const activePageId = useSketchStore((state) => state.activePageId);
   const activeLineId = useSketchStore((state) => state.activeLineId);
   const toolset = useSketchStore((state) => state.toolset);
   const addTypedLineAfter = useSketchStore((state) => state.addTypedLineAfter);
@@ -29,28 +39,29 @@ export function TypedLinesLayer() {
   const fieldRef = useRef<MathfieldElement | null>(null);
   const palette = useMemo(() => toolset?.palette ?? [], [toolset]);
 
-  const typing = mode === "type";
+  const interactive = pageId === activePageId;
+  const typing = page.mode === "type";
 
   return (
     <div
       className={cx(
         "absolute inset-0 touch-manipulation overflow-y-auto overscroll-contain",
-        typing ? "" : "pointer-events-none",
+        interactive && typing ? "" : "pointer-events-none",
       )}
-      // In type mode this whole layer is the typing surface: tapping the
-      // paper starts or activates a line, so it must not dismiss the math
-      // keyboard on the way (keyboardDismiss.ts). Inert in draw mode, where
-      // pointer events pass through to the ink canvas.
+      // In type mode on the active page this whole layer is the typing
+      // surface: tapping the paper starts or activates a line, so it must not
+      // dismiss the math keyboard on the way (keyboardDismiss.ts). Inert in
+      // draw mode and in non-active panes, where pointer events pass through.
       data-keep-math-keyboard=""
       onClick={(event) => {
         // A click on empty paper in type mode starts the first line, or a new
         // trailing line when the last one already has content.
-        if (!typing || event.target !== event.currentTarget) return;
+        if (!interactive || !typing || event.target !== event.currentTarget) return;
         const last = typedLines[typedLines.length - 1];
         if (!last) {
-          addTypedLineAfter(null);
+          addTypedLineAfter(pageId, null);
         } else if (last.latex.trim()) {
-          addTypedLineAfter(last.id);
+          addTypedLineAfter(pageId, last.id);
         } else {
           setActiveLine(last.id);
         }
@@ -66,7 +77,13 @@ export function TypedLinesLayer() {
       )}
       <ol className="flex flex-col" style={{ paddingTop: 19, paddingLeft: 19 }}>
         {typedLines.map((line, index) => {
-          const active = typing && line.id === activeLineId && status === "ready";
+          const active =
+            interactive && typing && line.id === activeLineId && status === "ready";
+          const rendered = line.latex.trim() ? (
+            <MarkdownMath variant="ui">{`$${line.latex}$`}</MarkdownMath>
+          ) : (
+            <span className="font-mono text-meta text-ink-faint">empty line</span>
+          );
           return (
             <li
               key={line.id}
@@ -79,16 +96,16 @@ export function TypedLinesLayer() {
               {active ? (
                 <MathField
                   value={line.latex}
-                  onChange={(latex) => updateTypedLine(line.id, latex)}
-                  onEnter={() => addTypedLineAfter(line.id)}
-                  onEmptyBackspace={() => removeTypedLine(line.id)}
+                  onChange={(latex) => updateTypedLine(pageId, line.id, latex)}
+                  onEnter={() => addTypedLineAfter(pageId, line.id)}
+                  onEmptyBackspace={() => removeTypedLine(pageId, line.id)}
                   compact
                   autoFocus
                   keyboardVariant="lines"
                   ariaLabel={`Solution line ${index + 1}`}
                   mathfieldRef={fieldRef}
                 />
-              ) : (
+              ) : interactive ? (
                 <button
                   type="button"
                   disabled={!typing}
@@ -96,18 +113,19 @@ export function TypedLinesLayer() {
                   className="min-h-[30px] rounded-input px-1 text-left text-ui text-ink"
                   aria-label={`Edit solution line ${index + 1}`}
                 >
-                  {line.latex.trim() ? (
-                    <MarkdownMath variant="ui">{`$${line.latex}$`}</MarkdownMath>
-                  ) : (
-                    <span className="font-mono text-meta text-ink-faint">empty line</span>
-                  )}
+                  {rendered}
                 </button>
+              ) : (
+                // Non-active pane: read-only KaTeX, no button semantics (A14).
+                <span className="min-h-[30px] px-1 text-left text-ui text-ink">
+                  {rendered}
+                </span>
               )}
             </li>
           );
         })}
       </ol>
-      {typing && activeLineId && status === "ready" && (
+      {interactive && typing && activeLineId && status === "ready" && (
         <div className="pointer-events-auto sticky bottom-0 border-t border-hairline bg-paper-0/95 px-3 py-2">
           <SymbolPalette
             ids={palette}

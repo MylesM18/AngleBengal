@@ -9,10 +9,13 @@ import {
   prepareCanvas,
   strokesNear,
 } from "@/lib/sketch/render";
+import { usePane } from "@/components/sketchpad/PaneContext";
 import {
   INK_COLORS,
   STROKE_SIZES,
+  usePage,
   useSketchStore,
+  useSurfaceContent,
   type StrokePoint,
 } from "@/lib/sketch/store";
 
@@ -42,12 +45,19 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
 
   const [size, setSize] = useState<Size>({ width: 0, height: 0 });
 
-  const strokes = useSketchStore((state) => state.strokes);
-  const background = useSketchStore((state) => state.background);
+  // Which page this canvas renders (D-168): the pane provides it, and outside
+  // split it is the active page. `scale` is the A15 pane render scale; all
+  // pointer math below divides by it so stroke coordinates stay in the page's
+  // reference space no matter how small the pane is drawn.
+  const { pageId, scale } = usePane();
+  const page = usePage(pageId);
+  const content = useSurfaceContent(pageId);
+  const strokes = content.strokes;
+  const background = page.surface;
+  const graphStep = page.graphStep;
   const tool = useSketchStore((state) => state.tool);
   const width = useSketchStore((state) => state.width);
   const color = useSketchStore((state) => state.color);
-  const graphStep = useSketchStore((state) => state.graphStep);
   const addStroke = useSketchStore((state) => state.addStroke);
   const eraseStrokes = useSketchStore((state) => state.eraseStrokes);
 
@@ -95,8 +105,12 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
    */
   const applySize = useCallback(
     (element: HTMLDivElement) => {
-      const box = element.getBoundingClientRect();
-      const next = { width: Math.floor(box.width), height: Math.floor(box.height) };
+      // offsetWidth/offsetHeight, not getBoundingClientRect: a split pane
+      // draws this whole stack inside a CSS transform: scale() wrapper (A15),
+      // and the bounding rect reports the scaled visual box. The backing
+      // store must match the LAYOUT size (the page's reference space), which
+      // offset dimensions report regardless of transforms.
+      const next = { width: element.offsetWidth, height: element.offsetHeight };
       if (next.width === 0 || next.height === 0) return;
       setSize((previous) =>
         previous.width === next.width && previous.height === next.height ? previous : next,
@@ -198,10 +212,25 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
     // pointerType "mouse" reports 0.5 or 0; only trust real pen pressure.
     const pressure =
       event.pointerType === "pen" && event.pressure > 0 ? event.pressure : 0.5;
-    return [event.clientX - rect.left, event.clientY - rect.top, pressure];
+    // The rect is the visual (possibly transform-scaled) box, so dividing the
+    // offset by the pane scale maps the sample back into reference space
+    // (A15). Scale is 1 outside split, where this is a no-op.
+    return [
+      (event.clientX - rect.left) / scale,
+      (event.clientY - rect.top) / scale,
+      pressure,
+    ];
   }
 
   function onPointerDown(event: React.PointerEvent<HTMLCanvasElement>) {
+    // The canvas never draws in type mode, on any page. Read from the store
+    // at event time, not the subscribed `page`: in a non-active split pane
+    // whose page is in type mode, the typed layer is pointer-events-none
+    // (A14), so the activation tap falls THROUGH to this canvas, and without
+    // the gate it would commit a one-point stroke (or erase with the eraser)
+    // on a surface the user only meant to activate. Draw-mode panes keep
+    // draw-on-first-touch; that is designed behavior (A14).
+    if (useSketchStore.getState().pages[pageId]?.mode === "type") return;
     // A real pen locks out touch for the rest of the session: once the
     // student is known to have a Pencil, an incoming touch pointer while
     // they are writing is the palm resting on the glass, not a second hand
@@ -240,7 +269,7 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
 
     if (tool === "eraser") {
       drawing.current = true;
-      eraseStrokes(strokesNear(strokes, point[0], point[1], ERASER_RADIUS));
+      eraseStrokes(pageId, strokesNear(strokes, point[0], point[1], ERASER_RADIUS));
       return;
     }
 
@@ -257,13 +286,14 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
     const point = pointFrom(event);
 
     if (tool === "eraser") {
-      const hit = strokesNear(
-        useSketchStore.getState().strokes,
-        point[0],
-        point[1],
-        ERASER_RADIUS,
-      );
-      if (hit.length) eraseStrokes(hit);
+      // Fresh read: the subscribed `strokes` can lag a fast drag by a render.
+      const state = useSketchStore.getState();
+      const livePage = state.pages[pageId];
+      const liveStrokes = livePage ? livePage.content[livePage.surface].strokes : [];
+      // ERASER_RADIUS is in reference space, like the points, so the hit test
+      // needs no scale correction of its own (A15).
+      const hit = strokesNear(liveStrokes, point[0], point[1], ERASER_RADIUS);
+      if (hit.length) eraseStrokes(pageId, hit);
       return;
     }
 
@@ -278,9 +308,10 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
       for (const sample of samples) {
         const pressure =
           event.pointerType === "pen" && sample.pressure > 0 ? sample.pressure : 0.5;
+        // Same visual-to-reference mapping as pointFrom (A15).
         current.current.push([
-          sample.clientX - rect.left,
-          sample.clientY - rect.top,
+          (sample.clientX - rect.left) / scale,
+          (sample.clientY - rect.top) / scale,
           pressure,
         ]);
       }
@@ -328,7 +359,7 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
     releasePointer(event.currentTarget, event.pointerId);
 
     if (tool === "pen" && current.current.length > 0) {
-      addStroke(current.current);
+      addStroke(pageId, current.current);
       current.current = [];
       const context = liveRef.current?.getContext("2d");
       context?.clearRect(0, 0, size.width, size.height);
@@ -349,7 +380,7 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
         className="absolute inset-0 touch-none"
         style={{ cursor: tool === "eraser" ? "cell" : "crosshair" }}
         role="img"
-        aria-label={`Scratch canvas. ${strokes.length} stroke${
+        aria-label={`Scratch canvas, ${page.name}. ${strokes.length} stroke${
           strokes.length === 1 ? "" : "s"
         } drawn. Tool: ${tool}, ${STROKE_SIZES[width]}px, ${color} ink, ${background} background.`}
       />

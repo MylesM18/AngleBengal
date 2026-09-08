@@ -15,6 +15,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { cx } from "@/lib/cx";
 import {
+  activePage,
   INK_COLORS,
   STROKE_SIZES,
   useSketchStore,
@@ -31,6 +32,10 @@ import {
  * left, Undo and Clear (with its confirm popover) in the middle, the one
  * "Clean up" button on the right. Cmd/Ctrl+Z undoes while focus is inside
  * the element marked `data-sketchpad` (the Sketchpad root).
+ *
+ * Every control here drives the ACTIVE page (D-172): mode, surface, undo and
+ * clear all read and write the page the toolbar's selectors follow, so in
+ * split view a pane must be activated (tapped) before the strip acts on it.
  */
 
 const MODES: { value: SketchMode; label: string }[] = [
@@ -51,7 +56,7 @@ const BACKGROUNDS: { value: Background; label: string; icon: IconName | null }[]
   { value: "graph", label: "Graph", icon: "graph" },
 ];
 
-const CLEAR_QUESTION = "Clear the whole canvas? This cannot be undone.";
+const CLEAR_QUESTION = "Clear this surface? This cannot be undone.";
 
 function isTextEntry(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -69,18 +74,24 @@ export function SketchToolbar({
   cleaning: boolean;
   onCleanUp: () => void;
 }) {
-  const mode = useSketchStore((state) => state.mode);
+  // Mode, surface, and the empty check all follow the ACTIVE page; tool,
+  // width, and ink stay session-global (they describe the hand, not a page).
+  const activePageId = useSketchStore((state) => state.activePageId);
+  const mode = useSketchStore((state) => activePage(state).mode);
   const tool = useSketchStore((state) => state.tool);
   const width = useSketchStore((state) => state.width);
   const color = useSketchStore((state) => state.color);
-  const background = useSketchStore((state) => state.background);
-  const strokeCount = useSketchStore((state) => state.strokes.length);
+  const background = useSketchStore((state) => activePage(state).surface);
+  const strokeCount = useSketchStore((state) => {
+    const page = activePage(state);
+    return page.content[page.surface].strokes.length;
+  });
 
   const setMode = useSketchStore((state) => state.setMode);
   const setTool = useSketchStore((state) => state.setTool);
   const setWidth = useSketchStore((state) => state.setWidth);
   const setColor = useSketchStore((state) => state.setColor);
-  const setBackground = useSketchStore((state) => state.setBackground);
+  const setSurface = useSketchStore((state) => state.setSurface);
   const undo = useSketchStore((state) => state.undo);
   const clear = useSketchStore((state) => state.clear);
   const mathLive = useMathLive();
@@ -97,15 +108,15 @@ export function SketchToolbar({
     clearWrapRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
   }, []);
 
-  function keepCanvas() {
+  function keepSurface() {
     setClearOpen(false);
     focusClearChip();
   }
 
-  function clearCanvas() {
-    clear();
+  function clearSurface() {
+    clear(activePageId);
     setClearOpen(false);
-    // The Clear chip is disabled once the canvas is empty, so focus goes to
+    // The Clear chip is disabled once the surface is empty, so focus goes to
     // the sketchpad root instead of a control that can no longer take it.
     stripRef.current
       ?.closest<HTMLElement>("[data-sketchpad]")
@@ -115,7 +126,7 @@ export function SketchToolbar({
   function onPopoverKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (event.key !== "Escape") return;
     event.stopPropagation();
-    keepCanvas();
+    keepSurface();
   }
 
   function onBackgroundKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -129,7 +140,7 @@ export function SketchToolbar({
     event.preventDefault();
     const index = BACKGROUNDS.findIndex((item) => item.value === background);
     const nextIndex = (index + delta + BACKGROUNDS.length) % BACKGROUNDS.length;
-    setBackground(BACKGROUNDS[nextIndex].value);
+    setSurface(activePageId, BACKGROUNDS[nextIndex].value);
     event.currentTarget
       .querySelectorAll<HTMLButtonElement>('[role="radio"]')
       [nextIndex]?.focus();
@@ -162,7 +173,8 @@ export function SketchToolbar({
       if (!root.contains(document.activeElement)) return;
       if (isTextEntry(event.target)) return;
       event.preventDefault();
-      useSketchStore.getState().undo();
+      const state = useSketchStore.getState();
+      state.undo(state.activePageId);
     };
     root.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("keydown", onKeyDown);
@@ -202,7 +214,7 @@ export function SketchToolbar({
           <button
             key={value}
             type="button"
-            onClick={() => setMode(value)}
+            onClick={() => setMode(activePageId, value)}
             aria-pressed={mode === value}
             disabled={value === "type" && mathLive.status === "failed"}
             title={
@@ -320,7 +332,7 @@ export function SketchToolbar({
               role="radio"
               aria-checked={checked}
               tabIndex={checked ? 0 : -1}
-              onClick={() => setBackground(value)}
+              onClick={() => setSurface(activePageId, value)}
               className={chipClasses({ variant: "toggle", active: checked })}
             >
               {icon ? (
@@ -338,7 +350,7 @@ export function SketchToolbar({
           floor: same reasoning as the Background group above, no widening
           needed. */}
       <div className="flex gap-1">
-        <Chip variant="action" icon="undo" onClick={undo} disabled={empty}>
+        <Chip variant="action" icon="undo" onClick={() => undo(activePageId)} disabled={empty}>
           Undo
         </Chip>
 
@@ -421,7 +433,7 @@ export function SketchToolbar({
                   <Button
                     size="sm"
                     variant="destructive"
-                    onClick={clearCanvas}
+                    onClick={clearSurface}
                     className="max-lg:tap-target"
                   >
                     Clear
@@ -429,7 +441,7 @@ export function SketchToolbar({
                   <Button
                     size="sm"
                     variant="tertiary"
-                    onClick={keepCanvas}
+                    onClick={keepSurface}
                     className="max-lg:tap-target"
                   >
                     Keep

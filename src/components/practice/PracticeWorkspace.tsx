@@ -216,9 +216,11 @@ export function PracticeWorkspace({
         server and every desktop client render exactly today's markup. The
         `isDesktop !== false` guard only bites after a compact client has
         hydrated, and then it genuinely unmounts this canvas: two live
-        SketchCanvas instances would take turns writing `canvasSize` into the
-        sketch store, and whichever measured last would decide what OCR and
-        the attempt snapshot composite.
+        SketchCanvas instances showing the same page would take turns writing
+        that page's `canvasSizes` entry (and its refSize) into the sketch
+        store, and whichever measured last would decide what OCR and the
+        attempt snapshot composite. Split panes are fine because each pane
+        renders a different page; a second whole Sketchpad is not.
       */}
       {isDesktop !== false && (
         <Sheet
