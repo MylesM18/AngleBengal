@@ -2940,3 +2940,39 @@ the harm D-071 names. A point that lands on a plain container is reported as a
 shortened hit area and does not fail, because the tap does nothing rather than
 something wrong. Clean up still spills its last few pixels onto the rail's
 background or the canvas, and that is the reported, non failing case.
+
+### D-165. The visual viewport probe holds the resting state, not the pinch
+
+Mobile fix plan Appendix A rung 1 asks for `visualViewport.scale === 1` at
+rest. Adding it needed a decision about what it can honestly claim, because
+the obvious version of this assertion is one that can never fail.
+
+**What it proves.** Browser emulation cannot pinch. Nothing in the rig can
+drive a real two finger gesture, so this does NOT verify that pinch zoom
+behaves well, and that stays a real device item on the owner's checklist,
+where it has been since the plan was written. What DOES regress silently in
+code is the other half: a page that comes to rest already zoomed or panned,
+which is the shape a page takes when it has loaded zoomed out to fit content
+too wide for it. So the probe asserts three numbers per route, at both compact
+widths: `scale` within 0.01 of 1, the visual viewport within 1px of the layout
+viewport, and both offsets at 0. The width comparison is the load bearing one:
+it catches the "loaded zoomed out to fit" case even where a scale reading
+would not.
+
+**How it is kept honest.** `scale === 1` would otherwise be the weakest
+assertion in the rig, passing identically on a healthy page and on a probe
+that had silently stopped reading anything. Chromium's DevTools Protocol can
+set the page scale factor directly, which is the same quantity a pinch drives,
+so `visual-viewport-detector.chromium.spec.ts` zooms a real page to 2x and
+asserts that `expectAtRest`, the exact function the route tests call, throws,
+then resets and asserts it passes again. Calling the shipped assertion rather
+than a copy of its checks is the point: a proof written against a parallel
+implementation would only show that the parallel implementation works.
+
+**Why a file name, not a skip.** WebKit exposes no CDP equivalent, so that
+detector is Chromium only. It is excluded from the WebKit project by the
+`.chromium.spec.ts` suffix in `playwright.config.ts` rather than skipped at
+run time, because this rig's output is only readable while a skip means
+something is genuinely missing (an empty library, no generated document). A
+standing skip for a permanent engine limitation would erode that, and the next
+real skip would be read as noise.
