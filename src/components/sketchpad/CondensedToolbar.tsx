@@ -8,6 +8,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
+import type { MathfieldElement } from "mathlive";
 
 import { Button } from "@/components/ui/Button";
 import { Chip, chipClasses } from "@/components/ui/Chip";
@@ -104,6 +105,10 @@ export function CondensedToolbar({
   /** null closed; "menu" the parked controls; "confirm" the Clear ask. */
   const [moreOpen, setMoreOpen] = useState<"menu" | "confirm" | null>(null);
   const clearTitleId = useId();
+  /** The math field this popover's open blurred, if any: see
+   *  suppressKeyboardAutoHide below. Restored to "auto" the moment the
+   *  popover closes. */
+  const suppressedFieldRef = useRef<MathfieldElement | null>(null);
 
   const empty = strokeCount === 0;
 
@@ -141,11 +146,59 @@ export function CondensedToolbar({
       [nextIndex]?.focus();
   }
 
+  /**
+   * Opening this popover moves focus off whatever math field the user was
+   * typing in (the trigger's own click/tap focus-shift, then the popover's
+   * own focus-on-open below). MathLive's "auto" keyboard policy reacts to
+   * that blur on its own: mathlive 0.110's VirtualKeyboard registers a
+   * document-level "focusout" listener (confirmed by reading
+   * node_modules/mathlive/mathlive.mjs) that, whenever a MATH-FIELD blurs
+   * and its mathVirtualKeyboardPolicy is not "manual", starts a 300ms timer
+   * which TEARS DOWN the whole keyboard element if no math field is focused
+   * when the timer fires. That is invisible to this app's own dismiss
+   * wiring: useKeyboardInset reads the real element's geometry, so its
+   * removal drops insetBottom to 0, condensedLayoutActive flips false, and
+   * Sketchpad swaps this whole toolbar back out for SketchToolbar mid
+   * interaction, taking the popover the user just opened down with it. The
+   * data-keep-math-keyboard marker on the strip root does not help here: it
+   * only blocks this app's OWN pointerdown dismiss listener
+   * (installKeyboardDismiss, MathField.tsx), a different path than
+   * MathLive's native focus-driven auto-hide.
+   *
+   * The gate that 300ms timer checks (field.mathVirtualKeyboardPolicy !==
+   * "manual") is read SYNCHRONOUSLY the instant the field's focusout fires,
+   * so flipping it has to happen before that fires, not after. Called from
+   * the trigger's pointerdown below, which (per spec, and per the standard
+   * "preventDefault() a mousedown to stop it focusing the target" pattern)
+   * always runs before a mousedown's own default focus-shift, so it wins the
+   * race on engines that move focus to a clicked button on press; called
+   * again from the top of the popover-open effect below as a second-chance
+   * fallback for engines that do not shift focus to a plain button on click
+   * at all, where the field is instead still focused at that point.
+   *
+   * Scoped to the ONE field instance that was actually focused, not a
+   * global default: MathField.tsx's own comment records that an earlier
+   * "manual" policy applied everywhere suppressed every keyboard. Restored
+   * to "auto" the moment the popover closes (the effect's cleanup below),
+   * so every other dismiss path, the Draw button's explicit
+   * mathVirtualKeyboard.hide() above, the outside-tap listener below, a real
+   * OS keyboard, is untouched: none of them wait on this gate, they call
+   * hide() directly.
+   */
+  function suppressKeyboardAutoHide(): void {
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || active.tagName !== "MATH-FIELD") return;
+    const field = active as MathfieldElement;
+    field.mathVirtualKeyboardPolicy = "manual";
+    suppressedFieldRef.current = field;
+  }
+
   // Open-popover discipline (SketchToolbar/PageBar precedent, A18): focus
   // moves into the popover on open, and a pointerdown outside popover and
   // trigger closes it without moving focus.
   useEffect(() => {
     if (!moreOpen) return;
+    suppressKeyboardAutoHide();
     if (moreOpen === "confirm") {
       // Confirm view: the last button is Keep, the safe default.
       const buttons = popoverRef.current?.querySelectorAll<HTMLButtonElement>("button");
@@ -162,7 +215,15 @@ export function CondensedToolbar({
       setMoreOpen(null);
     }
     document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      // Restore whatever field this popover session suppressed, so the next
+      // ordinary blur (no More popover involved) goes back to MathLive's
+      // normal auto-hide behavior instead of staying manual forever.
+      const field = suppressedFieldRef.current;
+      suppressedFieldRef.current = null;
+      if (field?.isConnected) field.mathVirtualKeyboardPolicy = "auto";
+    };
   }, [moreOpen]);
 
   return (
@@ -209,6 +270,7 @@ export function CondensedToolbar({
         type="button"
         aria-haspopup="dialog"
         aria-expanded={moreOpen !== null}
+        onPointerDown={suppressKeyboardAutoHide}
         onClick={() => setMoreOpen((open) => (open ? null : "menu"))}
         className={chipClasses({ variant: "action" })}
       >

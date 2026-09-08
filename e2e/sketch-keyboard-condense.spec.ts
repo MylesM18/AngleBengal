@@ -57,6 +57,38 @@ async function openTypedSketch(page: Page): Promise<void> {
   await setSketchMode(page, "Type");
 }
 
+/**
+ * Waits for the just-created typed line's math field to hold REAL, SETTLED
+ * DOM focus, not just a transient one. startTypedLine's own postcondition
+ * only waits for the math-field element to EXIST, not for it to hold focus:
+ * MathfieldElement's autoFocus lands asynchronously, and diagnosis here
+ * (temporary console instrumentation in MathField.tsx's mount effect,
+ * reverted) showed it can mount, unmount, and remount several times in a
+ * row before it settles, each cycle passing through a real blur. That
+ * mirrors MathField.tsx's own documented note that a second math field
+ * mounting right after a prior one unmounts is fragile (elsewhere in this
+ * spec that same pattern crashes iphone-webkit outright); on Chromium it
+ * does not crash, it just leaves the field genuinely unfocused for whichever
+ * remount happens to be live. A single toBeFocused() can resolve on one of
+ * the transient true reads mid churn, which is not the same as the churn
+ * having stopped. Requiring several agreeing reads in a row, spaced by
+ * expect.poll's own ticks so this spans real wall-clock time rather than a
+ * handful of back-to-back synchronous reads, confirms it actually has.
+ */
+async function waitForSettledMathFieldFocus(page: Page): Promise<void> {
+  let consecutive = 0;
+  await expect
+    .poll(
+      async () => {
+        const tag = await page.evaluate(() => document.activeElement?.tagName ?? null);
+        consecutive = tag === "MATH-FIELD" ? consecutive + 1 : 0;
+        return consecutive;
+      },
+      { message: "The typed line's math field never settled into stable focus." },
+    )
+    .toBeGreaterThanOrEqual(5);
+}
+
 /** Split 2 with the BOTTOM pane active and a live math field in it, then the
  *  keyboard up: the exact condensed-trigger geometry. Page 2 is auto-created
  *  by the split and inherits Type mode from Page 1 (store contract A10). */
@@ -78,6 +110,7 @@ async function condense(page: Page) {
 
   // Second tap starts line 1 in the bottom pane and mounts the math field.
   await startTypedLine(page, 1);
+  await waitForSettledMathFieldFocus(page);
   await showMathKeyboard(page);
 
   // Condensed: slim toolbar in, PageBar out.
