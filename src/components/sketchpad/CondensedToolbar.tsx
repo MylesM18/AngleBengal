@@ -72,6 +72,53 @@ function dismissMathKeyboard(): void {
   if (active instanceof HTMLElement && active.tagName === "MATH-FIELD") active.blur();
 }
 
+/**
+ * The minimal shape restoreSuppressedField and settleAbortedTap need from a
+ * math field: exported as its own type (I1, final-review.md) so the
+ * regression test can build a fake field without pulling in real MathLive
+ * DOM machinery.
+ */
+export type SuppressibleField = Pick<MathfieldElement, "isConnected" | "mathVirtualKeyboardPolicy">;
+
+/**
+ * Restores a field suppressed by suppressKeyboardAutoHide back to "auto".
+ * Idempotent: a ref that is already empty (restored already, or never
+ * suppressed) is a no-op. Exported and parameterized on a plain ref object
+ * rather than a closure over component state, so the I1 regression test can
+ * call it without mounting React or a DOM (final-review.md I1).
+ */
+export function restoreSuppressedField(fieldRef: { current: SuppressibleField | null }): void {
+  const field = fieldRef.current;
+  fieldRef.current = null;
+  if (field?.isConnected) field.mathVirtualKeyboardPolicy = "auto";
+}
+
+/**
+ * Settles an aborted tap on the More trigger (I1, final-review.md). A
+ * pointerdown that suppresses a field's auto-hide is not always followed by
+ * a click: the finger can slide off the chip and release, or the gesture
+ * can turn into a scroll and fire pointercancel. Call this from
+ * onPointerUp / onPointerCancel / onLostPointerCapture on the trigger: it
+ * restores the field one tick later UNLESS openedRef.current is already
+ * true, meaning a real click won the race first and the popover's own open
+ * effect (and its cleanup) now owns the restore instead. The deferral is
+ * what makes that race work: a genuine tap's click event is dispatched
+ * synchronously with pointerup, before this scheduled callback ever runs,
+ * so a real open always wins. schedule is injected (default
+ * setTimeout(run, 0)) so the regression test can drive the race with a fake
+ * scheduler instead of a live timer.
+ */
+export function settleAbortedTap(
+  openedRef: { current: boolean },
+  fieldRef: { current: SuppressibleField | null },
+  schedule: (run: () => void) => void = (run) => setTimeout(run, 0),
+): void {
+  schedule(() => {
+    if (openedRef.current) return;
+    restoreSuppressedField(fieldRef);
+  });
+}
+
 export function CondensedToolbar({
   cleaning,
   onCleanUp,
@@ -107,8 +154,13 @@ export function CondensedToolbar({
   const clearTitleId = useId();
   /** The math field this popover's open blurred, if any: see
    *  suppressKeyboardAutoHide below. Restored to "auto" the moment the
-   *  popover closes. */
+   *  popover closes, or sooner if the tap that suppressed it never turns
+   *  into a click (settleAbortedTap above, I1 final-review.md). */
   const suppressedFieldRef = useRef<MathfieldElement | null>(null);
+  /** True once a real click has followed the More trigger's pointerdown:
+   *  gates settleAbortedTap so it never undoes a genuine open (I1,
+   *  final-review.md). Reset to false at the start of every new press. */
+  const openedRef = useRef(false);
 
   const empty = strokeCount === 0;
 
@@ -184,6 +236,15 @@ export function CondensedToolbar({
    * mathVirtualKeyboard.hide() above, the outside-tap listener below, a real
    * OS keyboard, is untouched: none of them wait on this gate, they call
    * hide() directly.
+   *
+   * A pointerdown here is not always followed by a click (I1,
+   * final-review.md): the finger can slide off the chip and release, or the
+   * gesture can turn into a scroll and fire pointercancel instead. moreOpen
+   * would then never go truthy, so the effect below never runs and never
+   * restores the field. onPointerUp / onPointerCancel / onLostPointerCapture
+   * on the trigger call settleAbortedTap for exactly that case: it restores
+   * the field a tick later unless openedRef.current shows a real click won
+   * the race first.
    */
   function suppressKeyboardAutoHide(): void {
     const active = document.activeElement;
@@ -220,9 +281,7 @@ export function CondensedToolbar({
       // Restore whatever field this popover session suppressed, so the next
       // ordinary blur (no More popover involved) goes back to MathLive's
       // normal auto-hide behavior instead of staying manual forever.
-      const field = suppressedFieldRef.current;
-      suppressedFieldRef.current = null;
-      if (field?.isConnected) field.mathVirtualKeyboardPolicy = "auto";
+      restoreSuppressedField(suppressedFieldRef);
     };
   }, [moreOpen]);
 
@@ -270,8 +329,22 @@ export function CondensedToolbar({
         type="button"
         aria-haspopup="dialog"
         aria-expanded={moreOpen !== null}
-        onPointerDown={suppressKeyboardAutoHide}
-        onClick={() => setMoreOpen((open) => (open ? null : "menu"))}
+        onPointerDown={() => {
+          // A fresh press: the settle race from any earlier aborted tap is
+          // long since over, and this one has not produced a click yet.
+          openedRef.current = false;
+          suppressKeyboardAutoHide();
+        }}
+        onPointerUp={() => settleAbortedTap(openedRef, suppressedFieldRef)}
+        onPointerCancel={() => settleAbortedTap(openedRef, suppressedFieldRef)}
+        onLostPointerCapture={() => settleAbortedTap(openedRef, suppressedFieldRef)}
+        onClick={() => {
+          // Wins the settleAbortedTap race scheduled by onPointerUp above:
+          // a real click is dispatched synchronously with pointerup, before
+          // that setTimeout(0) callback ever runs.
+          openedRef.current = true;
+          setMoreOpen((open) => (open ? null : "menu"));
+        }}
         className={chipClasses({ variant: "action" })}
       >
         More
