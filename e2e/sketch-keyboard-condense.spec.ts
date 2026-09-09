@@ -70,7 +70,17 @@ test.afterEach(async ({ page }, testInfo) => {
   // there is nothing to reset and the Pages wait below would only turn the
   // skip into a failure.
   if (testInfo.status === "skipped") return;
-  await expect(page.getByRole("radiogroup", { name: "Pages" })).toBeVisible();
+  // Un-condense first, deterministically: the Pages radiogroup is hidden
+  // whenever the layout is condensed (Sketchpad.tsx:259), so a test that
+  // fails while condensed would otherwise time out on the wait below and
+  // skip resetSketchPages entirely, leaking that test's pages into the
+  // shared database for every later spec and run (final-review.md I3). Both
+  // catches below are deliberate: cleanup must run no matter why the test
+  // failed, and the test's own verdict already carries the failure.
+  await hideMathKeyboard(page).catch(() => {});
+  await expect(page.getByRole("radiogroup", { name: "Pages" }))
+    .toBeVisible()
+    .catch(() => {});
   await resetSketchPages(page);
   await page.waitForTimeout(2500);
 });
