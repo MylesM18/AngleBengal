@@ -41,6 +41,35 @@ test.beforeAll(async ({ browser }) => {
   await page.close();
 });
 
+// Symmetric with openTypedSketch's own resetSketchPages call: some tests in
+// this file add pages (addSketchPage) or grow a split (setSketchSplit) and
+// never remove them, which otherwise leaves extra pages on the served
+// problem in the shared database for later specs and runs to inherit.
+//
+// The Pages radiogroup wait matters, not just the reset: some tests end
+// right after hideMathKeyboard with no assertion of their own that the
+// condensed layout has finished exiting (the 200ms row animation noted
+// above condense()). resetSketchPages's first read, chips.count(), does not
+// retry the way toBeVisible() does, so calling it before that transition
+// settles can see zero chips and silently reset nothing.
+//
+// The trailing wait guards a second, separate gap: resetSketchPages's
+// deletions are store changes like any other, autosaved through the
+// PracticePanel subscription (buildWorkState) into noteProblemWork
+// (src/lib/resume/client.ts), which debounces the actual POST by
+// WORK_DEBOUNCE_MS (1500ms) from the last change. That flush otherwise only
+// fires early on pagehide/visibilitychange, and Playwright closing this
+// page for the next test does not reliably raise either, so without this
+// wait the reset's own deletions can lose the race and never reach the
+// server, leaving the pre-reset page count as the last saved state
+// (confirmed empirically: an isolated run of this file without the wait
+// left 2 of the pool's 4 problems at 2 pages despite every test passing).
+test.afterEach(async ({ page }) => {
+  await expect(page.getByRole("radiogroup", { name: "Pages" })).toBeVisible();
+  await resetSketchPages(page);
+  await page.waitForTimeout(2500);
+});
+
 /** Practice served, overlay open, one clean empty "Page 1", Type mode. */
 async function openTypedSketch(page: Page): Promise<void> {
   test.skip(
