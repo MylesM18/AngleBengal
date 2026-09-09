@@ -82,6 +82,27 @@ describe("clamping", () => {
     );
     expect(clamped).toEqual({ zoom: 1, offsetX: 0, offsetY: 0 });
   });
+
+  it("guards non-finite offsets to 0 instead of propagating NaN", () => {
+    const clamped = clampViewport(
+      { zoom: 2, offsetX: Number.NaN, offsetY: Number.POSITIVE_INFINITY },
+      REF,
+      FIT,
+      PANE,
+    );
+    expect(clamped.offsetX).toBe(0);
+    expect(clamped.offsetY).toBe(0);
+  });
+
+  it("never emits NaN in the transform after clamping a non-finite viewport", () => {
+    const clamped = clampViewport(
+      { zoom: Number.NaN, offsetX: Number.NaN, offsetY: Number.POSITIVE_INFINITY },
+      REF,
+      FIT,
+      PANE,
+    );
+    expect(paneTransform(FIT, clamped)).not.toContain("NaN");
+  });
 });
 
 describe("rubber band", () => {

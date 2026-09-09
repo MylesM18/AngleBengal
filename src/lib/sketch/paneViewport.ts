@@ -65,6 +65,7 @@ export function offsetBounds(contentPx: number, panePx: number): { min: number; 
 }
 
 function clampAxis(value: number, contentPx: number, panePx: number): number {
+  if (!Number.isFinite(value)) return 0;
   const { min, max } = offsetBounds(contentPx, panePx);
   return Math.min(max, Math.max(min, value));
 }
