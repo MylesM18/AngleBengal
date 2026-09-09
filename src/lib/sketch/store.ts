@@ -426,9 +426,7 @@ export const useSketchStore = create<SketchState>((set, get) => {
     pageOrder: [firstPage.id],
     activePageId: firstPage.id,
     splitPageIds: [],
-    paneViewports: {},
-    maximizedPane: null,
-    viewportGesturePane: null,
+    ...CLEAR_PANE_VIEWPORT_STATE,
 
     activeLineId: null,
     tool: "pen",
@@ -626,7 +624,7 @@ export const useSketchStore = create<SketchState>((set, get) => {
         state.maximizedPane === null &&
         state.viewportGesturePane === null
           ? state
-          : { paneViewports: {}, maximizedPane: null, viewportGesturePane: null },
+          : CLEAR_PANE_VIEWPORT_STATE,
       ),
 
     setViewportGesturePane: (viewportGesturePane) => set({ viewportGesturePane }),
