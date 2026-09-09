@@ -11,6 +11,7 @@ import type { WorldPoint } from "./graphCoords";
 
 import {
   DEFAULT_PANE_VIEWPORT,
+  isDefaultViewport,
   type PaneViewport,
 } from "./paneViewport";
 
@@ -206,6 +207,11 @@ export type SketchState = {
   resetAllPaneViewports: () => void;
   setViewportGesturePane: (paneIndex: number | null) => void;
   toggleMaximizedPane: (paneIndex: number) => void;
+  /** Commit-or-reset helper that Tasks 5 and 7 call at gesture end: writes
+   *  the viewport, or resets the pane to DEFAULT_PANE_VIEWPORT when the
+   *  gesture landed back at the default, so a pane back at fit never keeps
+   *  a redundant entry. */
+  commitPaneViewport: (paneIndex: number, viewport: PaneViewport) => void;
 
   // Per-page content actions (pageId always explicit). All of them write to
   // the page's ACTIVE surface document.
@@ -398,7 +404,21 @@ function withActiveSurface(
   return withSurface(state, pageId, undefined, patch);
 }
 
-export const useSketchStore = create<SketchState>((set) => {
+/**
+ * The three PR-2 session-only viewport fields, cleared together at every
+ * reset site (a split re-arrangement, a problem transition, closing compact
+ * sketch mode). One shared empty paneViewports object is safe across every
+ * reset because every store write that touches paneViewports spreads it
+ * into a new object first (setPaneViewport, resetPaneViewport, setPanePage):
+ * nothing ever mutates it in place.
+ */
+const CLEAR_PANE_VIEWPORT_STATE = {
+  paneViewports: {},
+  maximizedPane: null,
+  viewportGesturePane: null,
+} satisfies Pick<SketchState, "paneViewports" | "maximizedPane" | "viewportGesturePane">;
+
+export const useSketchStore = create<SketchState>((set, get) => {
   const firstPage = createPage("Page 1", FRESH_PAGE_SEED);
 
   return {
@@ -491,9 +511,7 @@ export const useSketchStore = create<SketchState>((set) => {
           splitPageIds,
           activePageId,
           ...(activeChanged ? { pendingGraphPoints: [], activeLineId: null } : {}),
-          ...(splitPageIds !== state.splitPageIds
-            ? { paneViewports: {}, maximizedPane: null, viewportGesturePane: null }
-            : {}),
+          ...(splitPageIds !== state.splitPageIds ? CLEAR_PANE_VIEWPORT_STATE : {}),
         };
       }),
 
@@ -510,9 +528,7 @@ export const useSketchStore = create<SketchState>((set) => {
           if (state.splitPageIds.length === 0) return state;
           return {
             splitPageIds: [],
-            paneViewports: {},
-            maximizedPane: null,
-            viewportGesturePane: null,
+            ...CLEAR_PANE_VIEWPORT_STATE,
           };
         }
 
@@ -560,9 +576,7 @@ export const useSketchStore = create<SketchState>((set) => {
           ...(activeChanged
             ? { activePageId, pendingGraphPoints: [], activeLineId: null }
             : {}),
-          ...(panesChanged
-            ? { paneViewports: {}, maximizedPane: null, viewportGesturePane: null }
-            : {}),
+          ...(panesChanged ? CLEAR_PANE_VIEWPORT_STATE : {}),
         };
       }),
 
@@ -621,6 +635,11 @@ export const useSketchStore = create<SketchState>((set) => {
       set((state) => ({
         maximizedPane: state.maximizedPane === paneIndex ? null : paneIndex,
       })),
+
+    commitPaneViewport: (paneIndex, viewport) =>
+      isDefaultViewport(viewport)
+        ? get().resetPaneViewport(paneIndex)
+        : get().setPaneViewport(paneIndex, viewport),
 
     setSurface: (pageId, surface) =>
       set((state) => {
@@ -931,9 +950,7 @@ export const useSketchStore = create<SketchState>((set) => {
           pageOrder: [page.id],
           activePageId: page.id,
           splitPageIds: [],
-          paneViewports: {},
-          maximizedPane: null,
-          viewportGesturePane: null,
+          ...CLEAR_PANE_VIEWPORT_STATE,
           activeLineId: null,
           pendingGraphPoints: [],
           graphTool: null,
@@ -1017,9 +1034,7 @@ export const useSketchStore = create<SketchState>((set) => {
           pageOrder,
           activePageId,
           splitPageIds: [],
-          paneViewports: {},
-          maximizedPane: null,
-          viewportGesturePane: null,
+          ...CLEAR_PANE_VIEWPORT_STATE,
           activeLineId: null,
           graphTool: null,
           pendingGraphPoints: [],

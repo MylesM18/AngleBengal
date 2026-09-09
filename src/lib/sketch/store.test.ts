@@ -833,4 +833,23 @@ describe("pane viewports (PR 2)", () => {
     expect(store().maximizedPane).toBeNull();
     expect(store().viewportGesturePane).toBeNull();
   });
+
+  it("commitPaneViewport no-ops when committing a default viewport with no entry", () => {
+    store().setSplit(2);
+    store().commitPaneViewport(0, { zoom: 1, offsetX: 0, offsetY: 0 });
+    expect(store().paneViewports[0]).toBeUndefined();
+  });
+
+  it("commitPaneViewport writes a non-default viewport", () => {
+    store().setSplit(2);
+    store().commitPaneViewport(0, { zoom: 2, offsetX: -10, offsetY: 5 });
+    expect(store().paneViewports[0]).toEqual({ zoom: 2, offsetX: -10, offsetY: 5 });
+  });
+
+  it("commitPaneViewport clears the key when a default viewport follows a non-default one", () => {
+    store().setSplit(2);
+    store().commitPaneViewport(0, { zoom: 2, offsetX: -10, offsetY: 5 });
+    store().commitPaneViewport(0, { zoom: 1, offsetX: 0, offsetY: 0 });
+    expect(store().paneViewports[0]).toBeUndefined();
+  });
 });
