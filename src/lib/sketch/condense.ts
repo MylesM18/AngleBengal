@@ -2,7 +2,8 @@
  * PR 1 of the sketch-split-mobile spec (docs/superpowers/specs/
  * 2026-09-07-sketch-split-mobile-design.md, section 4): pure math for the
  * keyboard-condensed split layout. No DOM here so vitest covers it, same
- * pattern as src/lib/practice/splitRatio.ts.
+ * pattern as src/lib/practice/splitRatio.ts, except swapCondensedPanes,
+ * which reads and writes the sketch store directly.
  */
 
 import { useSketchStore, type TypedLine } from "./store";
@@ -68,8 +69,8 @@ export function condensedLayoutActive(args: {
  * its bottom to clear the keyboard, a line above scrolls down to its top,
  * and a line already inside the band leaves scrollTop untouched. A band of
  * zero (keyboard covering the whole scroller) is a no-op rather than a
- * division-free thrash. Callers assign the result to scrollTop; the browser
- * clamps overshoot past the scroll range itself.
+ * scroll to a band that does not exist. Callers assign the result to
+ * scrollTop; the browser clamps overshoot past the scroll range itself.
  */
 export function typedLinesScrollTop(args: {
   scrollTop: number;
