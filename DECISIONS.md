@@ -3088,3 +3088,91 @@ bar itself is a paper strip (the kraft rule stays: toolbar and rail only),
 ordered toolbar, rail, page bar, canvases, with rename and split controls in a
 fixed right cluster anchored to the bar so the scrolling chip row never moves
 them.
+
+### D-173. Keyboard condense is derived, strips swap, panes animate
+
+PR 1 of the sketch-split-mobile spec (docs/superpowers/specs/
+2026-09-07-sketch-split-mobile-design.md sections 4 and 5). The condensed
+layout is computed on every render from useKeyboardInset, the rendered pane
+list, and the active page id: nothing is stored, so the state cannot go
+stale, and the desktop pane never computes true. Three implementation
+choices the spec left open. First, the toolbar swap animates as an
+opacity fade on the entering strip, reusing the existing cue-fade keyframe
+(opacity 0 to 1, 180ms, var(--ease-paper): within the spec's "about 200ms
+ease-out" and inside the D-131 three-animation motion budget), never a
+height tween, because both toolbars anchor absolutely-positioned popovers
+(Clear confirm, the More popover) to themselves and a height-animating
+wrapper needs overflow clipping that would cut those dialogs off; the fade
+wrapper is keyed per direction (a reused DOM node never restarts a mount
+animation) and carries max-lg z-20, because cue-fade's retained fill (the
+D-059 family) leaves a stacking context that would otherwise trap those
+popovers beneath the panes; PageBar and GraphRail swap without animation
+(the spec's motion sentence names heights and the toolbar only); the
+roughly 200ms ease-out height motion lives on the pane grid rows and the
+container's keyboard padding; and the compact toolbar accepts one fade-in
+on first sketch open as a side effect of mount-keyed animation. Second,
+the peek strip fits its page by width only, so the sliver is a
+natural-scale clip of the top of the page rather than the whole page
+shrunk into 36px, and the swap guard mirrors the trigger's geometry
+(splitPageIds length at least 2 with entry 1 active, the two RENDERED
+panes below lg) rather than a strict length of 2, so a desktop-set 3-4
+pane split carried onto mobile keeps a live swap button. Third, the peek
+swap puts the incoming page into type mode and creates one empty trailing
+line when it has none, because the spec's unconditional "the incoming
+page's trailing typed line receives focus" needs a line and a typing
+surface to land on; the keep marker rides the WHOLE peek pane (header
+page select included) as well as the condensed toolbar strip, so no
+condensed tap dismisses the math keyboard, and choosing Draw dismisses it
+explicitly, which is the designed exit back to the full layout.
+
+Two further rulings from a 2026-09-08 review extend this entry. The first
+concerns condensedLayoutActive directly: it never reads mode, so for a stretch
+after the Draw button is tapped the predicate can still read true while mode
+already reads "draw". CondensedToolbar's Draw button sets mode to "draw"
+synchronously and dismisses the math keyboard in the same click handler, but
+useKeyboardInset's focusout listener waits on a 250ms setTimeout before
+re-measuring (the dismiss animates, so an immediate read still sees the
+keyboard up), so insetBottom, and with it condensedLayoutActive and the
+condensed strip, only clear once that delayed measurement lands: for up to
+about 250ms, mode reads "draw" while condensed is still true. The window only
+opens if the More popover is already open when Draw is tapped, and it is
+benign: the three controls it briefly re-enables, Tool, Stroke width and Ink,
+each guarded by disabled={mode !== "draw"}, only write session-global tool,
+width and color preferences that are about to apply once mode settles, so
+nothing already drawn or committed is at risk. Gating condensedLayoutActive on
+mode === "type" instead, so it always agrees with mode, was raised and
+rejected: it contradicts the trigger formula fixed above (isDesktop, paneIds,
+activePageId, insetBottom, nothing else) and trades this sub-250ms transient
+for a more visible one, the pane grid snapping back to 50/50 while the keyboard
+is still visually mid-dismiss. The plan governs here: condensedLayoutActive's
+formula stays exactly as specified.
+
+The second ruling covers a related keyboard bug (product bug B), fixed here
+rather than deferred. Opening the More popover moves focus off the math field
+the user was typing in, and MathLive's own virtual keyboard reacts to that blur
+on its own: its document-level focusout listener starts a 300ms timer, when the
+blurred field's mathVirtualKeyboardPolicy is not "manual", that tears down the
+whole keyboard element if no math field is focused when the timer fires. This
+does not contradict the keep marker described above: data-keep-math-keyboard
+blocks only this app's own pointerdown dismiss listener (installKeyboardDismiss
+in MathField.tsx), and MathLive's focus-driven auto-hide is a different path
+the marker never reaches. The teardown is invisible to this app's own dismiss
+wiring in turn: useKeyboardInset reads the real keyboard element's geometry, so
+the removal drops insetBottom to 0, condensedLayoutActive flips false, and
+Sketchpad swaps the condensed toolbar back out for SketchToolbar mid
+interaction, taking the just-opened popover down with it. The fix keeps the
+keyboard actually up rather than only reacting after it disappears:
+CondensedToolbar sets mathVirtualKeyboardPolicy to "manual" on the one math
+field instance that was focused, early enough to win the race against that
+focusout (called from the trigger's pointerdown, with a second-chance call at
+the top of the popover-open effect for engines that do not shift focus to a
+plain button on click), and restores "auto" the moment the popover closes. Two
+alternatives were raised and not chosen: latching the condensed layout for as
+long as a popover stays open, and dropping the popover's focus-on-open behavior
+so the field is never blurred. The policy flip is scoped to that one focused
+field rather than set globally: MathField.tsx already records that an earlier
+"manual" policy applied everywhere left typed input unusable on phones.
+condensedLayoutActive's formula, the popover's own focus-on-open behavior, and
+the Draw button's explicit window.mathVirtualKeyboard?.hide() all stay
+untouched by this fix; no other dismiss path waits on the new gate, they call
+hide() directly.
