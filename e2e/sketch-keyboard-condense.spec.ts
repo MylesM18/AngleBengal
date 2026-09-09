@@ -64,7 +64,12 @@ test.beforeAll(async ({ browser }) => {
 // server, leaving the pre-reset page count as the last saved state
 // (confirmed empirically: an isolated run of this file without the wait
 // left 2 of the pool's 4 problems at 2 pages despite every test passing).
-test.afterEach(async ({ page }) => {
+test.afterEach(async ({ page }, testInfo) => {
+  // A test that skipped itself (no practice problem in the library, see the
+  // test.skip at the top of openTypedSketch) never opened the sketch, so
+  // there is nothing to reset and the Pages wait below would only turn the
+  // skip into a failure.
+  if (testInfo.status === "skipped") return;
   await expect(page.getByRole("radiogroup", { name: "Pages" })).toBeVisible();
   await resetSketchPages(page);
   await page.waitForTimeout(2500);
