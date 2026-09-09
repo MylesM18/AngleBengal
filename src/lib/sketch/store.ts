@@ -9,6 +9,11 @@ import type { GraphKind, ProblemToolset } from "@/lib/practice/tools";
 // close a runtime cycle. WorldPoint is erased at compile time either way.
 import type { WorldPoint } from "./graphCoords";
 
+import {
+  DEFAULT_PANE_VIEWPORT,
+  type PaneViewport,
+} from "./paneViewport";
+
 // Type-only for the same reason: workState imports this store's types.
 import type { ProblemWorkState } from "@/lib/resume/workState";
 
@@ -128,6 +133,20 @@ export type SketchState = {
   /** [] = split off; length 2..4 = pane page ids, left-to-right / top-to-bottom.
    *  Session-only view state (D-169): never persisted, cleared on problem change. */
   splitPageIds: string[];
+  /**
+   * Per-pane display viewport (PR 2): session-only, never persisted, keyed
+   * by pane index. A missing key means DEFAULT_PANE_VIEWPORT. Reset when
+   * the pane shows a different page, when the split toggles or re-arranges,
+   * on problem change, and when compact sketch mode closes. Display-only:
+   * never feeds refSize, OCR crops, or snapshots.
+   */
+  paneViewports: Record<number, PaneViewport>;
+  /** Which pane fills the sketch area (null = normal grid). Session-only,
+   *  same reset rules as paneViewports. */
+  maximizedPane: number | null;
+  /** Pane index currently under a live viewport gesture (pinch or wheel),
+   *  so the pane wrapper suppresses its transform transition. */
+  viewportGesturePane: number | null;
 
   // Session-global (NOT per page). activeLineId stays a single global field
   // (A8): only the active pane hosts a live math field, and typed-line ids
@@ -179,6 +198,14 @@ export type SketchState = {
   setSplit: (count: 0 | 2 | 3 | 4) => void;
   /** If pageId is already shown in another pane, the two panes swap (A5). */
   setPanePage: (paneIndex: number, pageId: string) => void;
+  // Pane viewport actions (PR 2). All session-only view state.
+  setPaneViewport: (paneIndex: number, viewport: PaneViewport) => void;
+  /** Back to fit: removes the key, so the pane renders DEFAULT_PANE_VIEWPORT. */
+  resetPaneViewport: (paneIndex: number) => void;
+  /** Viewports, maximize, and the live-gesture flag, all at once. */
+  resetAllPaneViewports: () => void;
+  setViewportGesturePane: (paneIndex: number | null) => void;
+  toggleMaximizedPane: (paneIndex: number) => void;
 
   // Per-page content actions (pageId always explicit). All of them write to
   // the page's ACTIVE surface document.
@@ -379,6 +406,9 @@ export const useSketchStore = create<SketchState>((set) => {
     pageOrder: [firstPage.id],
     activePageId: firstPage.id,
     splitPageIds: [],
+    paneViewports: {},
+    maximizedPane: null,
+    viewportGesturePane: null,
 
     activeLineId: null,
     tool: "pen",
@@ -461,6 +491,9 @@ export const useSketchStore = create<SketchState>((set) => {
           splitPageIds,
           activePageId,
           ...(activeChanged ? { pendingGraphPoints: [], activeLineId: null } : {}),
+          ...(splitPageIds !== state.splitPageIds
+            ? { paneViewports: {}, maximizedPane: null, viewportGesturePane: null }
+            : {}),
         };
       }),
 
@@ -474,7 +507,13 @@ export const useSketchStore = create<SketchState>((set) => {
     setSplit: (count) =>
       set((state) => {
         if (count === 0) {
-          return state.splitPageIds.length === 0 ? state : { splitPageIds: [] };
+          if (state.splitPageIds.length === 0) return state;
+          return {
+            splitPageIds: [],
+            paneViewports: {},
+            maximizedPane: null,
+            viewportGesturePane: null,
+          };
         }
 
         // D-172: entering split fills panes with pages in page order starting
@@ -510,12 +549,19 @@ export const useSketchStore = create<SketchState>((set) => {
         let activePageId = state.activePageId;
         if (!panes.includes(activePageId)) activePageId = panes[0];
         const activeChanged = activePageId !== state.activePageId;
+        // PR 2: a toggle or re-arrangement invalidates every pane viewport.
+        const panesChanged =
+          panes.length !== state.splitPageIds.length ||
+          panes.some((pid, index) => pid !== state.splitPageIds[index]);
         return {
           splitPageIds: panes,
           pages,
           pageOrder,
           ...(activeChanged
             ? { activePageId, pendingGraphPoints: [], activeLineId: null }
+            : {}),
+          ...(panesChanged
+            ? { paneViewports: {}, maximizedPane: null, viewportGesturePane: null }
             : {}),
         };
       }),
@@ -531,16 +577,50 @@ export const useSketchStore = create<SketchState>((set) => {
         splitPageIds[paneIndex] = pageId;
         // A5: a page shown elsewhere swaps panes rather than duplicating.
         if (otherIndex !== -1) splitPageIds[otherIndex] = current;
+        // PR 2: a pane showing a different page starts back at fit.
+        const paneViewports = { ...state.paneViewports };
+        delete paneViewports[paneIndex];
+        if (otherIndex !== -1) delete paneViewports[otherIndex];
         // A5: when the changed pane hosted the active page, the incoming page
         // becomes active, keeping the active page on the pane just touched.
         const activates = current === state.activePageId;
         return {
           splitPageIds,
+          paneViewports,
           ...(activates
             ? { activePageId: pageId, pendingGraphPoints: [], activeLineId: null }
             : {}),
         };
       }),
+
+    setPaneViewport: (paneIndex, viewport) =>
+      set((state) => ({
+        paneViewports: { ...state.paneViewports, [paneIndex]: viewport },
+      })),
+
+    resetPaneViewport: (paneIndex) =>
+      set((state) => {
+        if (!(paneIndex in state.paneViewports)) return state;
+        const paneViewports = { ...state.paneViewports };
+        delete paneViewports[paneIndex];
+        return { paneViewports };
+      }),
+
+    resetAllPaneViewports: () =>
+      set((state) =>
+        Object.keys(state.paneViewports).length === 0 &&
+        state.maximizedPane === null &&
+        state.viewportGesturePane === null
+          ? state
+          : { paneViewports: {}, maximizedPane: null, viewportGesturePane: null },
+      ),
+
+    setViewportGesturePane: (viewportGesturePane) => set({ viewportGesturePane }),
+
+    toggleMaximizedPane: (paneIndex) =>
+      set((state) => ({
+        maximizedPane: state.maximizedPane === paneIndex ? null : paneIndex,
+      })),
 
     setSurface: (pageId, surface) =>
       set((state) => {
@@ -851,6 +931,9 @@ export const useSketchStore = create<SketchState>((set) => {
           pageOrder: [page.id],
           activePageId: page.id,
           splitPageIds: [],
+          paneViewports: {},
+          maximizedPane: null,
+          viewportGesturePane: null,
           activeLineId: null,
           pendingGraphPoints: [],
           graphTool: null,
@@ -934,6 +1017,9 @@ export const useSketchStore = create<SketchState>((set) => {
           pageOrder,
           activePageId,
           splitPageIds: [],
+          paneViewports: {},
+          maximizedPane: null,
+          viewportGesturePane: null,
           activeLineId: null,
           graphTool: null,
           pendingGraphPoints: [],
@@ -967,5 +1053,15 @@ export function useSurfaceContent(pageId: string): SurfaceContent {
     const page: SketchPage | undefined = state.pages[pageId];
     const shown = page ?? activePage(state);
     return shown.content[shown.surface];
+  });
+}
+
+/** The viewport a pane renders: DEFAULT_PANE_VIEWPORT until a gesture
+ *  writes one. The default is a module constant, so the selector returns
+ *  a stable reference for untouched panes. */
+export function usePaneViewport(paneIndex: number): PaneViewport {
+  return useSketchStore((state) => {
+    const viewport: PaneViewport | undefined = state.paneViewports[paneIndex];
+    return viewport ?? DEFAULT_PANE_VIEWPORT;
   });
 }

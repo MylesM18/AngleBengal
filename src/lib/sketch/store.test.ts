@@ -759,3 +759,78 @@ describe("hydrateForProblem (D-156, v2)", () => {
     expect(store().activePageId).toBe("p900");
   });
 });
+
+describe("pane viewports (PR 2)", () => {
+  it("defaults empty, sets, and resets one pane's viewport", () => {
+    store().setSplit(2);
+    store().setPaneViewport(0, { zoom: 2, offsetX: -10, offsetY: -20 });
+    expect(store().paneViewports[0]).toEqual({ zoom: 2, offsetX: -10, offsetY: -20 });
+    store().resetPaneViewport(0);
+    expect(store().paneViewports[0]).toBeUndefined();
+  });
+
+  it("setPanePage resets the viewports of both panes in a swap", () => {
+    store().setSplit(2);
+    const [first, second] = store().splitPageIds;
+    store().setPaneViewport(0, { zoom: 2, offsetX: 0, offsetY: 0 });
+    store().setPaneViewport(1, { zoom: 3, offsetX: -5, offsetY: 0 });
+    store().setPanePage(0, second);
+    expect(store().splitPageIds).toEqual([second, first]);
+    expect(store().paneViewports[0]).toBeUndefined();
+    expect(store().paneViewports[1]).toBeUndefined();
+  });
+
+  it("split toggle and problem change reset viewports and maximize", () => {
+    store().setSplit(2);
+    store().setPaneViewport(1, { zoom: 2, offsetX: 0, offsetY: 0 });
+    store().toggleMaximizedPane(1);
+    store().setSplit(0);
+    expect(store().paneViewports).toEqual({});
+    expect(store().maximizedPane).toBeNull();
+
+    store().setSplit(2);
+    store().setPaneViewport(0, { zoom: 2, offsetX: 0, offsetY: 0 });
+    store().toggleMaximizedPane(0);
+    store().resetForNewProblem();
+    expect(store().paneViewports).toEqual({});
+    expect(store().maximizedPane).toBeNull();
+  });
+
+  it("a no-op setSplit to the same pane count keeps viewports", () => {
+    store().setSplit(2);
+    store().setPaneViewport(0, { zoom: 2, offsetX: 0, offsetY: 0 });
+    store().setSplit(2);
+    expect(store().paneViewports[0]).toEqual({ zoom: 2, offsetX: 0, offsetY: 0 });
+  });
+
+  it("toggleMaximizedPane toggles, switches, and clears", () => {
+    store().setSplit(2);
+    store().toggleMaximizedPane(0);
+    expect(store().maximizedPane).toBe(0);
+    store().toggleMaximizedPane(1);
+    expect(store().maximizedPane).toBe(1);
+    store().toggleMaximizedPane(1);
+    expect(store().maximizedPane).toBeNull();
+  });
+
+  it("removing a shown page resets viewports and maximize", () => {
+    store().setSplit(2);
+    const doomed = store().splitPageIds[1];
+    store().setPaneViewport(0, { zoom: 2, offsetX: 0, offsetY: 0 });
+    store().toggleMaximizedPane(0);
+    store().removePage(doomed);
+    expect(store().paneViewports).toEqual({});
+    expect(store().maximizedPane).toBeNull();
+  });
+
+  it("resetAllPaneViewports clears viewports, maximize, and the live gesture", () => {
+    store().setSplit(2);
+    store().setPaneViewport(0, { zoom: 2, offsetX: 0, offsetY: 0 });
+    store().toggleMaximizedPane(0);
+    store().setViewportGesturePane(0);
+    store().resetAllPaneViewports();
+    expect(store().paneViewports).toEqual({});
+    expect(store().maximizedPane).toBeNull();
+    expect(store().viewportGesturePane).toBeNull();
+  });
+});
