@@ -5,6 +5,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NoticeKind } from "@/components/ui/Notice";
 import { Toast } from "@/components/ui/Toast";
 import { cx } from "@/lib/cx";
+import {
+  condensedLayoutActive,
+  PEEK_STRIP_PX,
+  swapCondensedPanes,
+} from "@/lib/sketch/condense";
 import { latexToPlain } from "@/lib/sketch/latexToPlain";
 import { compositeToPng, getGraphLayerSource } from "@/lib/sketch/render";
 import {
@@ -14,8 +19,10 @@ import {
   type OcrBlock,
 } from "@/lib/sketch/store";
 import { useIsDesktop } from "@/lib/useIsDesktop";
+import { useKeyboardInset } from "@/lib/useKeyboardInset";
 
 import { CleanCopyPanel } from "./CleanCopyPanel";
+import { CondensedToolbar } from "./CondensedToolbar";
 import { GraphLayer } from "./GraphLayer";
 import { GraphRail } from "./GraphRail";
 import { PageBar } from "./PageBar";
@@ -65,6 +72,18 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     [isDesktop, splitPageIds],
   );
   const split = paneIds.length >= 2;
+
+  // PR 1 (sketch-split-mobile spec section 4): the condensed trigger is
+  // DERIVED on every render, never stored, so it cannot go stale. The hook
+  // activates only on compact; the desktop pane's instance stays inert and
+  // reports zero, so desktop behavior is untouched by construction.
+  const keyboardInset = useKeyboardInset(isDesktop === false);
+  const condensed = condensedLayoutActive({
+    isDesktop,
+    paneIds,
+    activePageId,
+    insetBottom: keyboardInset.bottom,
+  });
 
   // A5's active-visible invariant has to hold across the lg seam, not just
   // across store actions: a 3-4 pane split set on desktop keeps its full
@@ -200,18 +219,75 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     <div
       data-sketchpad
       tabIndex={-1}
-      className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0 outline-none"
+      className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0 outline-none transition-[padding-bottom] duration-200 ease-out"
+      // Spec section 4: the sketch container gets the keyboard inset as
+      // bottom padding while condensed, so the bottom pane ends above the
+      // keyboard. Not applied outside the condensed state: typing in the
+      // top pane deliberately triggers nothing.
+      style={condensed ? { paddingBottom: keyboardInset.bottom } : undefined}
     >
-      <SketchToolbar cleaning={cleaning} onCleanUp={() => void cleanUp()} />
-      {railVisible && <GraphRail />}
-      <PageBar />
+      {/* While condensed the full toolbar gives way to the slim row, and
+          PageBar and GraphRail hide (spec section 4). The toolbar swap
+          animates as a mount fade on the incoming strip via the existing
+          cue-fade keyframe: opacity only, no height tween, because each
+          strip anchors absolutely-positioned popovers to itself and an
+          overflow-clipping height animation would cut those dialogs off.
+          The keys are load-bearing: both branches render a same-type div in
+          the same slot, and without distinct keys React reuses the node, so
+          the animation would never restart on a swap. max-lg:z-20 (carried
+          by max-lg:relative) keeps the strips' z-20 popovers above the
+          z-auto panes, because cue-fade's retained `both` fill leaves a
+          permanent stacking context on this wrapper (the D-059 family).
+          The 200ms height motion lives on the pane grid rows and the
+          container padding (D-173). */}
+      {condensed ? (
+        <div
+          key="condensed-strip"
+          className="shrink-0 max-lg:relative max-lg:z-20 max-lg:animate-cue-fade"
+        >
+          <CondensedToolbar cleaning={cleaning} onCleanUp={() => void cleanUp()} />
+        </div>
+      ) : (
+        <div
+          key="full-strip"
+          className="shrink-0 max-lg:relative max-lg:z-20 max-lg:animate-cue-fade"
+        >
+          <SketchToolbar cleaning={cleaning} onCleanUp={() => void cleanUp()} />
+        </div>
+      )}
+      {railVisible && !condensed && <GraphRail />}
+      {!condensed && <PageBar />}
 
       {split ? (
-        <div className={cx("grid min-h-0 flex-1 gap-0.5", gridClasses(paneIds.length))}>
+        <div
+          className={cx(
+            "grid min-h-0 flex-1 gap-0.5 transition-[grid-template-rows] duration-200 ease-out",
+            gridClasses(paneIds.length),
+          )}
+          // Compact 2-pane rows come from an inline style so the condense
+          // transition has concrete from/to values to tween between; the
+          // non-condensed value is exactly what grid-rows-2 computes to.
+          // Desktop (and the hydration frame, isDesktop null) keeps the
+          // class-driven templates untouched.
+          style={
+            isDesktop === false && paneIds.length === 2
+              ? {
+                  gridTemplateRows: condensed
+                    ? `${PEEK_STRIP_PX}px minmax(0, 1fr)`
+                    : "minmax(0, 1fr) minmax(0, 1fr)",
+                }
+              : undefined
+          }
+        >
           {paneIds.map((pageId, index) => (
             // Keyed by page: setPanePage's pane swap moves the subtree with
             // its page instead of remounting two canvases.
-            <SketchPane key={pageId} pageId={pageId} paneIndex={index} />
+            <SketchPane
+              key={pageId}
+              pageId={pageId}
+              paneIndex={index}
+              peek={condensed && index === 0}
+            />
           ))}
         </div>
       ) : (
@@ -261,7 +337,21 @@ function gridClasses(count: number): string {
  * typed layer, and graph layer all inherit it: the first tap in a non-active
  * pane activates its page before any layer handler runs.
  */
-function SketchPane({ pageId, paneIndex }: { pageId: string; paneIndex: number }) {
+function SketchPane({
+  pageId,
+  paneIndex,
+  peek,
+}: {
+  pageId: string;
+  paneIndex: number;
+  /** PR 1 condensed state: this pane is the top peek strip. The whole pane
+   *  carries data-keep-math-keyboard while peek (header page select
+   *  included); the header keeps its functional page select; the layer area
+   *  is covered by the swap button, and the fit scale ignores the strip's
+   *  height so a natural-scale sliver of the TOP of the page shows instead
+   *  of the whole page shrunk into 36px (spec section 4). */
+  peek: boolean;
+}) {
   const page = usePage(pageId);
   const isActive = useSketchStore((state) => state.activePageId === pageId);
   const pages = useSketchStore((state) => state.pages);
@@ -298,7 +388,10 @@ function SketchPane({ pageId, paneIndex }: { pageId: string; paneIndex: number }
   const refSize = page.refSize;
   const r =
     refSize && refSize.width > 0 && refSize.height > 0 && paneSize.width > 0
-      ? Math.min(paneSize.width / refSize.width, paneSize.height / refSize.height, 1)
+      ? peek
+        ? // Width-fit only: the strip's height must clip, not shrink.
+          Math.min(paneSize.width / refSize.width, 1)
+        : Math.min(paneSize.width / refSize.width, paneSize.height / refSize.height, 1)
       : 1;
   const scaled = refSize !== null && r < 1;
   const pane = useMemo<PaneInfo>(
@@ -322,7 +415,21 @@ function SketchPane({ pageId, paneIndex }: { pageId: string; paneIndex: number }
   return (
     <PaneContext.Provider value={pane}>
       <div
+        // Spec section 4: the WHOLE peek strip carries data-keep-math-keyboard,
+        // header page select included. The global dismiss listener
+        // (installKeyboardDismiss, MathField.tsx) hides the keyboard and blurs
+        // the field on any pointerdown whose composed path lacks the marker;
+        // a marker on the sliver button alone would leave the header's page
+        // select dismissing the keyboard and collapsing the condensed layout
+        // under the finger (device checklist item 3).
+        {...(peek ? { "data-keep-math-keyboard": "" } : {})}
         onPointerDownCapture={() => {
+          // The peek strip must NOT activate its page on pointerdown:
+          // activation would make the top pane active, end the condensed
+          // state mid-tap, and move the swap button out from under the
+          // finger. The swap activates through setPanePage instead
+          // (swapCondensedPanes).
+          if (peek) return;
           const state = useSketchStore.getState();
           if (state.activePageId !== pageId) state.setActivePage(pageId);
         }}
@@ -380,6 +487,18 @@ function SketchPane({ pageId, paneIndex }: { pageId: string; paneIndex: number }
             </div>
           ) : (
             layers
+          )}
+          {peek && (
+            <button
+              type="button"
+              // No keep marker here: the pane CONTAINER carries
+              // data-keep-math-keyboard for the whole strip while peek
+              // (header select included), so this tap's composed path
+              // already keeps the math keyboard up.
+              aria-label={`Switch to ${page.name}`}
+              onClick={swapCondensedPanes}
+              className="absolute inset-0 z-10"
+            />
           )}
         </div>
       </div>

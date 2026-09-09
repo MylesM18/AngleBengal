@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { MathfieldElement } from "mathlive";
 
 import { MathField, useMathLive } from "@/components/math/MathField";
@@ -10,6 +10,10 @@ import { cx } from "@/lib/cx";
 import { TYPED_LINE_HEIGHT } from "@/lib/sketch/render";
 import { usePanePageId } from "@/components/sketchpad/PaneContext";
 import { usePage, useSketchStore, useSurfaceContent } from "@/lib/sketch/store";
+import { typedLinesScrollTop } from "@/lib/sketch/condense";
+import { useCoarsePointer } from "@/lib/useCoarsePointer";
+import { useIsDesktop } from "@/lib/useIsDesktop";
+import { useKeyboardInset } from "@/lib/useKeyboardInset";
 
 /**
  * The stacked typed-solution layer (spec Q2). Only the active line is a live
@@ -42,8 +46,59 @@ export function TypedLinesLayer() {
   const interactive = pageId === activePageId;
   const typing = page.mode === "type";
 
+  // Unsplit companion fix (sketch-split-mobile spec section 4): the keyboard
+  // inset pads the scroller so the trailing lines can scroll above the
+  // keyboard, and the active line is kept inside the visible band. Split is
+  // excluded on purpose: there the condensed Sketchpad container owns the
+  // inset, and padding here too would double-compensate. Activation copies
+  // PracticePanel's pattern (an lg-width iPad raises the same keyboards).
+  const isDesktop = useIsDesktop();
+  const coarsePointer = useCoarsePointer();
+  const splitCount = useSketchStore((state) => state.splitPageIds.length);
+  const inset = useKeyboardInset(
+    (isDesktop === false || coarsePointer) && splitCount < 2,
+  );
+
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  // Runs when the active line changes, when the keyboard's height changes
+  // (including its initial rise), and when the active line's own rendered
+  // height grows while it stays active (a fraction, root, or summation
+  // typed into it pushes past the 38px row floor). The first two triggers
+  // are the effect's own dependencies; the third comes from a ResizeObserver
+  // on the active line element, set up below and torn down on cleanup so it
+  // is re-attached whenever the active line changes. Observing the line
+  // rather than the scroller means this cannot feed back on itself:
+  // scrolling only changes the scroller's scrollTop, never any element's
+  // size. Instant assignment, not smooth scrolling: deterministic for the
+  // e2e rig and never fights the user's own scroll.
+  useEffect(() => {
+    if (!activeLineId) return;
+    const scroller = scrollerRef.current;
+    const line = scroller?.querySelector<HTMLElement>("[data-active-line]");
+    if (!scroller || !line) return;
+
+    const sync = () => {
+      const next = typedLinesScrollTop({
+        scrollTop: scroller.scrollTop,
+        clientHeight: scroller.clientHeight,
+        insetBottom: inset.bottom,
+        lineTop: line.offsetTop,
+        lineHeight: line.offsetHeight,
+      });
+      if (next !== scroller.scrollTop) scroller.scrollTop = next;
+    };
+
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(line);
+    return () => observer.disconnect();
+  }, [activeLineId, inset.bottom]);
+
   return (
     <div
+      ref={scrollerRef}
+      data-typed-lines=""
       className={cx(
         "absolute inset-0 touch-manipulation overflow-y-auto overscroll-contain",
         interactive && typing ? "" : "pointer-events-none",
@@ -53,6 +108,10 @@ export function TypedLinesLayer() {
       // dismiss the math keyboard on the way (keyboardDismiss.ts). Inert in
       // draw mode and in non-active panes, where pointer events pass through.
       data-keep-math-keyboard=""
+      // The inset as scroll room: without it the last screenful of lines can
+      // never be scrolled above the keyboard (same reasoning as the practice
+      // panel's R7 padding).
+      style={inset.bottom > 0 ? { paddingBottom: inset.bottom } : undefined}
       onClick={(event) => {
         // A click on empty paper in type mode starts the first line, or a new
         // trailing line when the last one already has content.
@@ -87,6 +146,10 @@ export function TypedLinesLayer() {
           return (
             <li
               key={line.id}
+              // The scroll effect and the e2e rig find the cursor line by
+              // this attribute; a data marker avoids callback-ref ordering
+              // races when the active line moves between list items.
+              data-active-line={line.id === activeLineId ? "" : undefined}
               className="flex items-center gap-2"
               style={{ minHeight: TYPED_LINE_HEIGHT }}
             >

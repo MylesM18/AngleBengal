@@ -139,7 +139,16 @@ export async function clearSketchSurface(page: Page): Promise<void> {
   const canvas = sketchCanvas(page);
   if ((await sketchStrokeCount(canvas)) === 0) return;
   await page.getByRole("button", { name: "Clear", exact: true }).click();
-  const dialog = page.getByRole("dialog");
+  // Named, not bare: an unscoped getByRole("dialog") also matches the outer
+  // Sketchpad overlay (PracticeWorkspace.tsx, role="dialog" aria-label=
+  // "Sketchpad"), which wraps this whole toolbar. That union has two buttons
+  // named exactly "Clear" (this popover's destructive confirm and the
+  // toolbar's own trigger chip, both inside the outer dialog), so the bare
+  // locator throws a strict-mode violation the moment a real stroke exists to
+  // clear. Naming the dialog by its own confirm text (mirrors
+  // renameActiveSketchPage's page.getByRole("dialog", { name: "Rename page" })
+  // one function above) resolves to exactly this popover.
+  const dialog = page.getByRole("dialog", { name: "Clear this surface? This cannot be undone." });
   await expect(dialog.getByText("Clear this surface? This cannot be undone.")).toBeVisible();
   await dialog.getByRole("button", { name: "Clear", exact: true }).click();
   await expectSketchStrokeCount(canvas, 0, "Clear did not empty the surface.");
@@ -252,4 +261,94 @@ export async function setSketchSplit(page: Page, panes: 0 | 2 | 3 | 4): Promise<
   // The pane headers are the split view's own tell: one "Pane page" picker
   // per rendered pane, none outside split.
   await expect(page.getByLabel("Pane page")).toHaveCount(panes === 0 ? 0 : panes);
+}
+
+/**
+ * Wipes the ACTIVE page's active surface to known-empty, typed lines
+ * included. The Clear chip only enables when the surface has STROKES, so a
+ * surface holding only typed lines from a previous run (pages are per-problem
+ * persisted work, D-169) needs one throwaway stroke before Clear can reach
+ * it; clear() then empties every content field at once.
+ */
+export async function wipeActiveSketchSurface(page: Page): Promise<void> {
+  await setSketchMode(page, "Draw");
+  const canvas = sketchCanvas(page);
+  await drawSketchStroke(page, canvas);
+  await expect
+    .poll(() => sketchStrokeCount(canvas), {
+      message: "The throwaway stroke never committed, so Clear stays disabled.",
+    })
+    .toBeGreaterThan(0);
+  await clearSketchSurface(page);
+}
+
+/**
+ * Starts (or reactivates) a typed line by tapping the typing paper of the
+ * given canvas. Requires that canvas's page to be ACTIVE and in Type mode:
+ * only then is TypedLinesLayer interactive over the canvas. Lands at 75% of
+ * the pane height, below the short line stack a normalized test builds, so
+ * the tap hits the layer itself (which is what starts a line) rather than an
+ * existing line button.
+ */
+export async function startTypedLine(page: Page, canvasIndex = 0): Promise<void> {
+  const canvas = sketchCanvas(page, canvasIndex);
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("The canvas has no bounding box to tap a typed line on.");
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.75);
+  await expect(
+    page.locator("math-field"),
+    "Tapping the typing paper did not produce a live math field.",
+  ).toHaveCount(1);
+}
+
+/**
+ * Raises MathLive's virtual keyboard deterministically. Emulation cannot
+ * raise an OS keyboard, but MathLive's keyboard is an in-page DOM element
+ * with a public API, and useKeyboardInset listens to exactly its events, so
+ * this drives the production trigger for the keyboard-condensed layout.
+ * Idempotent when the auto policy already raised it. Real-keyboard feel
+ * stays on the owner's device checklist (D-165 precedent).
+ */
+export async function showMathKeyboard(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as { mathVirtualKeyboard?: { show: () => void } };
+    w.mathVirtualKeyboard?.show();
+  });
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            mathVirtualKeyboard?: { visible: boolean; boundingRect: { height: number } };
+          };
+          const kb = w.mathVirtualKeyboard;
+          return kb?.visible ? kb.boundingRect.height : 0;
+        }),
+      { message: "MathLive's virtual keyboard did not raise." },
+    )
+    .toBeGreaterThan(0);
+}
+
+/** Hides the math keyboard and blurs the field, the same pair the app's own
+ *  dismiss path performs, so the condensed layout's restore is exercised. */
+export async function hideMathKeyboard(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as { mathVirtualKeyboard?: { hide: () => void } };
+    w.mathVirtualKeyboard?.hide();
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  });
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const w = window as unknown as {
+            mathVirtualKeyboard?: { visible: boolean; boundingRect: { height: number } };
+          };
+          const kb = w.mathVirtualKeyboard;
+          return kb?.visible ? kb.boundingRect.height : 0;
+        }),
+      { message: "MathLive's virtual keyboard did not hide." },
+    )
+    .toBe(0);
 }
