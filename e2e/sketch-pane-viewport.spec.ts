@@ -65,12 +65,28 @@ test("maximize fills the sketch area and restore brings the grid back", async ({
   // Spec section 6: the pane grid ANIMATES (the 200ms row tween), so poll
   // for the settled geometry instead of asserting an instant switch. The
   // other pane collapses to its header strip: 48px is the 44px compact
-  // header plus the pane root's 2px borders. Its body stays mounted (inert)
-  // behind the collapsed track, and both "Pane page" pickers stay on screen
-  // and functional.
+  // header plus the pane root's 2px borders. Both "Pane page" pickers stay
+  // on screen and functional; whether the collapsed pane's body actually
+  // stays mounted and inert (rather than being unmounted) is checked below,
+  // bound to the body element itself rather than to its header sibling.
   await expect.poll(() => paneHeight(page, 1)).toBe(48);
   expect(await paneHeight(page, 0)).toBeGreaterThan(before);
   await expect(page.getByLabel("Pane page")).toHaveCount(2);
+
+  // Bind directly to the body wrapper that receives `inert={collapsed}`
+  // (Sketchpad.tsx), a sibling of the header holding "Pane page" above.
+  // Two failure directions are covered on the collapsed pane (index 1):
+  // a regression that unmounts the body instead of marking it inert fails
+  // "attached", and one that leaves it mounted but drops the inert marking
+  // fails "inert". The still-visible pane (index 0) is asserted in the
+  // opposite direction, so a regression that marks every pane inert (or
+  // swaps the condition) also fails.
+  const collapsedBody = panes.nth(1).locator("[data-sketch-pane-body]");
+  await expect(collapsedBody).toBeAttached();
+  await expect(collapsedBody).toHaveJSProperty("inert", true);
+  const visibleBody = panes.nth(0).locator("[data-sketch-pane-body]");
+  await expect(visibleBody).toBeAttached();
+  await expect(visibleBody).toHaveJSProperty("inert", false);
 
   const restore = page.getByRole("button", { name: "Restore split, Page 1" });
   await expect(restore).toHaveAttribute("aria-pressed", "true");

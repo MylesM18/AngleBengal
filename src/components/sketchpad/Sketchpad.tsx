@@ -748,6 +748,10 @@ function SketchPane({
         </div>
         <div
           ref={measureRef}
+          // e2e hook for the body wrapper that actually receives `inert`
+          // below (a sibling of the header, not the header itself). Bare
+          // attribute, same pattern as data-sketchpad.
+          data-sketch-pane-body
           inert={collapsed}
           onPointerDown={onPanePointerDown}
           onPointerMove={onPanePointerMove}
