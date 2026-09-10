@@ -47,7 +47,7 @@ import { GraphLayer } from "./GraphLayer";
 import { GraphRail } from "./GraphRail";
 import { PageBar } from "./PageBar";
 import { PaneContext, type PaneInfo } from "./PaneContext";
-import { GESTURE_WINDOW_MS, SketchCanvas, type Size } from "./SketchCanvas";
+import { GESTURE_WINDOW_MS, penHasBeenSeen, SketchCanvas, type Size } from "./SketchCanvas";
 import { SketchToolbar } from "./SketchToolbar";
 import { TypedLinesLayer } from "./TypedLinesLayer";
 
@@ -483,6 +483,19 @@ function SketchPane({
 
   function onPanePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerType !== "touch") return;
+    // Same session-sticky palm rejection SketchCanvas applies to drawing
+    // (its penSeen flag, read through penHasBeenSeen so there is one flag,
+    // not a second one that could drift out of sync): once a real pen has
+    // drawn, a touch reaching the pane container is a resting palm, not
+    // pinch/pan intent, for the rest of the session. Checking only here is
+    // enough: this is the one place a pinch OPENS (pinchRef.current is
+    // assigned nowhere else in this component), so keeping it null here
+    // means onPanePointerMove and onPanePointerEnd already no-op on their
+    // own existing `if (!live) return` guards below. A pinch already live
+    // before penSeen became true is left to finish, the same "check only at
+    // entry" contract the canvas itself uses (it never rechecks penSeen in
+    // onPointerMove or endStroke either).
+    if (penHasBeenSeen()) return;
     const point = panePointFrom(event);
     const now = performance.now();
     const prior = [...paneTouches.current.entries()];

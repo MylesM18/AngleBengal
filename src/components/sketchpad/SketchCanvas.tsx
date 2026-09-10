@@ -35,6 +35,20 @@ import {
 let penSeen = false;
 
 /**
+ * Read-only accessor for `penSeen` (PR 2). Sketchpad.tsx's pane-level pinch,
+ * pan, and double-tap-reset handlers gate on this so a resting palm during
+ * active pen use cannot open or drive a pane viewport gesture, the same
+ * contract this file's own pointer handling already applies to drawing
+ * (below). Exported as a function, not the flag itself, so there is exactly
+ * one place that tracks whether a pen has been seen; Sketchpad.tsx reads it
+ * fresh each time instead of keeping a second flag that could drift out of
+ * sync with this one.
+ */
+export function penHasBeenSeen(): boolean {
+  return penSeen;
+}
+
+/**
  * The canvas stack (docs/06 §4): a background layer and an ink layer, both
  * devicePixelRatio-aware, sized to the panel.
  *
