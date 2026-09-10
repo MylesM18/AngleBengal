@@ -43,6 +43,20 @@ describe("compose and defaults", () => {
     expect(isDefaultViewport({ zoom: 1.01, offsetX: 0, offsetY: 0 })).toBe(false);
     expect(isDefaultViewport({ zoom: 1, offsetX: -1, offsetY: 0 })).toBe(false);
   });
+
+  it("leaves composedScale and paneTransform unguarded against a non-finite fit, on purpose", () => {
+    // Deliberate: fit's one real producer (Sketchpad.tsx's A15 computation)
+    // already falls back to 1 for a degenerate ratio, so a non-finite fit
+    // never actually reaches these. clampViewport is the hard-clamp
+    // boundary that guards the STORED viewport; composedScale and
+    // paneTransform stay pure pass-throughs. This documents the current,
+    // accepted behavior so a future change here is a deliberate decision,
+    // not a silent regression (see task-2-report.md, Fix round 2).
+    expect(composedScale(Number.NaN, 2)).toBeNaN();
+    expect(paneTransform(Number.NaN, DEFAULT_PANE_VIEWPORT)).toBe(
+      "translate(0px, 0px) scale(NaN)",
+    );
+  });
 });
 
 describe("clamping", () => {
@@ -102,6 +116,30 @@ describe("clamping", () => {
       PANE,
     );
     expect(paneTransform(FIT, clamped)).not.toContain("NaN");
+  });
+
+  it("guards the derived bound too: a NaN fit still clamps offsets to 0", () => {
+    // Here offsetX/offsetY are themselves finite; it is fit that is NaN, so
+    // composedScale and offsetBounds derive a non-finite min from it. The
+    // guard has to catch that derived bound, not just a non-finite raw
+    // offset input (which the round 1 fix already covers above).
+    const clamped = clampViewport(
+      { zoom: 2, offsetX: -500, offsetY: 10 },
+      REF,
+      Number.NaN,
+      PANE,
+    );
+    expect(clamped).toEqual({ zoom: 2, offsetX: 0, offsetY: 0 });
+  });
+
+  it("guards the derived bound too: an Infinity fit still clamps offsets to 0", () => {
+    const clamped = clampViewport(
+      { zoom: 2, offsetX: -500, offsetY: 10 },
+      REF,
+      Number.POSITIVE_INFINITY,
+      PANE,
+    );
+    expect(clamped).toEqual({ zoom: 2, offsetX: 0, offsetY: 0 });
   });
 });
 
