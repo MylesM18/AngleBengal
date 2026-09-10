@@ -26,6 +26,10 @@ import { useKeyboardInset } from "@/lib/useKeyboardInset";
  * time. A non-active split pane renders every line as static KaTeX with
  * pointer events disabled; the first tap activates the pane through the pane
  * container's capture handler, the second tap edits.
+ *
+ * The layer also owns the keyboard-aware inset and scroll-into-view
+ * behavior for the active line: see the inline comment below for the
+ * details.
  */
 export function TypedLinesLayer() {
   const pageId = usePanePageId();

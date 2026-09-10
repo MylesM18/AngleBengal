@@ -389,3 +389,128 @@ test("unsplit typing pads the layer and keeps the active line above the keyboard
 
   await hideMathKeyboard(page);
 });
+
+/**
+ * I2 (PR 1 final review, deferred to PR 2 Task 6b, D-174). Before this fix,
+ * useKeyboardInset's OS-keyboard branch counted ANY focused INPUT, TEXTAREA,
+ * MATH-FIELD, or contenteditable as "a keyboard is up", so on iOS, focusing
+ * the PageBar Rename field while split with the bottom pane active condensed
+ * the layout and unmounted PageBar mid-interaction, taking the open rename
+ * dialog down with it. Sketchpad now passes mathFieldOnly, narrowing that
+ * gate to MATH-FIELD only.
+ *
+ * The rig cannot raise a real OS keyboard (showMathKeyboard's own comment
+ * above explains why MathLive's in-page keyboard is the real trigger this
+ * file otherwise drives). This simulates the one signal the OS branch
+ * actually reads: osBottom = window.innerHeight - visualViewport.height
+ * (useKeyboardInset.ts). An init script redefines window.innerHeight to
+ * report OS_KEYBOARD_PX more than its real value, for every document this
+ * page navigates to, before any app script runs. That makes the subtraction
+ * produce a positive number the instant an element the gate recognizes
+ * holds focus, exactly what a real OS keyboard would do to it, while
+ * leaving the real visualViewport, and its scale, untouched (still 1, well
+ * under the 1.02 zoomed threshold). This proves the GATE, which tag names
+ * count as "editing", not WebKit's real behavior of the visual viewport
+ * shrinking while innerHeight does not: no real device keyboard opens here.
+ */
+test("a simulated OS keyboard ignores the rename field but still condenses for a typed line", async ({
+  page,
+}) => {
+  const OS_KEYBOARD_PX = 300;
+  await page.addInitScript((extra) => {
+    const real = window.innerHeight;
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      get: () => real + extra,
+    });
+  }, OS_KEYBOARD_PX);
+
+  await openTypedSketch(page);
+  await setSketchSplit(page, 2);
+  const canvases = page.getByRole("img", { name: /^Scratch canvas/ });
+  await expect(canvases).toHaveCount(2);
+
+  // Activate the bottom pane, the same first tap as condense() above, but
+  // without starting a typed line yet: direction (a) below is about a plain
+  // input, not a math field.
+  const bottomBox = await canvases.nth(1).boundingBox();
+  if (!bottomBox) throw new Error("No bottom canvas box to activate.");
+  await page.mouse.click(
+    bottomBox.x + bottomBox.width / 2,
+    bottomBox.y + bottomBox.height / 2,
+  );
+  await expect(sketchPageChips(page).nth(1)).toHaveAttribute("aria-checked", "true");
+
+  // Direction (a), I2's exact failure scenario: split, bottom pane active,
+  // Rename the active page. The popover's own effect focuses "Page name" on
+  // open (PageBar.tsx), a real DOM focusin the OS branch measures against.
+  await page.getByRole("button", { name: "Rename page" }).click();
+  const dialog = page.getByRole("dialog", { name: "Rename page" });
+  const nameInput = dialog.getByLabel("Page name");
+  await expect(dialog).toBeVisible();
+
+  // Give the condense-and-self-correct cycle time to fully play out before
+  // asserting, rather than racing it. If the gate were still document-wide:
+  // focusing the input would condense (osBottom > 0), unmounting PageBar
+  // and the dialog with it; the removed input then blurs, and
+  // useKeyboardInset's own focusout handler re-measures 250ms later
+  // (useKeyboardInset.ts), reads no editable element focused, and flips
+  // condensed back off, remounting PageBar. That remount is a FRESH
+  // PageBar instance: renameOpen is local state, so the dialog does not
+  // reopen. "Pages" and "More" alone would therefore self-correct back to
+  // their pre-bug look inside this same window and cannot be trusted as an
+  // immediate check; the dialog's permanent absence is what actually proves
+  // the bug fired, so this waits out the whole cycle first.
+  await page.waitForTimeout(900);
+
+  await expect(
+    dialog,
+    "The Rename dialog was torn down: the OS-keyboard gate treated the " +
+      "plain Page name input as a keyboard signal and condensed the split " +
+      "layout out from under it.",
+  ).toBeVisible();
+  await expect(nameInput).toBeFocused();
+  await expect(page.getByRole("radiogroup", { name: "Pages" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "More", exact: true })).toBeHidden();
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  // Direction (b), the SAME simulation: a sketch typed line (a MATH-FIELD)
+  // must still condense, proving the gate was narrowed rather than
+  // disabled. MathLive's own auto policy also tends to raise its in-page
+  // keyboard on focus (MathField.tsx's mathVirtualKeyboardPolicy = "auto"),
+  // which would independently satisfy insetBottom > 0 through the
+  // unconditional mlBottom branch regardless of this task's change, so it
+  // is explicitly hidden first: any condense observed after that can only
+  // be the OS branch itself recognizing MATH-FIELD.
+  await startTypedLine(page, 1);
+  await waitForSettledMathFieldFocus(page);
+  await page.evaluate(() => {
+    const w = window as unknown as { mathVirtualKeyboard?: { hide: () => void } };
+    w.mathVirtualKeyboard?.hide();
+  });
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const w = window as unknown as { mathVirtualKeyboard?: { visible: boolean } };
+          return w.mathVirtualKeyboard?.visible ?? false;
+        }),
+      { message: "MathLive's keyboard never hid for the OS-branch isolation check." },
+    )
+    .toBe(false);
+  // Hiding MathLive's panel must not itself blur the field: confirm settled
+  // MATH-FIELD focus again before reading the condensed state off it.
+  await waitForSettledMathFieldFocus(page);
+
+  await expect(
+    page.getByRole("button", { name: "More", exact: true }),
+    "With MathLive's own keyboard hidden, the OS branch alone should still " +
+      "condense for a focused math field: the gate must accept MATH-FIELD, " +
+      "not just reject everything.",
+  ).toBeVisible();
+  await expect(page.getByRole("radiogroup", { name: "Pages" })).toBeHidden();
+
+  await hideMathKeyboard(page);
+});

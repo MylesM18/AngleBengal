@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 import type { NoticeKind } from "@/components/ui/Notice";
 import { Toast } from "@/components/ui/Toast";
@@ -11,10 +18,26 @@ import {
   swapCondensedPanes,
 } from "@/lib/sketch/condense";
 import { latexToPlain } from "@/lib/sketch/latexToPlain";
+import {
+  DEFAULT_PANE_VIEWPORT,
+  clampViewport,
+  clampZoom,
+  composedScale,
+  isDefaultViewport,
+  paneTransform,
+  pinchViewport,
+  rubberBandViewport,
+  wheelZoomFactor,
+  zoomAtPoint,
+  type PanePoint,
+  type PaneViewport,
+  type PinchStart,
+} from "@/lib/sketch/paneViewport";
 import { compositeToPng, getGraphLayerSource } from "@/lib/sketch/render";
 import {
   activePage,
   usePage,
+  usePaneViewport,
   useSketchStore,
   type OcrBlock,
 } from "@/lib/sketch/store";
@@ -27,7 +50,7 @@ import { GraphLayer } from "./GraphLayer";
 import { GraphRail } from "./GraphRail";
 import { PageBar } from "./PageBar";
 import { PaneContext, type PaneInfo } from "./PaneContext";
-import { SketchCanvas, type Size } from "./SketchCanvas";
+import { GESTURE_WINDOW_MS, penHasBeenSeen, SketchCanvas, type Size } from "./SketchCanvas";
 import { SketchToolbar } from "./SketchToolbar";
 import { TypedLinesLayer } from "./TypedLinesLayer";
 
@@ -55,6 +78,9 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     (state) => activePage(state).surface === "graph",
   );
   const splitPageIds = useSketchStore((state) => state.splitPageIds);
+  // PR 2: which pane fills the sketch area (Task 3's store field), read here
+  // so the split grid below can render the maximize row template.
+  const maximizedPane = useSketchStore((state) => state.maximizedPane);
   const splitGraphAll = useSketchStore((state) =>
     state.splitPageIds.some((id) => state.pages[id]?.surface === "graph"),
   );
@@ -77,13 +103,39 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
   // DERIVED on every render, never stored, so it cannot go stale. The hook
   // activates only on compact; the desktop pane's instance stays inert and
   // reports zero, so desktop behavior is untouched by construction.
-  const keyboardInset = useKeyboardInset(isDesktop === false);
+  //
+  // mathFieldOnly = true (D-174, PR 2 Task 6b): the split overlay also holds
+  // plain inputs with nothing to do with the math surface (PageBar's Rename
+  // field, GraphRail's units field), and the hook's default document-wide
+  // gate used to treat either as "a keyboard is up", condensing the layout
+  // out from under an open dialog. Narrowed here to MATH-FIELD only; the
+  // other three call sites keep the document-wide default.
+  const keyboardInset = useKeyboardInset(isDesktop === false, true);
   const condensed = condensedLayoutActive({
     isDesktop,
     paneIds,
     activePageId,
     insetBottom: keyboardInset.bottom,
   });
+
+  // PR 1's keyboard condense outranks maximize while the keyboard is up
+  // (spec section 6): while condensed, PR 1's layout renders and
+  // maximizedPane is ignored; the maximize state itself is kept, so it
+  // comes back when the keyboard closes. The bounds check covers a stale
+  // index after the compact 2-pane slice (a 3-4 pane split set on desktop
+  // still carries its full splitPageIds when the viewport shrinks to
+  // mobile, where paneIds is sliced to the first two).
+  const maximizedVisible =
+    split && !condensed && maximizedPane !== null && maximizedPane < paneIds.length
+      ? maximizedPane
+      : null;
+
+  // Collapsed pane track: the full header strip plus the pane root's 2px
+  // top and bottom borders (compact header h-11 = 44px, lg header h-8 =
+  // 32px). isDesktop is PR 1's breakpoint value; on the hydration frame
+  // (null) compact is the safe read, and no maximize exists before the
+  // user can interact anyway.
+  const collapsedTrackPx = isDesktop ? 36 : 48;
 
   // A5's active-visible invariant has to hold across the lg seam, not just
   // across store actions: a 3-4 pane split set on desktop keeps its full
@@ -110,7 +162,7 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     : activeSurfaceIsGraph;
 
   const singlePane = useMemo<PaneInfo>(
-    () => ({ pageId: activePageId, scale: 1 }),
+    () => ({ pageId: activePageId, scale: 1, offsetX: 0, offsetY: 0 }),
     [activePageId],
   );
   const setCanvasSize = useSketchStore((state) => state.setCanvasSize);
@@ -262,21 +314,36 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
         <div
           className={cx(
             "grid min-h-0 flex-1 gap-0.5 transition-[grid-template-rows] duration-200 ease-out",
-            gridClasses(paneIds.length),
+            maximizedVisible !== null ? "grid-cols-1" : gridClasses(paneIds.length),
           )}
           // Compact 2-pane rows come from an inline style so the condense
           // transition has concrete from/to values to tween between; the
           // non-condensed value is exactly what grid-rows-2 computes to.
           // Desktop (and the hydration frame, isDesktop null) keeps the
-          // class-driven templates untouched.
+          // class-driven templates untouched. Maximize takes the first claim
+          // on the row template, ahead of the condensed/normal branch, which
+          // stays byte-for-byte as PR 1 landed it.
           style={
-            isDesktop === false && paneIds.length === 2
+            maximizedVisible !== null
               ? {
-                  gridTemplateRows: condensed
-                    ? `${PEEK_STRIP_PX}px minmax(0, 1fr)`
-                    : "minmax(0, 1fr) minmax(0, 1fr)",
+                  // Maximize (spec section 6): one pane fills the sketch
+                  // area, the rest collapse to their header strips, stacked
+                  // in pane order.
+                  gridTemplateRows: paneIds
+                    .map((_, index) =>
+                      index === maximizedVisible
+                        ? "minmax(0, 1fr)"
+                        : `minmax(${collapsedTrackPx}px, 0fr)`,
+                    )
+                    .join(" "),
                 }
-              : undefined
+              : isDesktop === false && paneIds.length === 2
+                ? {
+                    gridTemplateRows: condensed
+                      ? `${PEEK_STRIP_PX}px minmax(0, 1fr)`
+                      : "minmax(0, 1fr) minmax(0, 1fr)",
+                  }
+                : undefined
           }
         >
           {paneIds.map((pageId, index) => (
@@ -287,6 +354,7 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
               pageId={pageId}
               paneIndex={index}
               peek={condensed && index === 0}
+              collapsed={maximizedVisible !== null && index !== maximizedVisible}
             />
           ))}
         </div>
@@ -331,6 +399,19 @@ function gridClasses(count: number): string {
 }
 
 /**
+ * Best-effort capture, the same contract as SketchCanvas's capturePointer:
+ * setPointerCapture throws when the pointer is already gone, and losing
+ * capture only means the gesture ends early if a finger leaves the pane.
+ */
+function capturePanePointer(element: HTMLElement, pointerId: number): void {
+  try {
+    element.setPointerCapture(pointerId);
+  } catch {
+    // Track without capture.
+  }
+}
+
+/**
  * One split pane: header with the page picker, then the page's full layer
  * stack, scaled down to fit when the page has a reference size (A15). The
  * pane CONTAINER carries pointerdown-capture activation (A14) so canvas,
@@ -341,6 +422,7 @@ function SketchPane({
   pageId,
   paneIndex,
   peek,
+  collapsed = false,
 }: {
   pageId: string;
   paneIndex: number;
@@ -351,9 +433,13 @@ function SketchPane({
    *  height so a natural-scale sliver of the TOP of the page shows instead
    *  of the whole page shrunk into 36px (spec section 4). */
   peek: boolean;
+  /** Maximize (PR 2): true collapses this pane to its header strip, keeping
+   *  its body mounted (inert) behind the collapsed row track. */
+  collapsed?: boolean;
 }) {
   const page = usePage(pageId);
   const isActive = useSketchStore((state) => state.activePageId === pageId);
+  const maximized = useSketchStore((state) => state.maximizedPane === paneIndex);
   const pages = useSketchStore((state) => state.pages);
   const pageOrder = useSketchStore((state) => state.pageOrder);
   const setCanvasSize = useSketchStore((state) => state.setCanvasSize);
@@ -363,9 +449,11 @@ function SketchPane({
   // plus a ResizeObserver for later changes.
   const [paneSize, setPaneSize] = useState<Size>({ width: 0, height: 0 });
   const cleanupRef = useRef<(() => void) | null>(null);
+  const clipRef = useRef<HTMLDivElement | null>(null);
   const measureRef = useCallback((element: HTMLDivElement | null) => {
     cleanupRef.current?.();
     cleanupRef.current = null;
+    clipRef.current = element;
     if (!element) return;
     const apply = () => {
       const next = { width: element.offsetWidth, height: element.offsetHeight };
@@ -393,11 +481,246 @@ function SketchPane({
           Math.min(paneSize.width / refSize.width, 1)
         : Math.min(paneSize.width / refSize.width, paneSize.height / refSize.height, 1)
       : 1;
-  const scaled = refSize !== null && r < 1;
+
+  // PR 2: the pane's session viewport composes onto the A15 fit transform
+  // above (r stays peek-aware, PR 1's shipped condensed/normal/peek
+  // branches govern; the viewport composes around them rather than
+  // replacing them).
+  const viewport = usePaneViewport(paneIndex);
+  const gestureLive = useSketchStore((state) => state.viewportGesturePane === paneIndex);
+  const zoomed = !isDefaultViewport(viewport);
+  // The transform wrapper mounts when the fit scale shrinks the page (as
+  // before) OR the viewport has left its default. refSize is required either
+  // way, because the wrapper lays out at exactly refSize (A15).
+  const wrapperActive = refSize !== null && refSize.width > 0 && (r < 1 || zoomed);
+  const composed = wrapperActive ? composedScale(r, viewport.zoom) : 1;
   const pane = useMemo<PaneInfo>(
-    () => ({ pageId, scale: scaled ? r : 1 }),
-    [pageId, scaled, r],
+    () => ({
+      pageId,
+      scale: composed,
+      offsetX: wrapperActive ? viewport.offsetX : 0,
+      offsetY: wrapperActive ? viewport.offsetY : 0,
+    }),
+    [pageId, composed, wrapperActive, viewport.offsetX, viewport.offsetY],
   );
+
+  // Latest fit and pane size for the native wheel listener: kept in refs so
+  // the effect below subscribes once per pane instead of on every resize.
+  // Writing `.current` during render trips react-hooks/refs (MathField.tsx
+  // hits the same rule for its callback refs), so the sync happens in an
+  // every-render effect instead; both refs are only ever read from the
+  // native wheel listener below, which fires well after commit, so the
+  // timing is equivalent.
+  const fitRef = useRef(r);
+  const paneSizeRef = useRef(paneSize);
+  useEffect(() => {
+    fitRef.current = r;
+    paneSizeRef.current = paneSize;
+  });
+  const wheelSettle = useRef<number | null>(null);
+
+  // PR 1 + PR 2 interaction, decided here per the Task 4 review's ledgered
+  // deferred minor: a pane can carry a zoom from before it became the peek
+  // strip, since entering condensed mode is a derived layout change
+  // (condensedLayoutActive), not a store transition, so nothing else resets
+  // paneViewports for it. The peek strip's whole point is a natural-scale
+  // sliver of the page (the peek branch of `r` above is width-fit only, on
+  // that premise), so a carried-over zoom would break that contract. Decision:
+  // clear the pane's viewport the moment it becomes the peek strip, rather
+  // than clamp zoom out of the render composition (which would special-case
+  // peek inside composedScale/paneTransform and go against owner ruling Q1's
+  // instruction to keep the uniform composition shape). A no-op when the pane
+  // is already at the default viewport (resetPaneViewport itself is a no-op
+  // when the pane holds no entry).
+  useEffect(() => {
+    if (peek) useSketchStore.getState().resetPaneViewport(paneIndex);
+  }, [peek, paneIndex]);
+
+  // PR 2 pinch state. The touch map records every touch on this pane; the
+  // canvas keeps its own stroke logic and rolls the in-flight stroke back
+  // on its own (target phase runs before this bubble handler). A second
+  // touch inside GESTURE_WINDOW_MS opens the pinch: the pair drives the
+  // viewport live instead of going inert, reversing D-159.
+  const paneTouches = useRef<Map<number, { x: number; y: number; downAt: number }>>(
+    new Map(),
+  );
+  const pinchRef = useRef<{ ids: [number, number]; start: PinchStart } | null>(null);
+
+  function panePointFrom(event: ReactPointerEvent<HTMLDivElement>): PanePoint {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  function onPanePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "touch") return;
+    // Same session-sticky palm rejection SketchCanvas applies to drawing
+    // (its penSeen flag, read through penHasBeenSeen so there is one flag,
+    // not a second one that could drift out of sync): once a real pen has
+    // drawn, a touch reaching the pane container is a resting palm, not
+    // pinch/pan intent, for the rest of the session. Checking only here is
+    // enough: this is the one place a pinch OPENS (pinchRef.current is
+    // assigned nowhere else in this component), so keeping it null here
+    // means onPanePointerMove and onPanePointerEnd already no-op on their
+    // own existing `if (!live) return` guards below. A pinch already live
+    // before penSeen became true is left to finish, the same "check only at
+    // entry" contract the canvas itself uses (it never rechecks penSeen in
+    // onPointerMove or endStroke either).
+    if (penHasBeenSeen()) return;
+    const point = panePointFrom(event);
+    const now = performance.now();
+    const prior = [...paneTouches.current.entries()];
+    paneTouches.current.set(event.pointerId, { ...point, downAt: now });
+    if (pinchRef.current !== null || prior.length !== 1) return;
+    const [firstId, first] = prior[0];
+    // Same window as the canvas rollback: beyond it the second touch is a
+    // late-landing palm and the stroke in progress keeps its owner.
+    if (now - first.downAt > GESTURE_WINDOW_MS) return;
+    // No reference space to zoom yet (page never measured): stay inert.
+    if (!refSize || refSize.width <= 0) return;
+    const state = useSketchStore.getState();
+    const current: PaneViewport | undefined = state.paneViewports[paneIndex];
+    pinchRef.current = {
+      ids: [firstId, event.pointerId],
+      start: {
+        viewport: current ?? DEFAULT_PANE_VIEWPORT,
+        fit: r,
+        a: { x: first.x, y: first.y },
+        b: point,
+      },
+    };
+    // Capturing on the container retargets both pointers' moves here, away
+    // from the canvas (which has already rolled its stroke back).
+    capturePanePointer(event.currentTarget, firstId);
+    capturePanePointer(event.currentTarget, event.pointerId);
+    state.setViewportGesturePane(paneIndex);
+  }
+
+  function onPanePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "touch") return;
+    const tracked = paneTouches.current.get(event.pointerId);
+    if (!tracked) return;
+    const point = panePointFrom(event);
+    tracked.x = point.x;
+    tracked.y = point.y;
+    const live = pinchRef.current;
+    if (!live || !refSize) return;
+    const a = paneTouches.current.get(live.ids[0]);
+    const b = paneTouches.current.get(live.ids[1]);
+    if (!a || !b) return;
+    const next = pinchViewport(live.start, { x: a.x, y: a.y }, { x: b.x, y: b.y });
+    // Soft bounds while the fingers are down; the end handler snaps.
+    useSketchStore
+      .getState()
+      .setPaneViewport(paneIndex, rubberBandViewport(next, refSize, live.start.fit, paneSize));
+  }
+
+  function onPanePointerEnd(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "touch") return;
+    paneTouches.current.delete(event.pointerId);
+    const live = pinchRef.current;
+    if (!live || !live.ids.includes(event.pointerId)) return;
+    pinchRef.current = null;
+    const state = useSketchStore.getState();
+    if (refSize) {
+      const current: PaneViewport | undefined = state.paneViewports[paneIndex];
+      const settled = clampViewport(
+        current ?? DEFAULT_PANE_VIEWPORT,
+        refSize,
+        live.start.fit,
+        paneSize,
+      );
+      // Owner ruling Q4: commitPaneViewport is the store's own commit-or-reset
+      // helper (writes settled, or resets to DEFAULT_PANE_VIEWPORT when
+      // settled landed back at default), used instead of the inline
+      // isDefaultViewport-then-branch idiom.
+      state.commitPaneViewport(paneIndex, settled);
+    }
+    // Clearing the gesture flag re-enables the wrapper transition, so the
+    // rubber-band excess animates away.
+    state.setViewportGesturePane(null);
+  }
+
+  // Maximize, restore, and pane resizes change the legal pan range; snap a
+  // committed viewport back inside it. Never fights a live gesture.
+  useEffect(() => {
+    if (!refSize || refSize.width <= 0 || paneSize.width === 0) return;
+    if (isDefaultViewport(viewport)) return;
+    const state = useSketchStore.getState();
+    if (state.viewportGesturePane === paneIndex) return;
+    const clamped = clampViewport(viewport, refSize, r, paneSize);
+    if (
+      clamped.zoom !== viewport.zoom ||
+      clamped.offsetX !== viewport.offsetX ||
+      clamped.offsetY !== viewport.offsetY
+    ) {
+      // Owner ruling Q4: commitPaneViewport is the store's own commit-or-
+      // reset helper (writes clamped, or resets to DEFAULT_PANE_VIEWPORT
+      // when clamped landed back at default, the same branch the pinch-end
+      // and wheel commits use), used instead of the inline
+      // isDefaultViewport-then-branch idiom.
+      state.commitPaneViewport(paneIndex, clamped);
+    }
+  }, [viewport, refSize, r, paneSize, paneIndex]);
+
+  // Desktop parity (spec section 6): trackpad pinch and ctrl+wheel are the
+  // same DOM event and zoom the pane under the cursor, anchored at the
+  // cursor; plain wheel pans while zoomed and stays a normal (inert) wheel
+  // at fit. A NATIVE listener with passive:false, because React delegates
+  // from the root, where browsers default wheel listeners to passive, and a
+  // passive handler cannot preventDefault the scroll it replaces.
+  useEffect(() => {
+    const element = clipRef.current;
+    if (!element || collapsed) return;
+    const onWheel = (event: WheelEvent) => {
+      const state = useSketchStore.getState();
+      const ref = state.pages[pageId]?.refSize;
+      if (!ref || ref.width <= 0) return;
+      const fit = fitRef.current;
+      const paneBox = paneSizeRef.current;
+      const stored: PaneViewport | undefined = state.paneViewports[paneIndex];
+      const current = stored ?? DEFAULT_PANE_VIEWPORT;
+      let next: PaneViewport | null = null;
+      if (event.ctrlKey) {
+        const rect = element.getBoundingClientRect();
+        const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        const zoom = clampZoom(current.zoom * wheelZoomFactor(event.deltaY));
+        next = clampViewport(zoomAtPoint(current, fit, anchor, zoom), ref, fit, paneBox);
+      } else if (current.zoom > 1) {
+        next = clampViewport(
+          {
+            zoom: current.zoom,
+            offsetX: current.offsetX - event.deltaX,
+            offsetY: current.offsetY - event.deltaY,
+          },
+          ref,
+          fit,
+          paneBox,
+        );
+      }
+      if (next === null) return;
+      event.preventDefault();
+      // Owner ruling Q4: commitPaneViewport is the store's own commit-or-
+      // reset helper (writes next, or resets to DEFAULT_PANE_VIEWPORT when
+      // next landed back at default, the same branch the pinch-end and
+      // re-clamp commits above use), used instead of the inline
+      // isDefaultViewport-then-branch idiom.
+      state.commitPaneViewport(paneIndex, next);
+      // Wheel steps land discretely; suppressing the transition until the
+      // wheel goes quiet keeps the content under the cursor instead of
+      // trailing it by 200ms.
+      state.setViewportGesturePane(paneIndex);
+      if (wheelSettle.current !== null) window.clearTimeout(wheelSettle.current);
+      wheelSettle.current = window.setTimeout(() => {
+        wheelSettle.current = null;
+        useSketchStore.getState().setViewportGesturePane(null);
+      }, 150);
+    };
+    element.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      element.removeEventListener("wheel", onWheel);
+      if (wheelSettle.current !== null) window.clearTimeout(wheelSettle.current);
+    };
+  }, [pageId, paneIndex, collapsed]);
 
   const reportSize = useCallback(
     (size: Size) => setCanvasSize(pageId, size),
@@ -433,6 +756,8 @@ function SketchPane({
           const state = useSketchStore.getState();
           if (state.activePageId !== pageId) state.setActivePage(pageId);
         }}
+        // e2e geometry hook (same bare-attribute pattern as data-sketchpad).
+        data-sketch-pane={paneIndex}
         // A19: a constant 2px border on every pane so activation recolors
         // without reflowing; the cobalt ring stays the :focus-visible
         // indicator and nothing else.
@@ -441,17 +766,18 @@ function SketchPane({
           isActive ? "border-ink" : "border-hairline",
         )}
       >
-        {/* A20: the picker fills the header, so the whole strip is the tap
-            target; D-158 already gives the select 16px text below lg, and
-            tap-target cannot help a replaced element (no ::after). */}
-        <div className="h-11 shrink-0 border-b border-hairline bg-paper-1 lg:h-8">
+        {/* A20: the picker fills the header's flexible remainder, so the
+            strip stays the page tap target; D-158 gives the select 16px
+            text below lg. The maximize button and zoom chip sit in a fixed
+            right cluster, 44px targets on compact (h-11 w-11), h-8 at lg. */}
+        <div className="flex h-11 shrink-0 items-center border-b border-hairline bg-paper-1 lg:h-8">
           <select
             aria-label="Pane page"
             value={pageId}
             onChange={(event) =>
               useSketchStore.getState().setPanePage(paneIndex, event.target.value)
             }
-            className="h-full w-full bg-transparent pl-2 pr-6 text-ui text-ink"
+            className="h-full min-w-0 flex-1 bg-transparent pl-2 pr-6 text-ui text-ink"
           >
             {pageOrder.map((id) => (
               <option key={id} value={id}>
@@ -459,9 +785,68 @@ function SketchPane({
               </option>
             ))}
           </select>
+          {zoomed && !collapsed && (
+            // The chip is ALSO the e2e automation hook: Playwright cannot
+            // synthesize a real pinch (D-165), so ctrl+wheel zooms and this
+            // chip proves and resets it. Keep the aria-label shape stable:
+            // "<pct>%, reset zoom, <page name>".
+            <button
+              type="button"
+              onClick={() => useSketchStore.getState().resetPaneViewport(paneIndex)}
+              aria-label={`${Math.round(viewport.zoom * 100)}%, reset zoom, ${page.name}`}
+              className="flex h-full shrink-0 items-center gap-1 border-l border-hairline px-2 font-mono text-meta text-ink"
+            >
+              {Math.round(viewport.zoom * 100)}%
+              <svg viewBox="0 0 16 16" className="h-3 w-3" aria-hidden>
+                <path
+                  d="M3 8a5 5 0 0 1 8.5-3.5M13 8a5 5 0 0 1-8.5 3.5M11.5 1.5v3h-3M4.5 14.5v-3h3"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+              </svg>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => useSketchStore.getState().toggleMaximizedPane(paneIndex)}
+            aria-label={maximized ? `Restore split, ${page.name}` : `Maximize ${page.name}`}
+            aria-pressed={maximized}
+            className="flex h-full w-11 shrink-0 items-center justify-center border-l border-hairline text-ink lg:w-8"
+          >
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden>
+              {maximized ? (
+                <path
+                  d="M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+              ) : (
+                <path
+                  d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+              )}
+            </svg>
+          </button>
         </div>
-        <div ref={measureRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-          {scaled && refSize ? (
+        <div
+          ref={measureRef}
+          // e2e hook for the body wrapper that actually receives `inert`
+          // below (a sibling of the header, not the header itself). Bare
+          // attribute, same pattern as data-sketchpad.
+          data-sketch-pane-body
+          inert={collapsed}
+          onPointerDown={onPanePointerDown}
+          onPointerMove={onPanePointerMove}
+          onPointerUp={onPanePointerEnd}
+          onPointerCancel={onPanePointerEnd}
+          className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
+          {wrapperActive && refSize ? (
             // The layer stack lays out at the page's reference size and is
             // scaled visually, so canvas backing stores, stroke coordinates,
             // and the graph board all stay in one space per page (A15). The
@@ -479,8 +864,14 @@ function SketchPane({
               style={{
                 width: refSize.width,
                 height: refSize.height,
-                transform: `scale(${r})`,
+                // PR 2: pan offset and zoom ride the SAME wrapper that
+                // carried the A15 fit scale, so there is one coordinate
+                // system: translate(offset) scale(fit * zoom), origin top
+                // left. The transition animates double-tap and chip resets;
+                // it is suppressed while a gesture drives the values live.
+                transform: paneTransform(r, viewport),
                 transformOrigin: "top left",
+                transition: gestureLive ? "none" : "transform 200ms ease-out",
               }}
             >
               {layers}

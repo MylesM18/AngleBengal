@@ -78,6 +78,9 @@ export function PracticeWorkspace({
   const closeSketch = useCallback(() => {
     returnFocusToSketch.current = true;
     setSketchOpen(false);
+    // PR 2: pane viewports are session view state; leaving sketch mode
+    // resets zoom, pan, and maximize so reopening starts at fit.
+    useSketchStore.getState().resetAllPaneViewports();
   }, []);
 
   /** Inserting from the clean copy leaves compact sketch mode through the same

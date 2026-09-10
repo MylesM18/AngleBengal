@@ -200,42 +200,14 @@ export function CondensedToolbar({
 
   /**
    * Opening this popover moves focus off whatever math field the user was
-   * typing in (the trigger's own click/tap focus-shift, then the popover's
-   * own focus-on-open below). MathLive's "auto" keyboard policy reacts to
-   * that blur on its own: mathlive 0.110's VirtualKeyboard registers a
-   * document-level "focusout" listener (confirmed by reading
-   * node_modules/mathlive/mathlive.mjs) that, whenever a MATH-FIELD blurs
-   * and its mathVirtualKeyboardPolicy is not "manual", starts a 300ms timer
-   * which TEARS DOWN the whole keyboard element if no math field is focused
-   * when the timer fires. That is invisible to this app's own dismiss
-   * wiring: useKeyboardInset reads the real element's geometry, so its
-   * removal drops insetBottom to 0, condensedLayoutActive flips false, and
-   * Sketchpad swaps this whole toolbar back out for SketchToolbar mid
-   * interaction, taking the popover the user just opened down with it. The
-   * data-keep-math-keyboard marker on the strip root does not help here: it
-   * only blocks this app's OWN pointerdown dismiss listener
-   * (installKeyboardDismiss, MathField.tsx), a different path than
-   * MathLive's native focus-driven auto-hide.
-   *
-   * The gate that 300ms timer checks (field.mathVirtualKeyboardPolicy !==
-   * "manual") is read SYNCHRONOUSLY the instant the field's focusout fires,
-   * so flipping it has to happen before that fires, not after. Called from
-   * the trigger's pointerdown below, which (per spec, and per the standard
-   * "preventDefault() a mousedown to stop it focusing the target" pattern)
-   * always runs before a mousedown's own default focus-shift, so it wins the
-   * race on engines that move focus to a clicked button on press; called
-   * again from the top of the popover-open effect below as a second-chance
-   * fallback for engines that do not shift focus to a plain button on click
-   * at all, where the field is instead still focused at that point.
-   *
-   * Scoped to the ONE field instance that was actually focused, not a
-   * global default: MathField.tsx's own comment records that an earlier
-   * "manual" policy applied everywhere suppressed every keyboard. Restored
-   * to "auto" the moment the popover closes (the effect's cleanup below),
-   * so every other dismiss path, the Draw button's explicit
-   * mathVirtualKeyboard.hide() above, the outside-tap listener below, a real
-   * OS keyboard, is untouched: none of them wait on this gate, they call
-   * hide() directly.
+   * typing in, which lets MathLive's own 300ms focus-driven auto-hide timer
+   * tear down the keyboard, and with it this popover, mid-interaction (bug
+   * B: see D-173's second ruling for the full mechanism). CondensedToolbar
+   * sets mathVirtualKeyboardPolicy to "manual" on the one focused field
+   * early enough to win that race, called from the trigger's pointerdown
+   * and again from the top of the popover-open effect below for engines
+   * that do not shift focus to a plain button on click, and restores
+   * "auto" the moment the popover closes.
    *
    * A pointerdown here is not always followed by a click (I1,
    * final-review.md): the finger can slide off the chip and release, or the
