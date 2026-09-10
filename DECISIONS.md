@@ -3176,3 +3176,21 @@ condensedLayoutActive's formula, the popover's own focus-on-open behavior, and
 the Draw button's explicit window.mathVirtualKeyboard?.hide() all stay
 untouched by this fix; no other dismiss path waits on the new gate, they call
 hide() directly.
+
+### D-174. useKeyboardInset's OS-keyboard gate narrows to math fields, Sketchpad only
+
+PR 2 Task 6b, owner ruling on I2 from PR 1's final review, deferred into
+this branch. Before this fix, useKeyboardInset's OS-keyboard branch counted
+ANY focused INPUT, TEXTAREA, MATH-FIELD, or contenteditable as a keyboard
+being up, so on iOS, focusing the PageBar Rename field or the GraphRail
+units input while split with the bottom pane active condensed the layout
+and unmounted PageBar and GraphRail mid-interaction. The owner-visible
+change: a keyboard raised for a non-math input no longer condenses the
+sketch split layout. useKeyboardInset gained an opt-in parameter,
+mathFieldOnly, that restricts the same gate to MATH-FIELD elements; it
+defaults to false, and only the Sketchpad call site passes true. The other
+three call sites (ChatDrawer, PracticePanel, TypedLinesLayer) keep today's
+document-wide gate, unchanged. condensedLayoutActive's formula in
+src/lib/sketch/condense.ts was deliberately NOT touched: it still reads
+isDesktop, paneIds, activePageId, and insetBottom only, and the narrowing
+happens entirely upstream, at the inset's own source.

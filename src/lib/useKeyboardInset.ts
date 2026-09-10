@@ -42,8 +42,20 @@ const NONE: KeyboardInset = { bottom: 0, top: 0 };
  * padding. The MathLive branch is scale-independent and always reports.
  * Focusout re-measures after a timeout, since the dismiss animates and an
  * immediate read still sees the keyboard up.
+ *
+ * The OS branch's own focus gate ("editing" below) has two modes. By
+ * default it counts any focused INPUT, TEXTAREA, MATH-FIELD, or
+ * contenteditable, document-wide: this is what ChatDrawer, PracticePanel,
+ * and TypedLinesLayer get, since none of them pass a second argument.
+ * Sketchpad passes `mathFieldOnly = true` to narrow that same gate to
+ * MATH-FIELD only (D-174): the split overlay also holds plain inputs that
+ * have nothing to do with the math surface (PageBar's Rename field,
+ * GraphRail's units field), and counting either of those as "a keyboard is
+ * up" used to condense the split layout out from under an open dialog. The
+ * MathLive branch (mlBottom) reads its own visibility flag and is
+ * unaffected either way: it stays unconditional in both modes.
  */
-export function useKeyboardInset(active: boolean): KeyboardInset {
+export function useKeyboardInset(active: boolean, mathFieldOnly = false): KeyboardInset {
   const [inset, setInset] = useState<KeyboardInset>(NONE);
 
   useEffect(() => {
@@ -60,10 +72,12 @@ export function useKeyboardInset(active: boolean): KeyboardInset {
       const el = document.activeElement;
       const editing =
         !!el &&
-        (el.tagName === "INPUT" ||
-          el.tagName === "TEXTAREA" ||
-          el.tagName === "MATH-FIELD" ||
-          (el instanceof HTMLElement && el.isContentEditable));
+        (mathFieldOnly
+          ? el.tagName === "MATH-FIELD"
+          : el.tagName === "INPUT" ||
+            el.tagName === "TEXTAREA" ||
+            el.tagName === "MATH-FIELD" ||
+            (el instanceof HTMLElement && el.isContentEditable));
       const osBottom =
         !zoomed && editing && viewport
           ? Math.max(0, window.innerHeight - viewport.height)
@@ -122,7 +136,7 @@ export function useKeyboardInset(active: boolean): KeyboardInset {
       }
       setInset(NONE);
     };
-  }, [active]);
+  }, [active, mathFieldOnly]);
 
   return active ? inset : NONE;
 }

@@ -100,7 +100,14 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
   // DERIVED on every render, never stored, so it cannot go stale. The hook
   // activates only on compact; the desktop pane's instance stays inert and
   // reports zero, so desktop behavior is untouched by construction.
-  const keyboardInset = useKeyboardInset(isDesktop === false);
+  //
+  // mathFieldOnly = true (D-174, PR 2 Task 6b): the split overlay also holds
+  // plain inputs with nothing to do with the math surface (PageBar's Rename
+  // field, GraphRail's units field), and the hook's default document-wide
+  // gate used to treat either as "a keyboard is up", condensing the layout
+  // out from under an open dialog. Narrowed here to MATH-FIELD only; the
+  // other three call sites keep the document-wide default.
+  const keyboardInset = useKeyboardInset(isDesktop === false, true);
   const condensed = condensedLayoutActive({
     isDesktop,
     paneIds,
