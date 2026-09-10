@@ -11,6 +11,13 @@ import {
 } from "@/lib/sketch/render";
 import { usePane } from "@/components/sketchpad/PaneContext";
 import {
+  isDoubleTap,
+  isTapStroke,
+  strokeExtent,
+  type PaneViewport,
+  type TapSample,
+} from "@/lib/sketch/paneViewport";
+import {
   INK_COLORS,
   STROKE_SIZES,
   usePage,
@@ -88,6 +95,8 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
    */
   const strokeStartedAt = useRef(0);
   const ownerIsTouch = useRef(false);
+  /** Last committed touch tap, for the zoomed double-tap reset (PR 2). */
+  const lastTap = useRef<TapSample | null>(null);
 
   /**
    * Measures the panel and keeps the canvases matched to it.
@@ -231,6 +240,14 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
     // on a surface the user only meant to activate. Draw-mode panes keep
     // draw-on-first-touch; that is designed behavior (A14).
     if (useSketchStore.getState().pages[pageId]?.mode === "type") return;
+    // PR 2: while a pane viewport gesture is live, a touch landing on the
+    // canvas is a third finger adjusting the zoom, never a stroke.
+    if (
+      event.pointerType === "touch" &&
+      useSketchStore.getState().viewportGesturePane !== null
+    ) {
+      return;
+    }
     // A real pen locks out touch for the rest of the session: once the
     // student is known to have a Pencil, an incoming touch pointer while
     // they are writing is the palm resting on the glass, not a second hand
@@ -335,6 +352,44 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
     context?.clearRect(0, 0, size.width, size.height);
   }
 
+  /**
+   * PR 2 double-tap reset: two quick touch dots on a ZOOMED split pane read
+   * as "back to fit". Checked only while zoom > 1, so it cannot misfire at
+   * default zoom (two fast dots stay two dots). While zoomed, the second
+   * dot rolls back (stroke-rollback reuse) and the first, already
+   * committed, survives. Recorded as a decision, not a surprise.
+   * Returns true when the reset fired and the in-flight dot must discard.
+   */
+  function maybeResetOnDoubleTap(event: React.PointerEvent<HTMLCanvasElement>): boolean {
+    const now = performance.now();
+    const duration = now - strokeStartedAt.current;
+    // Extent is measured in reference space; scale it back to visual px so
+    // the tap threshold matches finger physics at any zoom.
+    const extent = strokeExtent(current.current) * scale;
+    const tap: TapSample = { at: now, x: event.clientX, y: event.clientY };
+    if (!isTapStroke(duration, extent)) {
+      lastTap.current = null;
+      return false;
+    }
+    const state = useSketchStore.getState();
+    const paneIndex = state.splitPageIds.indexOf(pageId);
+    if (paneIndex === -1) {
+      // Unsplit view: no pane viewport, taps are just dots.
+      lastTap.current = tap;
+      return false;
+    }
+    const viewport: PaneViewport | undefined = state.paneViewports[paneIndex];
+    if (viewport !== undefined && viewport.zoom > 1 && isDoubleTap(lastTap.current, tap)) {
+      // Removing the key returns the pane to DEFAULT_PANE_VIEWPORT; the
+      // wrapper's transition animates it back to fit.
+      state.resetPaneViewport(paneIndex);
+      lastTap.current = null;
+      return true;
+    }
+    lastTap.current = tap;
+    return false;
+  }
+
   function cancelStroke(event: React.PointerEvent<HTMLCanvasElement>) {
     // pointercancel means the system took the gesture (edge swipe,
     // notification shade, Scribble): the user's intent was not a stroke, so
@@ -359,6 +414,10 @@ export function SketchCanvas({ onSizeChange }: { onSizeChange?: (size: Size) => 
     releasePointer(event.currentTarget, event.pointerId);
 
     if (tool === "pen" && current.current.length > 0) {
+      if (event.pointerType === "touch" && maybeResetOnDoubleTap(event)) {
+        discardStroke();
+        return;
+      }
       addStroke(pageId, current.current);
       current.current = [];
       const context = liveRef.current?.getContext("2d");
@@ -400,7 +459,7 @@ const ERASER_RADIUS = 12;
  * palm-rejection guidance) put the human two-finger landing spread under
  * about 150ms; a palm follows the pen or leading finger by more.
  */
-const GESTURE_WINDOW_MS = 150;
+export const GESTURE_WINDOW_MS = 150;
 
 /**
  * Pointer capture is a convenience, not a precondition for drawing.

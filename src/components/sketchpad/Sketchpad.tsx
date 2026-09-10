@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 import type { NoticeKind } from "@/components/ui/Notice";
 import { Toast } from "@/components/ui/Toast";
@@ -12,9 +19,16 @@ import {
 } from "@/lib/sketch/condense";
 import { latexToPlain } from "@/lib/sketch/latexToPlain";
 import {
+  DEFAULT_PANE_VIEWPORT,
+  clampViewport,
   composedScale,
   isDefaultViewport,
   paneTransform,
+  pinchViewport,
+  rubberBandViewport,
+  type PanePoint,
+  type PaneViewport,
+  type PinchStart,
 } from "@/lib/sketch/paneViewport";
 import { compositeToPng, getGraphLayerSource } from "@/lib/sketch/render";
 import {
@@ -33,7 +47,7 @@ import { GraphLayer } from "./GraphLayer";
 import { GraphRail } from "./GraphRail";
 import { PageBar } from "./PageBar";
 import { PaneContext, type PaneInfo } from "./PaneContext";
-import { SketchCanvas, type Size } from "./SketchCanvas";
+import { GESTURE_WINDOW_MS, SketchCanvas, type Size } from "./SketchCanvas";
 import { SketchToolbar } from "./SketchToolbar";
 import { TypedLinesLayer } from "./TypedLinesLayer";
 
@@ -337,6 +351,19 @@ function gridClasses(count: number): string {
 }
 
 /**
+ * Best-effort capture, the same contract as SketchCanvas's capturePointer:
+ * setPointerCapture throws when the pointer is already gone, and losing
+ * capture only means the gesture ends early if a finger leaves the pane.
+ */
+function capturePanePointer(element: HTMLElement, pointerId: number): void {
+  try {
+    element.setPointerCapture(pointerId);
+  } catch {
+    // Track without capture.
+  }
+}
+
+/**
  * One split pane: header with the page picker, then the page's full layer
  * stack, scaled down to fit when the page has a reference size (A15). The
  * pane CONTAINER carries pointerdown-capture activation (A14) so canvas,
@@ -422,6 +449,114 @@ function SketchPane({
     [pageId, composed, wrapperActive, viewport.offsetX, viewport.offsetY],
   );
 
+  // PR 1 + PR 2 interaction, decided here per the Task 4 review's ledgered
+  // deferred minor: a pane can carry a zoom from before it became the peek
+  // strip, since entering condensed mode is a derived layout change
+  // (condensedLayoutActive), not a store transition, so nothing else resets
+  // paneViewports for it. The peek strip's whole point is a natural-scale
+  // sliver of the page (the peek branch of `r` above is width-fit only, on
+  // that premise), so a carried-over zoom would break that contract. Decision:
+  // clear the pane's viewport the moment it becomes the peek strip, rather
+  // than clamp zoom out of the render composition (which would special-case
+  // peek inside composedScale/paneTransform and go against owner ruling Q1's
+  // instruction to keep the uniform composition shape). A no-op when the pane
+  // is already at the default viewport (resetPaneViewport itself is a no-op
+  // when the pane holds no entry).
+  useEffect(() => {
+    if (peek) useSketchStore.getState().resetPaneViewport(paneIndex);
+  }, [peek, paneIndex]);
+
+  // PR 2 pinch state. The touch map records every touch on this pane; the
+  // canvas keeps its own stroke logic and rolls the in-flight stroke back
+  // on its own (target phase runs before this bubble handler). A second
+  // touch inside GESTURE_WINDOW_MS opens the pinch: the pair drives the
+  // viewport live instead of going inert, reversing D-159.
+  const paneTouches = useRef<Map<number, { x: number; y: number; downAt: number }>>(
+    new Map(),
+  );
+  const pinchRef = useRef<{ ids: [number, number]; start: PinchStart } | null>(null);
+
+  function panePointFrom(event: ReactPointerEvent<HTMLDivElement>): PanePoint {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  function onPanePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "touch") return;
+    const point = panePointFrom(event);
+    const now = performance.now();
+    const prior = [...paneTouches.current.entries()];
+    paneTouches.current.set(event.pointerId, { ...point, downAt: now });
+    if (pinchRef.current !== null || prior.length !== 1) return;
+    const [firstId, first] = prior[0];
+    // Same window as the canvas rollback: beyond it the second touch is a
+    // late-landing palm and the stroke in progress keeps its owner.
+    if (now - first.downAt > GESTURE_WINDOW_MS) return;
+    // No reference space to zoom yet (page never measured): stay inert.
+    if (!refSize || refSize.width <= 0) return;
+    const state = useSketchStore.getState();
+    const current: PaneViewport | undefined = state.paneViewports[paneIndex];
+    pinchRef.current = {
+      ids: [firstId, event.pointerId],
+      start: {
+        viewport: current ?? DEFAULT_PANE_VIEWPORT,
+        fit: r,
+        a: { x: first.x, y: first.y },
+        b: point,
+      },
+    };
+    // Capturing on the container retargets both pointers' moves here, away
+    // from the canvas (which has already rolled its stroke back).
+    capturePanePointer(event.currentTarget, firstId);
+    capturePanePointer(event.currentTarget, event.pointerId);
+    state.setViewportGesturePane(paneIndex);
+  }
+
+  function onPanePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "touch") return;
+    const tracked = paneTouches.current.get(event.pointerId);
+    if (!tracked) return;
+    const point = panePointFrom(event);
+    tracked.x = point.x;
+    tracked.y = point.y;
+    const live = pinchRef.current;
+    if (!live || !refSize) return;
+    const a = paneTouches.current.get(live.ids[0]);
+    const b = paneTouches.current.get(live.ids[1]);
+    if (!a || !b) return;
+    const next = pinchViewport(live.start, { x: a.x, y: a.y }, { x: b.x, y: b.y });
+    // Soft bounds while the fingers are down; the end handler snaps.
+    useSketchStore
+      .getState()
+      .setPaneViewport(paneIndex, rubberBandViewport(next, refSize, live.start.fit, paneSize));
+  }
+
+  function onPanePointerEnd(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "touch") return;
+    paneTouches.current.delete(event.pointerId);
+    const live = pinchRef.current;
+    if (!live || !live.ids.includes(event.pointerId)) return;
+    pinchRef.current = null;
+    const state = useSketchStore.getState();
+    if (refSize) {
+      const current: PaneViewport | undefined = state.paneViewports[paneIndex];
+      const settled = clampViewport(
+        current ?? DEFAULT_PANE_VIEWPORT,
+        refSize,
+        live.start.fit,
+        paneSize,
+      );
+      // Owner ruling Q4: commitPaneViewport is the store's own commit-or-reset
+      // helper (writes settled, or resets to DEFAULT_PANE_VIEWPORT when
+      // settled landed back at default), used instead of the inline
+      // isDefaultViewport-then-branch idiom.
+      state.commitPaneViewport(paneIndex, settled);
+    }
+    // Clearing the gesture flag re-enables the wrapper transition, so the
+    // rubber-band excess animates away.
+    state.setViewportGesturePane(null);
+  }
+
   const reportSize = useCallback(
     (size: Size) => setCanvasSize(pageId, size),
     [setCanvasSize, pageId],
@@ -483,7 +618,14 @@ function SketchPane({
             ))}
           </select>
         </div>
-        <div ref={measureRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div
+          ref={measureRef}
+          onPointerDown={onPanePointerDown}
+          onPointerMove={onPanePointerMove}
+          onPointerUp={onPanePointerEnd}
+          onPointerCancel={onPanePointerEnd}
+          className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
           {wrapperActive && refSize ? (
             // The layer stack lays out at the page's reference size and is
             // scaled visually, so canvas backing stores, stroke coordinates,
