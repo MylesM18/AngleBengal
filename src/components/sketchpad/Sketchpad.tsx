@@ -75,6 +75,9 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     (state) => activePage(state).surface === "graph",
   );
   const splitPageIds = useSketchStore((state) => state.splitPageIds);
+  // PR 2: which pane fills the sketch area (Task 3's store field), read here
+  // so the split grid below can render the maximize row template.
+  const maximizedPane = useSketchStore((state) => state.maximizedPane);
   const splitGraphAll = useSketchStore((state) =>
     state.splitPageIds.some((id) => state.pages[id]?.surface === "graph"),
   );
@@ -104,6 +107,25 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     activePageId,
     insetBottom: keyboardInset.bottom,
   });
+
+  // PR 1's keyboard condense outranks maximize while the keyboard is up
+  // (spec section 6): while condensed, PR 1's layout renders and
+  // maximizedPane is ignored; the maximize state itself is kept, so it
+  // comes back when the keyboard closes. The bounds check covers a stale
+  // index after the compact 2-pane slice (a 3-4 pane split set on desktop
+  // still carries its full splitPageIds when the viewport shrinks to
+  // mobile, where paneIds is sliced to the first two).
+  const maximizedVisible =
+    split && !condensed && maximizedPane !== null && maximizedPane < paneIds.length
+      ? maximizedPane
+      : null;
+
+  // Collapsed pane track: the full header strip plus the pane root's 2px
+  // top and bottom borders (compact header h-11 = 44px, lg header h-8 =
+  // 32px). isDesktop is PR 1's breakpoint value; on the hydration frame
+  // (null) compact is the safe read, and no maximize exists before the
+  // user can interact anyway.
+  const collapsedTrackPx = isDesktop ? 36 : 48;
 
   // A5's active-visible invariant has to hold across the lg seam, not just
   // across store actions: a 3-4 pane split set on desktop keeps its full
@@ -282,21 +304,36 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
         <div
           className={cx(
             "grid min-h-0 flex-1 gap-0.5 transition-[grid-template-rows] duration-200 ease-out",
-            gridClasses(paneIds.length),
+            maximizedVisible !== null ? "grid-cols-1" : gridClasses(paneIds.length),
           )}
           // Compact 2-pane rows come from an inline style so the condense
           // transition has concrete from/to values to tween between; the
           // non-condensed value is exactly what grid-rows-2 computes to.
           // Desktop (and the hydration frame, isDesktop null) keeps the
-          // class-driven templates untouched.
+          // class-driven templates untouched. Maximize takes the first claim
+          // on the row template, ahead of the condensed/normal branch, which
+          // stays byte-for-byte as PR 1 landed it.
           style={
-            isDesktop === false && paneIds.length === 2
+            maximizedVisible !== null
               ? {
-                  gridTemplateRows: condensed
-                    ? `${PEEK_STRIP_PX}px minmax(0, 1fr)`
-                    : "minmax(0, 1fr) minmax(0, 1fr)",
+                  // Maximize (spec section 6): one pane fills the sketch
+                  // area, the rest collapse to their header strips, stacked
+                  // in pane order.
+                  gridTemplateRows: paneIds
+                    .map((_, index) =>
+                      index === maximizedVisible
+                        ? "minmax(0, 1fr)"
+                        : `minmax(${collapsedTrackPx}px, 0fr)`,
+                    )
+                    .join(" "),
                 }
-              : undefined
+              : isDesktop === false && paneIds.length === 2
+                ? {
+                    gridTemplateRows: condensed
+                      ? `${PEEK_STRIP_PX}px minmax(0, 1fr)`
+                      : "minmax(0, 1fr) minmax(0, 1fr)",
+                  }
+                : undefined
           }
         >
           {paneIds.map((pageId, index) => (
@@ -307,6 +344,7 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
               pageId={pageId}
               paneIndex={index}
               peek={condensed && index === 0}
+              collapsed={maximizedVisible !== null && index !== maximizedVisible}
             />
           ))}
         </div>
@@ -374,6 +412,7 @@ function SketchPane({
   pageId,
   paneIndex,
   peek,
+  collapsed = false,
 }: {
   pageId: string;
   paneIndex: number;
@@ -384,9 +423,13 @@ function SketchPane({
    *  height so a natural-scale sliver of the TOP of the page shows instead
    *  of the whole page shrunk into 36px (spec section 4). */
   peek: boolean;
+  /** Maximize (PR 2): true collapses this pane to its header strip, keeping
+   *  its body mounted (inert) behind the collapsed row track. */
+  collapsed?: boolean;
 }) {
   const page = usePage(pageId);
   const isActive = useSketchStore((state) => state.activePageId === pageId);
+  const maximized = useSketchStore((state) => state.maximizedPane === paneIndex);
   const pages = useSketchStore((state) => state.pages);
   const pageOrder = useSketchStore((state) => state.pageOrder);
   const setCanvasSize = useSketchStore((state) => state.setCanvasSize);
@@ -570,6 +613,28 @@ function SketchPane({
     state.setViewportGesturePane(null);
   }
 
+  // Maximize, restore, and pane resizes change the legal pan range; snap a
+  // committed viewport back inside it. Never fights a live gesture.
+  useEffect(() => {
+    if (!refSize || refSize.width <= 0 || paneSize.width === 0) return;
+    if (isDefaultViewport(viewport)) return;
+    const state = useSketchStore.getState();
+    if (state.viewportGesturePane === paneIndex) return;
+    const clamped = clampViewport(viewport, refSize, r, paneSize);
+    if (
+      clamped.zoom !== viewport.zoom ||
+      clamped.offsetX !== viewport.offsetX ||
+      clamped.offsetY !== viewport.offsetY
+    ) {
+      // Owner ruling Q4: commitPaneViewport is the store's own commit-or-
+      // reset helper (writes clamped, or resets to DEFAULT_PANE_VIEWPORT
+      // when clamped landed back at default, the same branch the pinch-end
+      // and wheel commits use), used instead of the inline
+      // isDefaultViewport-then-branch idiom.
+      state.commitPaneViewport(paneIndex, clamped);
+    }
+  }, [viewport, refSize, r, paneSize, paneIndex]);
+
   const reportSize = useCallback(
     (size: Size) => setCanvasSize(pageId, size),
     [setCanvasSize, pageId],
@@ -604,6 +669,8 @@ function SketchPane({
           const state = useSketchStore.getState();
           if (state.activePageId !== pageId) state.setActivePage(pageId);
         }}
+        // e2e geometry hook (same bare-attribute pattern as data-sketchpad).
+        data-sketch-pane={paneIndex}
         // A19: a constant 2px border on every pane so activation recolors
         // without reflowing; the cobalt ring stays the :focus-visible
         // indicator and nothing else.
@@ -612,17 +679,18 @@ function SketchPane({
           isActive ? "border-ink" : "border-hairline",
         )}
       >
-        {/* A20: the picker fills the header, so the whole strip is the tap
-            target; D-158 already gives the select 16px text below lg, and
-            tap-target cannot help a replaced element (no ::after). */}
-        <div className="h-11 shrink-0 border-b border-hairline bg-paper-1 lg:h-8">
+        {/* A20: the picker fills the header's flexible remainder, so the
+            strip stays the page tap target; D-158 gives the select 16px
+            text below lg. The maximize button and zoom chip sit in a fixed
+            right cluster, 44px targets on compact (h-11 w-11), h-8 at lg. */}
+        <div className="flex h-11 shrink-0 items-center border-b border-hairline bg-paper-1 lg:h-8">
           <select
             aria-label="Pane page"
             value={pageId}
             onChange={(event) =>
               useSketchStore.getState().setPanePage(paneIndex, event.target.value)
             }
-            className="h-full w-full bg-transparent pl-2 pr-6 text-ui text-ink"
+            className="h-full min-w-0 flex-1 bg-transparent pl-2 pr-6 text-ui text-ink"
           >
             {pageOrder.map((id) => (
               <option key={id} value={id}>
@@ -630,9 +698,57 @@ function SketchPane({
               </option>
             ))}
           </select>
+          {zoomed && !collapsed && (
+            // The chip is ALSO the e2e automation hook: Playwright cannot
+            // synthesize a real pinch (D-165), so ctrl+wheel zooms and this
+            // chip proves and resets it. Keep the aria-label shape stable:
+            // "<pct>%, reset zoom, <page name>".
+            <button
+              type="button"
+              onClick={() => useSketchStore.getState().resetPaneViewport(paneIndex)}
+              aria-label={`${Math.round(viewport.zoom * 100)}%, reset zoom, ${page.name}`}
+              className="flex h-full shrink-0 items-center gap-1 border-l border-hairline px-2 font-mono text-meta text-ink"
+            >
+              {Math.round(viewport.zoom * 100)}%
+              <svg viewBox="0 0 16 16" className="h-3 w-3" aria-hidden>
+                <path
+                  d="M3 8a5 5 0 0 1 8.5-3.5M13 8a5 5 0 0 1-8.5 3.5M11.5 1.5v3h-3M4.5 14.5v-3h3"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+              </svg>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => useSketchStore.getState().toggleMaximizedPane(paneIndex)}
+            aria-label={maximized ? `Restore split, ${page.name}` : `Maximize ${page.name}`}
+            aria-pressed={maximized}
+            className="flex h-full w-11 shrink-0 items-center justify-center border-l border-hairline text-ink lg:w-8"
+          >
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden>
+              {maximized ? (
+                <path
+                  d="M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+              ) : (
+                <path
+                  d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+              )}
+            </svg>
+          </button>
         </div>
         <div
           ref={measureRef}
+          inert={collapsed}
           onPointerDown={onPanePointerDown}
           onPointerMove={onPanePointerMove}
           onPointerUp={onPanePointerEnd}
