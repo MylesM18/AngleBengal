@@ -3194,3 +3194,55 @@ document-wide gate, unchanged. condensedLayoutActive's formula in
 src/lib/sketch/condense.ts was deliberately NOT touched: it still reads
 isDesktop, paneIds, activePageId, and insetBottom only, and the narrowing
 happens entirely upstream, at the inset's own source.
+
+### D-175. D-159 reversed: canvas pinch is per-pane content zoom
+
+D-159 left the two-finger pair inert after the stroke rollback because page
+pinch zoom was the only zoom on offer and the canvas had no viewport of its
+own. PR 2 of the sketch split design gives each split pane a session-only
+viewport (zoom 1 to 3 plus a clamped pan offset) composed onto the A15 fit
+transform, so the pair now drives that pane's viewport live instead of going
+inert. The rollback itself is retained exactly as it was: the in-flight
+stroke still rolls back when the second touch lands inside GESTURE_WINDOW_MS,
+and that same window is what feeds the pinch. Scope is the split panes: the
+unsplit canvas has no pane viewport, so its two-finger pair stays rolled back
+and inert as before. Owner approved the reversal in the 2026-09-07 design.
+
+### D-176. Double-tap resets zoom only while zoomed; the zoomed double-dot loses its second dot
+
+Double-tap on a zoomed pane animates it back to fit. The check runs only when
+that pane's zoom exceeds 1, so at default zoom two fast dots stay two dots
+and the reset cannot misfire. While zoomed, two fast dots at nearly the same
+spot read as a reset: the second dot rolls back (stroke-rollback reuse) and
+the first, already committed, survives. The reset rides the pen commit path
+only: with the eraser selected, or in type mode, a double-tap does not
+reset, and the way back to fit there is pinching out, or the chip on
+desktop. Accepted edge cases, recorded as decisions, not surprises.
+
+### D-177. Pane viewports are session-only view state
+
+paneViewports and maximizedPane live in the sketch store beside splitPageIds
+and follow the same rule D-169 set for it: never persisted, not part of the
+v2 work state, invisible to the dirty subscription. They reset whenever a
+pane shows a different page (setPanePage), when the split toggles or
+re-arranges (setSplit, removePage fixups), on problem change
+(resetForNewProblem and hydrateForProblem), and when compact sketch mode
+closes. A restored problem always opens at fit.
+
+### D-178. Peek strip resets a pane viewport; maximize targets a slot, not a page
+
+Two further PR 2 behaviors are owner-visible and reversible, recorded here
+rather than left implicit. First, a pane's viewport resets the instant that
+pane becomes the condensed top peek strip: entering condensed mode is a
+derived layout change (condensedLayoutActive), not a store transition, so
+none of the triggers in D-177 fire for it. Sketchpad.tsx's SketchPane runs a
+dedicated effect keyed on its own peek prop that calls resetPaneViewport the
+moment peek turns true, because the peek strip is a natural-scale sliver of
+the page's top (width-fit only) and a carried-over zoom would break that
+contract; a no-op when the pane already sits at default. Second, maximize
+targets a pane SLOT, not a page: maximizedPane in the sketch store holds a
+pane index, not a page id, and toggleMaximizedPane and the SketchPane render
+both key off that index. setPanePage swaps the page shown in a pane and
+resets that pane's viewport, but never reads or writes maximizedPane, so
+swapping the page under a maximized slot (setPanePage on that pane index)
+leaves the slot maximized and simply shows the new page there instead.
