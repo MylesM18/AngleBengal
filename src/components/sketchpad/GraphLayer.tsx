@@ -293,9 +293,11 @@ export function GraphLayer() {
       <div
         className={
           armed
-            ? // touch-manipulation: placing a graph point is two quick taps in
-              // the same spot, the exact double-tap-zoom trigger (R2).
-              "pointer-events-auto absolute inset-0 touch-manipulation cursor-crosshair"
+            ? // touch-none: placing a graph point is two quick taps in the
+              // same spot, the exact double-tap-zoom trigger (R2). None is
+              // affordable here since this overlay never scrolls, and it
+              // also releases the two-finger pinch to the pane handlers.
+              "pointer-events-auto absolute inset-0 touch-none cursor-crosshair"
             : "absolute inset-0"
         }
         role="application"
