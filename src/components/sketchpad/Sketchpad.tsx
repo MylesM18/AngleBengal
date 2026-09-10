@@ -670,7 +670,7 @@ function SketchPane({
   // passive handler cannot preventDefault the scroll it replaces.
   useEffect(() => {
     const element = clipRef.current;
-    if (!element || collapsed) return;
+    if (!element || collapsed || peek) return;
     const onWheel = (event: WheelEvent) => {
       const state = useSketchStore.getState();
       const ref = state.pages[pageId]?.refSize;
@@ -718,9 +718,18 @@ function SketchPane({
     element.addEventListener("wheel", onWheel, { passive: false });
     return () => {
       element.removeEventListener("wheel", onWheel);
-      if (wheelSettle.current !== null) window.clearTimeout(wheelSettle.current);
+      if (wheelSettle.current === null) return;
+      window.clearTimeout(wheelSettle.current);
+      wheelSettle.current = null;
+      // The pending settle was going to clear this flag; the cleanup has to
+      // do it instead, or a re-run or unmount inside the 150ms window
+      // latches it and SketchCanvas's `!== null` touch gate kills drawing on
+      // every pane for the rest of the session. Guarded on ownership so a
+      // re-run cannot clear a pinch another pane has live.
+      const state = useSketchStore.getState();
+      if (state.viewportGesturePane === paneIndex) state.setViewportGesturePane(null);
     };
-  }, [pageId, paneIndex, collapsed]);
+  }, [pageId, paneIndex, collapsed, peek]);
 
   const reportSize = useCallback(
     (size: Size) => setCanvasSize(pageId, size),

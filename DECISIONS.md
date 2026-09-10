@@ -3246,3 +3246,28 @@ both key off that index. setPanePage swaps the page shown in a pane and
 resets that pane's viewport, but never reads or writes maximizedPane, so
 swapping the page under a maximized slot (setPanePage on that pane index)
 leaves the slot maximized and simply shows the new page there instead.
+
+### D-179. D-176's pinch route was unreachable in type mode and under an armed graph tool
+
+D-176 records that the double-tap reset does not fire with the eraser
+selected or in type mode, and that the way back to fit there is pinching
+out, or the chip on desktop. As PR 2 shipped, the type-mode half of that was
+not true on touch. TypedLinesLayer's scroller and GraphLayer's armed
+placement overlay both carried touch-action manipulation, which leaves pinch
+zoom to the browser; the browser consumed the two-finger gesture, the pointer
+stream never reached the pane body handlers on the pane, and a zoomed pane in
+type mode, or under an armed graph tool, had no touch route back to fit at
+all. Only the desktop chip and ctrl+wheel worked. The correction runs
+forward, not backward: instead of narrowing D-176 to match the code, the code
+now matches D-176. The typed-lines scroller moves to touch-action pan-y,
+which keeps its vertical scrolling browser-driven and still suppresses
+double-tap zoom, and the armed graph overlay moves to touch-action none,
+which it can afford because it never scrolls and which suppresses the same
+double-tap zoom the R2 comment guards. Both values exclude pinch zoom, so the
+browser stops consuming the gesture and the pane pinch opens as D-176 always
+claimed. Single-finger behavior is unchanged in both places:
+onPanePointerDown opens a pinch only when a second touch lands while exactly
+one is already down and inside GESTURE_WINDOW_MS. The eraser half of D-176
+was accurate as written and is untouched, as is the pen lockout that keeps
+the pane pinch out of the way for the rest of a session once a real stylus
+has been seen, which remains the one case with no touch route back to fit.

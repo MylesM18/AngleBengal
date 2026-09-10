@@ -104,7 +104,7 @@ export function TypedLinesLayer() {
       ref={scrollerRef}
       data-typed-lines=""
       className={cx(
-        "absolute inset-0 touch-manipulation overflow-y-auto overscroll-contain",
+        "absolute inset-0 touch-pan-y overflow-y-auto overscroll-contain",
         interactive && typing ? "" : "pointer-events-none",
       )}
       // In type mode on the active page this whole layer is the typing
