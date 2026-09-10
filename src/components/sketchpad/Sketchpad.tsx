@@ -11,10 +11,16 @@ import {
   swapCondensedPanes,
 } from "@/lib/sketch/condense";
 import { latexToPlain } from "@/lib/sketch/latexToPlain";
+import {
+  composedScale,
+  isDefaultViewport,
+  paneTransform,
+} from "@/lib/sketch/paneViewport";
 import { compositeToPng, getGraphLayerSource } from "@/lib/sketch/render";
 import {
   activePage,
   usePage,
+  usePaneViewport,
   useSketchStore,
   type OcrBlock,
 } from "@/lib/sketch/store";
@@ -110,7 +116,7 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     : activeSurfaceIsGraph;
 
   const singlePane = useMemo<PaneInfo>(
-    () => ({ pageId: activePageId, scale: 1 }),
+    () => ({ pageId: activePageId, scale: 1, offsetX: 0, offsetY: 0 }),
     [activePageId],
   );
   const setCanvasSize = useSketchStore((state) => state.setCanvasSize);
@@ -393,10 +399,27 @@ function SketchPane({
           Math.min(paneSize.width / refSize.width, 1)
         : Math.min(paneSize.width / refSize.width, paneSize.height / refSize.height, 1)
       : 1;
-  const scaled = refSize !== null && r < 1;
+
+  // PR 2: the pane's session viewport composes onto the A15 fit transform
+  // above (r stays peek-aware, PR 1's shipped condensed/normal/peek
+  // branches govern; the viewport composes around them rather than
+  // replacing them).
+  const viewport = usePaneViewport(paneIndex);
+  const gestureLive = useSketchStore((state) => state.viewportGesturePane === paneIndex);
+  const zoomed = !isDefaultViewport(viewport);
+  // The transform wrapper mounts when the fit scale shrinks the page (as
+  // before) OR the viewport has left its default. refSize is required either
+  // way, because the wrapper lays out at exactly refSize (A15).
+  const wrapperActive = refSize !== null && refSize.width > 0 && (r < 1 || zoomed);
+  const composed = wrapperActive ? composedScale(r, viewport.zoom) : 1;
   const pane = useMemo<PaneInfo>(
-    () => ({ pageId, scale: scaled ? r : 1 }),
-    [pageId, scaled, r],
+    () => ({
+      pageId,
+      scale: composed,
+      offsetX: wrapperActive ? viewport.offsetX : 0,
+      offsetY: wrapperActive ? viewport.offsetY : 0,
+    }),
+    [pageId, composed, wrapperActive, viewport.offsetX, viewport.offsetY],
   );
 
   const reportSize = useCallback(
@@ -461,7 +484,7 @@ function SketchPane({
           </select>
         </div>
         <div ref={measureRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-          {scaled && refSize ? (
+          {wrapperActive && refSize ? (
             // The layer stack lays out at the page's reference size and is
             // scaled visually, so canvas backing stores, stroke coordinates,
             // and the graph board all stay in one space per page (A15). The
@@ -479,8 +502,14 @@ function SketchPane({
               style={{
                 width: refSize.width,
                 height: refSize.height,
-                transform: `scale(${r})`,
+                // PR 2: pan offset and zoom ride the SAME wrapper that
+                // carried the A15 fit scale, so there is one coordinate
+                // system: translate(offset) scale(fit * zoom), origin top
+                // left. The transition animates double-tap and chip resets;
+                // it is suppressed while a gesture drives the values live.
+                transform: paneTransform(r, viewport),
                 transformOrigin: "top left",
+                transition: gestureLive ? "none" : "transform 200ms ease-out",
               }}
             >
               {layers}
