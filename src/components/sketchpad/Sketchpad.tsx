@@ -21,11 +21,14 @@ import { latexToPlain } from "@/lib/sketch/latexToPlain";
 import {
   DEFAULT_PANE_VIEWPORT,
   clampViewport,
+  clampZoom,
   composedScale,
   isDefaultViewport,
   paneTransform,
   pinchViewport,
   rubberBandViewport,
+  wheelZoomFactor,
+  zoomAtPoint,
   type PanePoint,
   type PaneViewport,
   type PinchStart,
@@ -446,9 +449,11 @@ function SketchPane({
   // plus a ResizeObserver for later changes.
   const [paneSize, setPaneSize] = useState<Size>({ width: 0, height: 0 });
   const cleanupRef = useRef<(() => void) | null>(null);
+  const clipRef = useRef<HTMLDivElement | null>(null);
   const measureRef = useCallback((element: HTMLDivElement | null) => {
     cleanupRef.current?.();
     cleanupRef.current = null;
+    clipRef.current = element;
     if (!element) return;
     const apply = () => {
       const next = { width: element.offsetWidth, height: element.offsetHeight };
@@ -498,6 +503,21 @@ function SketchPane({
     }),
     [pageId, composed, wrapperActive, viewport.offsetX, viewport.offsetY],
   );
+
+  // Latest fit and pane size for the native wheel listener: kept in refs so
+  // the effect below subscribes once per pane instead of on every resize.
+  // Writing `.current` during render trips react-hooks/refs (MathField.tsx
+  // hits the same rule for its callback refs), so the sync happens in an
+  // every-render effect instead; both refs are only ever read from the
+  // native wheel listener below, which fires well after commit, so the
+  // timing is equivalent.
+  const fitRef = useRef(r);
+  const paneSizeRef = useRef(paneSize);
+  useEffect(() => {
+    fitRef.current = r;
+    paneSizeRef.current = paneSize;
+  });
+  const wheelSettle = useRef<number | null>(null);
 
   // PR 1 + PR 2 interaction, decided here per the Task 4 review's ledgered
   // deferred minor: a pane can carry a zoom from before it became the peek
@@ -641,6 +661,66 @@ function SketchPane({
       state.commitPaneViewport(paneIndex, clamped);
     }
   }, [viewport, refSize, r, paneSize, paneIndex]);
+
+  // Desktop parity (spec section 6): trackpad pinch and ctrl+wheel are the
+  // same DOM event and zoom the pane under the cursor, anchored at the
+  // cursor; plain wheel pans while zoomed and stays a normal (inert) wheel
+  // at fit. A NATIVE listener with passive:false, because React delegates
+  // from the root, where browsers default wheel listeners to passive, and a
+  // passive handler cannot preventDefault the scroll it replaces.
+  useEffect(() => {
+    const element = clipRef.current;
+    if (!element || collapsed) return;
+    const onWheel = (event: WheelEvent) => {
+      const state = useSketchStore.getState();
+      const ref = state.pages[pageId]?.refSize;
+      if (!ref || ref.width <= 0) return;
+      const fit = fitRef.current;
+      const paneBox = paneSizeRef.current;
+      const stored: PaneViewport | undefined = state.paneViewports[paneIndex];
+      const current = stored ?? DEFAULT_PANE_VIEWPORT;
+      let next: PaneViewport | null = null;
+      if (event.ctrlKey) {
+        const rect = element.getBoundingClientRect();
+        const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        const zoom = clampZoom(current.zoom * wheelZoomFactor(event.deltaY));
+        next = clampViewport(zoomAtPoint(current, fit, anchor, zoom), ref, fit, paneBox);
+      } else if (current.zoom > 1) {
+        next = clampViewport(
+          {
+            zoom: current.zoom,
+            offsetX: current.offsetX - event.deltaX,
+            offsetY: current.offsetY - event.deltaY,
+          },
+          ref,
+          fit,
+          paneBox,
+        );
+      }
+      if (next === null) return;
+      event.preventDefault();
+      // Owner ruling Q4: commitPaneViewport is the store's own commit-or-
+      // reset helper (writes next, or resets to DEFAULT_PANE_VIEWPORT when
+      // next landed back at default, the same branch the pinch-end and
+      // re-clamp commits above use), used instead of the inline
+      // isDefaultViewport-then-branch idiom.
+      state.commitPaneViewport(paneIndex, next);
+      // Wheel steps land discretely; suppressing the transition until the
+      // wheel goes quiet keeps the content under the cursor instead of
+      // trailing it by 200ms.
+      state.setViewportGesturePane(paneIndex);
+      if (wheelSettle.current !== null) window.clearTimeout(wheelSettle.current);
+      wheelSettle.current = window.setTimeout(() => {
+        wheelSettle.current = null;
+        useSketchStore.getState().setViewportGesturePane(null);
+      }, 150);
+    };
+    element.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      element.removeEventListener("wheel", onWheel);
+      if (wheelSettle.current !== null) window.clearTimeout(wheelSettle.current);
+    };
+  }, [pageId, paneIndex, collapsed]);
 
   const reportSize = useCallback(
     (size: Size) => setCanvasSize(pageId, size),
