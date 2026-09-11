@@ -1,15 +1,38 @@
 <svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
-<title>AngleBengal</title>
-<desc>The plum app icon: the cream alpha and beta glyphs with terracotta rosette dots on a rounded plum plate (rx 44); corners transparent for the tab chip. The pair is scaled 1.074 about the plate centre so it fills the frame to the same width the single beta filled in height before (D-183).</desc>
-<rect width="240" height="240" rx="44" fill="#4C3E57"/>
-<g transform="translate(120 120) scale(1.074) translate(-120 -120)">
-<path transform="translate(26.0,157) scale(0.0735,-0.0735)" fill="#F9F5EC" stroke="#F9F5EC" stroke-width="30" stroke-linejoin="round" d="M412 -23Q315 -23 239.5 23.0Q164 69 123.0 147.0Q82 225 82 324Q82 463 159.5 599.0Q237 735 365.5 820.0Q494 905 635 905Q739 905 818.0 850.5Q897 796 938.0 705.5Q979 615 979 512L981 375Q1051 472 1099.5 576.5Q1148 681 1174 793Q1178 805 1190 805H1214Q1233 805 1233 786Q1233 784 1231 780Q1207 686 1171.0 599.5Q1135 513 1086.5 432.0Q1038 351 981 285Q981 31 1040 31Q1078 31 1102.5 53.5Q1127 76 1145.5 109.0Q1164 142 1169 143H1194Q1210 143 1210 123Q1210 72 1151.5 24.5Q1093 -23 1036 -23Q962 -23 913.0 25.0Q864 73 846 150Q750 68 638.0 22.5Q526 -23 412 -23ZM416 31Q635 31 836 211Q835 223 833.0 240.5Q831 258 831 260V481Q831 852 631 852Q511 852 421.0 749.5Q331 647 285.5 504.5Q240 362 240 244Q240 155 285.5 93.0Q331 31 416 31Z"/>
-<path transform="translate(119.3,157) scale(0.0735,-0.0735)" fill="#F9F5EC" stroke="#F9F5EC" stroke-width="30" stroke-linejoin="round" d="M55 -397Q49 -397 44.0 -390.0Q39 -383 39 -377L354 889Q381 991 433.0 1087.0Q485 1183 563.5 1265.5Q642 1348 736.0 1396.0Q830 1444 936 1444Q1012 1444 1073.5 1410.5Q1135 1377 1170.5 1316.5Q1206 1256 1206 1180Q1206 1107 1178.0 1040.5Q1150 974 1100.0 916.5Q1050 859 993 823Q1026 802 1052.0 769.5Q1078 737 1094.0 701.5Q1110 666 1119.0 622.5Q1128 579 1128 541Q1128 436 1083.0 334.0Q1038 232 960.5 149.0Q883 66 783.0 17.5Q683 -31 578 -31Q463 -31 371.0 32.0Q279 95 244 203L96 -385Q96 -397 80 -397ZM582 25Q674 25 748.5 85.5Q823 146 871.5 237.5Q920 329 945.5 431.5Q971 534 971 618Q971 722 911 782Q841 756 774 756Q612 756 612 811Q612 883 797 883Q863 883 918 862Q962 896 998.0 962.0Q1034 1028 1052.5 1100.0Q1071 1172 1071 1235Q1071 1302 1035.5 1346.5Q1000 1391 932 1391Q807 1391 699.5 1314.0Q592 1237 518.0 1119.5Q444 1002 412 877L299 424Q288 377 285 319Q285 191 369.0 108.0Q453 25 582 25ZM674 817Q705 809 776 809Q811 809 846 821Q844 823 838 823Q816 829 791 829Q698 829 674 817Z"/>
-<circle cx="93" cy="130" r="4.2" fill="#B5522E"/><circle cx="94.8" cy="128.2" r="3.0" fill="#F9F5EC"/>
-<circle cx="39" cy="123" r="2.7" fill="#B5522E"/>
-<circle cx="195.8" cy="116.9" r="5.3" fill="#B5522E"/><circle cx="198.1" cy="114.6" r="3.9" fill="#F9F5EC"/>
-<circle cx="174.8" cy="96.6" r="4.2" fill="#B5522E"/><circle cx="172.9" cy="98.5" r="3.0" fill="#F9F5EC"/>
-<circle cx="136.5" cy="140.9" r="3.0" fill="#B5522E"/>
-<circle cx="179.3" cy="149.9" r="2.5" fill="#B5522E"/>
-</g>
+  <title>AngleBengal</title>
+  <desc>The cream-detail bengal mark on a plum disc: a full-frame circle in plum with the head at its natural size on top, its ears reaching 81% of the radius, corners transparent for the tab chip. The home screen icons keep the alpha and beta plate (D-184).</desc>
+
+  <!-- plum disc, the ground the mark reads against in a tab strip -->
+  <circle cx="120" cy="120" r="120" fill="#4C3E57"/>
+
+  <!-- head sheet with die-cut ear notches (real holes) -->
+  <path fill-rule="evenodd" fill="#B5522E" d="
+    M 58 88 L 74 34 L 98 74 L 120 78 L 142 74 L 166 34 L 182 88 L 186 130
+    C 182 168 156 198 120 204 C 84 198 58 168 54 130 Z
+    M 170.4 73.9 L 155.2 68.6 L 164.3 53.4 Z
+    M 69.6 73.9 L 75.7 53.4 L 84.8 68.6 Z"/>
+
+  <!-- forehead stripes -->
+  <path d="M 106 86 L 103 102" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 120 84 L 120 102" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 134 86 L 137 102" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- eyes -->
+  <circle cx="95" cy="126" r="7.5" fill="#F9F5EC"/>
+  <circle cx="145" cy="126" r="7.5" fill="#F9F5EC"/>
+
+  <!-- nose: the hidden measured angle -->
+  <path d="M 120 160 L 107 145" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 120 160 L 133 145" stroke="#F9F5EC" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 113.8 152.8 A 9.5 9.5 0 0 1 126.2 152.8" stroke="#F9F5EC" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+
+  <!-- crescent rosettes: ink spots with offset die-cut bites -->
+  <path fill-rule="evenodd" fill="#F9F5EC" d="
+    M 77 143 A 7 7 0 1 0 77 157 A 7 7 0 1 0 77 143 Z
+    M 80 141.2 A 5.8 5.8 0 1 0 80 152.8 A 5.8 5.8 0 1 0 80 141.2 Z"/>
+  <path fill-rule="evenodd" fill="#F9F5EC" d="
+    M 160 157 A 6 6 0 1 0 160 169 A 6 6 0 1 0 160 157 Z
+    M 157.5 160.5 A 5 5 0 1 0 157.5 170.5 A 5 5 0 1 0 157.5 160.5 Z"/>
+  <circle cx="166" cy="138" r="3.2" fill="#F9F5EC"/>
+  <circle cx="90" cy="174" r="3" fill="#F9F5EC"/>
 </svg>
