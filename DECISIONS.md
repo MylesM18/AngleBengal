@@ -3307,3 +3307,30 @@ reversible:
    png by pattern (D-152), so the new lockup path already passes. The test
    pins the new paths so a future tightening cannot silently break the
    logged-out login page.
+
+### D-181. App icon: the beta glyph scaled 1.2 about the plate centre
+
+Owner call (2026-09-10): "Lets make the B in the app icon a bit bigger so it
+looks a bit more clear and official". The B is the cream beta glyph of the
+D-180 icon. In favicon.svg and icon-source.svg the glyph and its rosette
+dots are wrapped in one group, translate(120 120) scale(1.2)
+translate(-120 -120), so the art grows about the plate centre and the
+composition stays where D-180 put it. Measured at 512, the cream ink now
+spans 50.8% of the width and 79.5% of the height (it was 42.2% by 66.2%),
+leaving about a tenth of the frame above and below and a quarter on each
+side, inside the corner mask iOS applies to the home-screen icon. The
+lockup and the bengal mark are not touched. Choices made in this PR, each
+one reversible:
+
+1. Scale 1.2 is the reading of "a bit bigger": visibly larger from the tab
+   chip up, with margin to spare. Another value is a one-line change to the
+   group transform plus a re-render.
+2. favicon-32.png, apple-touch-icon.png and icon-512.png are re-rendered
+   from the SVGs with sharp 0.35.3 and the call
+   sharp(svg).resize(size, size).png(), which was proven to reproduce the
+   previously committed bytes of all three PNGs exactly before it was used
+   on the new art. Density-based sharp calls do not reproduce them and were
+   not used. Each SVG desc records the scale.
+3. Icon URLs bump to ?v=5 per D-152, and the two manifest.webmanifest icon
+   srcs take the query for the first time, so an installed web app refreshes
+   its icon as well as the tab and home-screen ones.
