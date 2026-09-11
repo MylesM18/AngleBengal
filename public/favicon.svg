@@ -1,10 +1,12 @@
 <svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
   <title>AngleBengal</title>
-  <desc>The cream-detail bengal mark on a plum disc: a full-frame circle in plum with the head at its natural size on top, its ears reaching 81% of the radius, corners transparent for the tab chip. The home screen icons keep the alpha and beta plate (D-184).</desc>
+  <desc>The cream-detail bengal mark on a plum disc: a full-frame circle in plum with the head on top, scaled 1.12 about the disc centre so its ears reach 91% of the radius (D-185), corners transparent for the tab chip. The home screen icons keep the alpha and beta plate (D-184).</desc>
 
   <!-- plum disc, the ground the mark reads against in a tab strip -->
   <circle cx="120" cy="120" r="120" fill="#4C3E57"/>
 
+  <!-- the head, scaled 1.12 about the disc centre so it reads at tab sizes (D-185) -->
+  <g transform="translate(120 120) scale(1.12) translate(-120 -120)">
   <!-- head sheet with die-cut ear notches (real holes) -->
   <path fill-rule="evenodd" fill="#B5522E" d="
     M 58 88 L 74 34 L 98 74 L 120 78 L 142 74 L 166 34 L 182 88 L 186 130
@@ -35,4 +37,5 @@
     M 157.5 160.5 A 5 5 0 1 0 157.5 170.5 A 5 5 0 1 0 157.5 160.5 Z"/>
   <circle cx="166" cy="138" r="3.2" fill="#F9F5EC"/>
   <circle cx="90" cy="174" r="3" fill="#F9F5EC"/>
+  </g>
 </svg>
