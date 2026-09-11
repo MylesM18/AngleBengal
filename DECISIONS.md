@@ -3271,3 +3271,39 @@ one is already down and inside GESTURE_WINDOW_MS. The eraser half of D-176
 was accurate as written and is untouched, as is the pen lockout that keeps
 the pane pinch out of the way for the rest of a session once a real stylus
 has been seen, which remains the one case with no touch route back to fit.
+
+### D-180. Brand refresh: the outlined lockup where the name was typed, the plum beta icon as the app icon
+
+Owner call (2026-09-10): the long form word logo replaces the mark-plus-text
+pair wherever the name was typed, and the plum app icon replaces the
+bengal-head icon set. The bengal mark stays on the mark-only surfaces (the
+Tutor chip and the chat drawer header). Choices made in this PR, each one
+reversible:
+
+1. "Long form word logo" is read as the lockup file (bengal head beside the
+   outlined wordmark), not the text-only wordmark file. Both the header and
+   the login card rendered head plus name together, and the lockup is that
+   composition as designed. The wordmark-only file was not added to the repo;
+   flipping to it is one file copy plus keeping the bare mark beside it.
+2. The lockup ships with its viewBox cropped to the ink (52 43 800 152 of the
+   0 0 873 240 upload, four units of margin) so a 24px slot renders the head
+   at the 24px the bare mark had, the D-153 crop rationale applied to the
+   header. Header 126x24, login card 147x28 with "Sign in to continue" moved
+   beneath it. It overwrites public/anglebengal-lockup.svg, whose live-text
+   Archivo wordmark depended on a loaded font and was referenced nowhere.
+3. The pair's visible text becomes the image alt "AngleBengal" (the header
+   link keeps aria-label "AngleBengal home"), so the name still reaches
+   screen readers and page search. No test asserted the visible text.
+4. Icon corners: favicon.svg and favicon-32.png keep the upload's rounded
+   plate (rx 44) on a transparent ground, right for a tab chip on any strip.
+   apple-touch-icon.png and icon-512.png are rasterized full-bleed (rx 0,
+   same art) because iOS masks its own corners and paints transparent ones
+   black, and the previous PNGs were already full-bleed plum. icon-source.svg
+   is replaced with that full-bleed variant so the raster source stays in the
+   repo; the PNGs come from it through sharp. manifest.webmanifest colours
+   are untouched (not asked).
+5. Icon URLs bump to ?v=4 per D-152, and the apple entry takes the query too.
+6. The login wall needs no code change: guard.ts allows any root-level svg or
+   png by pattern (D-152), so the new lockup path already passes. The test
+   pins the new paths so a future tightening cannot silently break the
+   logged-out login page.

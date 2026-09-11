@@ -13,12 +13,9 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-desk p-4">
       <div className="w-full max-w-sm rounded-chip bg-paper-1 p-6 shadow-sheet">
-        <div className="mb-5 flex items-center gap-2.5">
-          <Image src="/anglebengal-mark-dark.svg" alt="" width={28} height={28} priority />
-          <div>
-            <div className="font-expanded text-ui-lg text-ink">AngleBengal</div>
-            <div className="text-meta text-ink-soft">Sign in to continue</div>
-          </div>
+        <div className="mb-5 flex flex-col gap-1.5">
+          <Image src="/anglebengal-lockup.svg" alt="AngleBengal" width={147} height={28} priority />
+          <div className="text-meta text-ink-soft">Sign in to continue</div>
         </div>
         <LoginForm />
       </div>
