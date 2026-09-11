@@ -3517,3 +3517,32 @@ inherent to the art, not to the fit, and no scale inside a 240 frame closes it.
 favicon-32.png re-renders from the SVG. icon-source.svg is untouched apart from
 its desc, which no longer says the tab carries a different mark. Icon URLs bump
 to ?v=8 per D-152, since ?v=7 shipped with D-185.
+
+### D-187. The tab favicon's glyphs take a heavier stroke than the home screen icon's
+
+Owner call (2026-09-11): "make the glyphs thicker so it's not so faint", about
+the alpha and beta pair D-186 put in the tab favicon.
+
+Each glyph is a filled path with a matching cream stroke, so weight is one
+number: stroke-width on the two glyph paths, in glyph units that the path
+transform scales by 0.0735. favicon.svg takes it from 30 to 100, which is 7.89
+units of the 240 frame against 2.37. Measured at 512, the cream ink covers
+17.1% of the frame where it covered 11.0%, and the furthest ink moves from
+94.4% to 96.7% of the disc radius with zero pixels outside the disc. The scale
+stays at 1.074, and the rosette dots still paint after the glyphs, so a heavier
+stroke does not swallow any of them.
+
+The stroke is now the one thing the two icons differ in, and that is
+deliberate. The home screen icon is read at 180px, where a hairline is elegant;
+the tab icon is read at 16 and 32, where it disappears. A heavier cut for the
+small size is optical sizing, not drift. The cost is real and worth stating: a
+future change to the art has to be made in both files, and only the scale is
+still shared.
+
+Heavier weights were rendered and passed over. At 130 the letterforms still
+read and the ink reaches 19.7%, but the furthest ink sits at 97.7% of the
+radius and the beta crowds the rim. At 180 the counters begin to close and the
+ink all but touches the disc edge. 100 is the heaviest weight that leaves both
+the counters and the ring of plum intact.
+
+Icon URLs bump to ?v=9 per D-152, since ?v=8 shipped with D-186.
