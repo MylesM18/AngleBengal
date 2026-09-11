@@ -41,18 +41,18 @@ export function TopBar({ chatOpen, onToggleChat, tutorRef }: TopBarProps) {
         className="flex items-center gap-2 rounded-chip px-1 max-lg:tap-target"
         aria-label="AngleBengal home"
       >
-        {/* `priority` because this mark is above the fold and is measured as
-            the Largest Contentful Paint; without it Next warns to load it
-            eagerly. */}
+        {/* The lockup (bengal head beside the outlined wordmark, D-180) replaces
+            the mark-and-text pair; its viewBox is cropped to the ink so the head
+            renders at the 24px the bare mark had. `priority` because it is above
+            the fold and measured as the Largest Contentful Paint. */}
         <Image
-          src="/anglebengal-mark-dark.svg"
-          alt=""
-          width={24}
+          src="/anglebengal-lockup.svg"
+          alt="AngleBengal"
+          width={126}
           height={24}
           priority
           className="shrink-0"
         />
-        <span className="font-expanded text-ui-lg text-ink">AngleBengal</span>
       </Link>
 
       <nav className="hidden flex-1 items-center gap-1 lg:flex" aria-label="Main tabs">

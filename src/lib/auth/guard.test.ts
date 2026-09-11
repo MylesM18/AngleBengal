@@ -13,6 +13,10 @@ describe("isPublicPath", () => {
     "/anglebengal-mark.svg",
     "/anglebengal-mark-dark.svg",
     "/apple-touch-icon.png",
+    "/anglebengal-lockup.svg",
+    "/favicon.svg",
+    "/favicon-32.png",
+    "/icon-512.png",
   ])("allows %s without a session", (path) => {
     expect(isPublicPath(path)).toBe(true);
   });
