@@ -3428,3 +3428,33 @@ reversible:
 4. Icon URLs bump to ?v=6 per D-152, in layout.tsx and in the two
    manifest.webmanifest srcs, and the layout comment now names D-183 as the
    art change behind the query.
+
+### D-184. The tab favicon goes back to the bengal, on a plum disc, and the login ground goes plum
+
+Owner call (2026-09-11), two asks in one message: put the plum on the login
+page background, and switch the favicon back to the bengal mark with its cream
+accents, on a plum circle. Both land on the D-183 branch because the favicon
+files are the same ones that PR was already rewriting.
+
+1. Favicon. favicon.svg is the cream-detail bengal head from
+   anglebengal-mark-dark.svg, verbatim, over a full-frame plum circle
+   (cx 120, cy 120, r 120) painted first. The head keeps its natural size: the
+   ears reach 81% of the disc radius, which leaves a ring of plum on every
+   side, and the corners outside the circle stay transparent so a tab chip
+   masks cleanly. favicon-32.png re-renders from it, still through
+   sharp(svg).resize(32, 32).png().
+2. The two surfaces now carry different marks, deliberately. This restores the
+   split the icon set had before D-180, the bengal face in the tab and a plum
+   plate on the home screen, except the home screen plate is now the alpha and
+   beta pair from D-183. A face survives a 16px tab better than a two-glyph
+   lockup does, which is the reason that split existed in the first place. The
+   icon-source.svg desc no longer claims the same art as favicon.svg.
+3. Login ground. src/app/login/page.tsx swaps bg-desk for bg-plum, a token
+   that already existed at #4c3e57 and already paints the icon plate. That page
+   only: the desk stays everywhere else, and the cream card, its shadow and its
+   ink are untouched, so nothing on the page sets text directly on plum. The
+   main is min-h-dvh so the plum covers the viewport, and html already carries
+   overscroll-behavior-y: contain, so the desk under body cannot rubber-band
+   into view.
+4. No second cache-bust. The ?v=6 bump from D-183 has not shipped yet
+   (production is still on ?v=5), so it covers this art change as well.
