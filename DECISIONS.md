@@ -3458,3 +3458,33 @@ files are the same ones that PR was already rewriting.
    into view.
 4. No second cache-bust. The ?v=6 bump from D-183 has not shipped yet
    (production is still on ?v=5), so it covers this art change as well.
+
+### D-185. The tab favicon's bengal head scaled 1.12 inside its disc
+
+Owner call (2026-09-11): "Make the favicon a bit bigger and bengal icon within
+the circle a bit more noticable".
+
+The disc cannot get bigger. It is already a full-frame circle, r 120 in a 240
+viewBox, touching all four edges, so the only way to fill more of a tab slot
+would be to stop being a circle, which is the shape D-184 was asked for. A
+tighter viewBox was tried and rejected: clipping the circle against the frame
+leaves four flat chords and the icon reads as a cut octagon rather than a disc.
+
+So the size went into the head instead. favicon.svg now wraps the mark in
+translate(120 120) scale(1.12) translate(-120 -120), the device D-181 and D-183
+already use. Measured at 512, the head's ink covers 33.6% of the frame where it
+covered 26.8%, and its furthest point reaches 91% of the disc radius where it
+reached 81%, so a ring of plum still shows on every side and the ear tips stay
+clear of the rim. Scale 1.20 was tried and rejected at 97% of the radius: the
+ears crowd the edge and the disc stops reading as a ring. favicon-32.png
+re-renders from the SVG. Nothing else in the icon set moves.
+
+Not taken, and worth knowing. The rust head measures 1.97:1 against the plum
+disc while the cream accents measure 9.04:1, so at 16px it is the cream that
+carries the mark, not the silhouette. A cream keyline around the head would
+lift the silhouette to the cream's contrast and make the cat unmistakable in a
+tab strip. That is a restyle of the mark rather than a size change, so it was
+rendered for the owner to look at and deliberately left out of this PR.
+
+Icon URLs bump to ?v=7 per D-152. ?v=6 carried D-183 and D-184 and has already
+shipped, so this art change needs its own.
