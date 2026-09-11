@@ -3390,3 +3390,41 @@ changes, each reversible on its own:
 Not taken: auto-arming Point when the dialog opens (an armed overlay takes
 pointer events away from the pen, against D-154), and a tool picker inside
 the dialog (the chips already are one).
+
+### D-183. App icon: the alpha and beta pair, sized to the frame the lone beta filled
+
+Owner call (2026-09-11): swap the app icon for a supplied SVG, "but make sure
+the size of the logo remains the same as it currently is". The supplied art
+keeps the plum plate and the exact beta path of D-180, adds a cream alpha to
+its left, and carries six rosette dots where there were four. It arrives drawn
+smaller than the icon it replaces: at its own scale the pair spans 74.2% of
+the width and 57.4% of the height, where the D-181 beta spanned 51.0% by
+79.7%.
+
+Two glyphs cannot hold the beta at its old height. Side by side at that size
+the pair measures 103% of the frame. So "the same size" is read as the same
+fill of the plate. favicon.svg and icon-source.svg wrap the supplied art in
+one group, translate(120 120) scale(1.074) translate(-120 -120), the device
+D-181 already used, and the pair now spans 79.9% of the width against the
+79.7% of height the lone beta filled, centred with about a tenth of the frame
+clear on each side. The beta alone is necessarily smaller than it was, 77% of
+its D-181 height, because it now shares the width with the alpha. The lockup
+and the bengal mark are not touched. Choices made in this PR, each one
+reversible:
+
+1. The supplied art is kept verbatim inside the wrapper: same path data, same
+   glyph transforms, same dot positions and radii. The only thing dropped is
+   the file's C2PA metadata block, 30KB of base64 that has no place in a
+   favicon refetched on every cold page load. Scale is a one-line change to
+   the group transform plus a re-render.
+2. The wider mark is safe on both surfaces: measured with the plate removed,
+   no ink falls outside the rx-44 plate at 512, and none falls outside the
+   n=5 squircle iOS masks onto a home-screen icon at 180.
+3. favicon-32.png, apple-touch-icon.png and icon-512.png are re-rendered from
+   the SVGs with sharp 0.35.3 and the call sharp(svg).resize(size, size).png(),
+   proven again on this branch to reproduce the previously committed bytes of
+   all three exactly before it was used on the new art. favicon-32.png comes
+   from favicon.svg, the other two from icon-source.svg.
+4. Icon URLs bump to ?v=6 per D-152, in layout.tsx and in the two
+   manifest.webmanifest srcs, and the layout comment now names D-183 as the
+   art change behind the query.
