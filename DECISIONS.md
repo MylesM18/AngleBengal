@@ -3334,3 +3334,52 @@ one reversible:
 3. Icon URLs bump to ?v=5 per D-152, and the two manifest.webmanifest icon
    srcs take the query for the first time, so an installed web app refreshes
    its icon as well as the tab and home-screen ones.
+
+### D-182. The math keyboard spaces and slashes, and typed coordinates always place
+
+Owner report (2026-09-11): pressing space in a math field inserted nothing,
+the math keyboard showed no "/" key, and typing x and y into the graph
+rail's exact-coordinates dialog plotted nothing. Three causes, three
+changes, each reversible on its own:
+
+1. Space. MathLive's mathModeSpace option defaults to the empty string, so
+   the space bar (a hardware one, and the alphabetic layer's blank key,
+   which types a space through the same path) moved the cursor out of the
+   current group instead of inserting anything. Every field now sets
+   mathModeSpace to the thick space "\;", the widest of the three spacing
+   commands MathLive documents for the option and the closest to a text
+   space. latexToPlain folds the thin, medium and thick spaces to one plain
+   space, so the grader and the clean copy read "2 cm" for what renders as
+   2 cm; before this the medium and thick spaces would have survived as
+   literal characters in graded text. A medium or thin space is a
+   one-string change plus nothing else.
+
+2. Slash. The app 123 layer (D-128) gains a "/" key beside the division
+   sign, inserting a literal solidus, and a labelled space key on its bottom
+   row that types a space through the keycap's key property (a label-only
+   keycap types its label). Every row is now nine widths: the wide "=" and
+   backspace on the middle rows keep the columns aligned, since rows of
+   unequal width read as the misalignment D-128 removed. The return and
+   "+ line" keys drop from width 2 to 1.5 to make room; measured at 360px,
+   the narrowest compact width the rig covers, the "+ line" label is 38px
+   wide inside a 52px key and the "space" label 36px inside its 52px key,
+   so neither clips. A hardware "/" keeps MathLive's default binding to a
+   fraction; the key is the way to a slash glyph on every device.
+
+3. Exact coordinates. commitGraphPoint returned silently unless a placement
+   chip was armed, and the dialog cleared its inputs regardless, so the
+   entry vanished with no feedback. Now no chip armed places a point: the
+   click path never reaches the function unarmed (the placement overlay
+   only takes pointer events while a tool is armed), so the default is the
+   dialog's alone, and the tool is read, never set, so ink and typing keep
+   working over graph paper (D-154). Shade shades the region holding the
+   typed point. Eraser and Dashed act on an object that already exists,
+   which a coordinate cannot name, so they keep the entry and say so in
+   the rail's hint; a rejected second point (identical, or straight above a
+   parabola vertex) keeps the entry beside its hint the same way. The
+   function returns whether it consumed the point and the dialog clears
+   the inputs only then.
+
+Not taken: auto-arming Point when the dialog opens (an armed overlay takes
+pointer events away from the pen, against D-154), and a tool picker inside
+the dialog (the chips already are one).

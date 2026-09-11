@@ -15,6 +15,11 @@ import { pathKeepsKeyboard } from "@/lib/math/keyboardDismiss";
  * cleanly; the built-in alphabetic and greek layers stay as extra tabs.
  * Insert strings use the same #@/#? placeholder semantics as the palette.
  *
+ * Every row is nine widths (D-182): the "/" key sits with the division sign
+ * on the top row, a space key sits on the bottom row, and the wide "=" and
+ * backspace on the middle rows keep every column aligned, since rows of
+ * unequal width read as the misalignment D-128 removed.
+ *
  * Two variants differ only in the bottom-right key: the answer box keeps the
  * standard return glyph (commit = submit), while the typed-lines surface
  * shows an explicit "+ line" key. Both run MathLive's commit command, which
@@ -25,15 +30,19 @@ function appMathLayout(lastKey: Partial<VirtualKeyboardKeycap>): VirtualKeyboard
     label: "123",
     tooltip: "Numbers and symbols",
     rows: [
-      ["7", "8", "9", "\\div", "(", ")", { latex: "\\sqrt{#@}", label: "&radic;" }, { latex: "#@^{#?}", label: "x&#8319;" }],
-      ["4", "5", "6", "\\times", "x", "n", { latex: "\\frac{#@}{#?}", label: "a/b" }, "="],
-      ["1", "2", "3", "-", "<", ">", ",", { label: "[backspace]", width: 1 }],
+      ["7", "8", "9", "\\div", "/", "(", ")", { latex: "\\sqrt{#@}", label: "&radic;" }, { latex: "#@^{#?}", label: "x&#8319;" }],
+      ["4", "5", "6", "\\times", "x", "n", { latex: "\\frac{#@}{#?}", label: "a/b" }, { latex: "=", width: 2 }],
+      ["1", "2", "3", "-", "<", ">", ",", { label: "[backspace]", width: 2 }],
       // The bottom-right corner is the close key (D-155): the keyboard also
       // hides on any tap outside it, but an explicit control has to exist.
       [
         { label: "0", width: 1 },
         ".",
         "+",
+        // `key` makes MathLive type the space, the same mathModeSpace path
+        // as the space bar and the alphabetic layer's blank key. A key with
+        // only a label types its label, so "space" needs the explicit key.
+        { label: "space", key: " ", class: "small", width: 1.5 },
         { label: "[left]", width: 1 },
         { label: "[right]", width: 1 },
         lastKey,
@@ -43,11 +52,11 @@ function appMathLayout(lastKey: Partial<VirtualKeyboardKeycap>): VirtualKeyboard
   };
 }
 
-const APP_MATH_LAYOUT = appMathLayout({ label: "[return]", width: 2 });
+const APP_MATH_LAYOUT = appMathLayout({ label: "[return]", width: 1.5 });
 const APP_MATH_LINES_LAYOUT = appMathLayout({
   label: "+ line",
   class: "action",
-  width: 2,
+  width: 1.5,
   command: ["performWithFeedback", "commit"],
 });
 
@@ -211,6 +220,12 @@ export function MathField({
       // exists. The earlier "manual" policy suppressed every keyboard, which
       // left typed input unusable on phones (owner report after PR #13).
       field.mathVirtualKeyboardPolicy = "auto";
+      // MathLive's mathModeSpace defaults to "", so the space bar inserted
+      // nothing on every surface (owner report). The thick space is the
+      // widest of the three spacing commands MathLive documents for the
+      // option and the closest to a text space; latexToPlain folds it back
+      // to a plain space for the grader and the clean copy (D-182).
+      field.mathModeSpace = "\\;";
       field.value = value;
       field.setAttribute("aria-label", ariaLabel);
       field.style.display = "block";
