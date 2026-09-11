@@ -94,7 +94,10 @@ export function GraphRail() {
       setHint("Enter numbers, fractions like 3/2 work too.");
       return;
     }
-    commitGraphPoint(activePageId, [x, y], setHint);
+    // Clear only what was consumed: a rejected entry (a degenerate second
+    // point, or Eraser or Dashed armed) stays in the inputs beside its hint,
+    // so nothing typed is ever silently discarded (D-182).
+    if (!commitGraphPoint(activePageId, [x, y], setHint)) return;
     if (xRef.current) xRef.current.value = "";
     if (yRef.current) yRef.current.value = "";
   }

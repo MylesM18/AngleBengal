@@ -323,21 +323,42 @@ const POINTS_NEEDED: Record<string, number> = {
  * active page (A4), so callers hand in a pageId that IS active by the time
  * this runs: the rail reads activePageId, and a pane click arrives after the
  * pane container's capture handler has activated that pane's page.
+ *
+ * Returns true when the point was consumed (an object was drawn, a region
+ * was shaded, or a first point is now pending) and false when nothing
+ * changed, with the hint saying why. The dialog keeps its typed values on
+ * false so they can be corrected rather than retyped (D-182).
+ *
+ * The rail tool decides what a point means, and the dialog can arrive with
+ * none armed: the placement overlay only takes clicks while a tool is
+ * armed, so an unarmed call is always typed coordinates, and those place a
+ * point (D-182). The tool is read, never set, so ink and typing keep
+ * working over graph paper afterwards (D-154). Eraser and Dashed edit an
+ * object that already exists, which a coordinate cannot name, so they
+ * explain themselves instead of silently eating the entry.
  */
 export function commitGraphPoint(
   pageId: string,
   world: WorldPoint,
   setHint: (hint: string | null) => void,
-): void {
+): boolean {
   const state = useSketchStore.getState();
-  const tool = state.graphTool;
-  if (!tool || !(tool in POINTS_NEEDED)) return;
+  const tool = state.graphTool ?? "point";
+  if (tool === "shade") {
+    setHint(null);
+    state.addGraphShade(pageId, world);
+    return true;
+  }
+  if (!(tool in POINTS_NEEDED)) {
+    setHint("Eraser and Dashed act on a drawn object: tap it on the grid.");
+    return false;
+  }
   const kind = tool as GraphObject["kind"];
   const points = [...state.pendingGraphPoints, world];
   const error = placementError(kind, points);
   if (error) {
     setHint(error);
-    return;
+    return false;
   }
   setHint(null);
   if (points.length >= POINTS_NEEDED[kind]) {
@@ -345,4 +366,5 @@ export function commitGraphPoint(
   } else {
     state.pushPendingGraphPoint(world);
   }
+  return true;
 }

@@ -12,7 +12,10 @@ export function latexToPlain(latex: string): string {
     .replace(/\\lim_\{([^{}]*)\\to *([^{}]*)\}/g, " lim $1->$2 ")
     .replace(/\\frac\{d\}\{dx\}/g, " d/dx ")
     .replace(/\\int/g, " integral ")
-    .replace(/\\,/g, " ")
+    // Thin, medium and thick spaces: the space bar inserts one of these
+    // (MathField.tsx sets mathModeSpace, D-182), and none is a letter
+    // command, so the catch-all strip below would leave "\;" in graded text.
+    .replace(/\\[,:;]/g, " ")
     .replace(/\\left\|([^|]*)\\right\|/g, "abs($1)")
     .replace(/\\left|\\right/g, "")
     .replace(/\{\}\^\{([^{}]*)\}C_\{([^{}]*)\}/g, "nCr($1,$2)")
