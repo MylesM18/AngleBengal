@@ -179,14 +179,19 @@ test.describe("math keyboard (typed lines)", () => {
     await page.keyboard.type("y");
     await expect.poll(() => mathFieldValue(page)).toBe("x\\;y");
 
-    // The app 123 layer: a "/" key that inserts a solidus (a hardware "/"
-    // makes a fraction, so this key is the only way to the glyph), and a
+    // Hardware "/": a solidus, not MathLive's default smart fraction (which
+    // would have swallowed the y into a numerator). Owner call, D-182.
+    await page.keyboard.press("/");
+    await page.keyboard.type("z");
+    await expect.poll(() => mathFieldValue(page)).toBe("x\\;y/z");
+
+    // The app 123 layer: a "/" key that inserts the same solidus, and a
     // space key that types the same space as the space bar.
     await showMathKeyboard(page);
     await keycap(page, "/").click();
-    await expect.poll(() => mathFieldValue(page)).toBe("x\\;y/");
+    await expect.poll(() => mathFieldValue(page)).toBe("x\\;y/z/");
     await keycap(page, "space").click();
-    await expect.poll(() => mathFieldValue(page)).toBe("x\\;y/\\;");
+    await expect.poll(() => mathFieldValue(page)).toBe("x\\;y/z/\\;");
 
     await hideMathKeyboard(page);
     await wipeActiveSketchSurface(page);
