@@ -3488,3 +3488,32 @@ rendered for the owner to look at and deliberately left out of this PR.
 
 Icon URLs bump to ?v=7 per D-152. ?v=6 carried D-183 and D-184 and has already
 shipped, so this art change needs its own.
+
+### D-186. The tab favicon carries the alpha and beta pair, still on its plum disc
+
+Owner call (2026-09-11): "lets change the favicon back to the ab but keep the
+plum color circle". So the disc from D-184 stays and the bengal head inside it
+goes back to the alpha and beta pair. D-184's split is over: the two icon
+surfaces carry the same art again, differing only in the shape of the plate,
+a full-frame circle in the tab and the rounded rx-44 plate on the home screen.
+
+favicon.svg takes the art verbatim from icon-source.svg at the same
+translate(120 120) scale(1.074) translate(-120 -120) the home screen icon uses.
+Keeping the scale identical rather than refitting it to the circle is the
+point: one number describes both icons, and a later change to the art moves
+both by editing the same group. Measured at 512, the furthest ink sits at 94.4%
+of the disc radius with zero pixels outside the disc, so a thin ring of plum
+still shows and nothing is clipped. A refit to 1.035, which would have matched
+the 91% the bengal head reached under D-185, was rendered and passed over: it
+buys a slightly wider ring at the cost of the shared number, and the owner's
+last two calls both asked for more size, not less.
+
+Worth recording, since it is the cost of this swap. The bengal head covered
+33.6% of the frame in ink; the alpha and beta pair covers 11.0%, because a
+two-glyph lockup is thin strokes where a cat head is a solid sheet. The tab
+icon is therefore lighter than it was under D-185, at any size. That is
+inherent to the art, not to the fit, and no scale inside a 240 frame closes it.
+
+favicon-32.png re-renders from the SVG. icon-source.svg is untouched apart from
+its desc, which no longer says the tab carries a different mark. Icon URLs bump
+to ?v=8 per D-152, since ?v=7 shipped with D-185.
