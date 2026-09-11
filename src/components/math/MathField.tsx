@@ -258,6 +258,28 @@ export function MathField({
             event.stopPropagation();
             onEmptyBackspaceRef.current?.();
           }
+          // A hardware "/" is bound by MathLive to a smart fraction, which
+          // swallows what came before it into a numerator, so the solidus
+          // could not be typed at all. Intercepted here like Enter, before
+          // the keystroke reaches MathLive's sink, and inserted as the same
+          // solidus the 123 layer's "/" key inserts (owner call, D-182).
+          // Not done through the keybindings option: its setter only works
+          // on a mounted field, and that extra post-mount setOptions made
+          // the WebKit remount churn the rig already documents flaky (the
+          // condense spec's OS-keyboard test failed 2 of 4 runs with it and
+          // 0 of 4 without). Modifier chords stay MathLive's.
+          if (
+            event.key === "/" &&
+            !event.altKey &&
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !event.isComposing &&
+            !field.readOnly
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            field.insert("/");
+          }
         },
         { capture: true },
       );

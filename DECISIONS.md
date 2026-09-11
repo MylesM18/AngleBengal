@@ -3363,8 +3363,15 @@ changes, each reversible on its own:
    "+ line" keys drop from width 2 to 1.5 to make room; measured at 360px,
    the narrowest compact width the rig covers, the "+ line" label is 38px
    wide inside a 52px key and the "space" label 36px inside its 52px key,
-   so neither clips. A hardware "/" keeps MathLive's default binding to a
-   fraction; the key is the way to a slash glyph on every device.
+   so neither clips. A hardware "/" now types the same solidus the key
+   inserts, an owner call made on the same day once the keycap was in:
+   MathLive's default binding made it a smart fraction that swallowed what
+   came before it into a numerator. The keystroke is intercepted in the
+   field's capture-phase keydown listener, the way Enter already is, rather
+   than through the keybindings option, whose setter needs a mounted field
+   and whose post-mount call made the rig's WebKit remount churn flakier.
+   Modifier chords and the rest of MathLive's bindings stay, and the a/b
+   key remains the way to a stacked fraction.
 
 3. Exact coordinates. commitGraphPoint returned silently unless a placement
    chip was armed, and the dialog cleared its inputs regardless, so the
