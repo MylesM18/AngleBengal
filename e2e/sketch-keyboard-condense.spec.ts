@@ -378,6 +378,37 @@ test("unsplit typing pads the layer and keeps the active line above the keyboard
   page,
 }) => {
   await openTypedSketch(page);
+  // Pinned, and pinned to GRAPH specifically (D-190). Normalization manages
+  // page count and surface CONTENT but never surface CHOICE, and
+  // servePracticeProblem serves whichever of the pooled problems the API
+  // returns, so this test used to inherit whatever background that problem
+  // was last left on. That decided the result outright rather than jittering
+  // it: on graph the rail costs 141px, leaving the layer exactly as tall as
+  // the keyboard, and the assertion below is then UNSATISFIABLE, not slow
+  // (measured 664 against a 447 ceiling, with the scroll a correct no-op
+  // over a zero band). Off graph it passed. With 3 of the 4 pooled problems
+  // sitting on graph, and this file's first test flipping another one onto
+  // graph every run, it read as a 1-in-4 flake that was quietly ratcheting
+  // toward always failing.
+  //
+  // Graph is the right pin because it is the case that was broken: the rail
+  // now yields its height to the keyboard (Sketchpad.tsx), so this covers
+  // that fix rather than steering around it. Plain would have been green
+  // for the wrong reason.
+  //
+  // Wiped AFTER the switch, unlike the first test in this file, which sets
+  // Graph and stops because it never counts lines. Content is per SURFACE
+  // (page.content[page.surface]), so openTypedSketch's wipe only emptied
+  // whichever surface the recycled page happened to arrive on; switching
+  // afterwards uncovers the graph surface's own leftover typed lines and
+  // the count loop below then asserts against the wrong total. Re-wiping
+  // here empties the surface this test actually types on.
+  await setSketchBackground(page, "Graph");
+  await wipeActiveSketchSurface(page);
+  // wipeActiveSketchSurface leaves Draw mode behind (it needs a throwaway
+  // stroke before Clear enables), the same reason openTypedSketch sets Type
+  // as its own last step.
+  await setSketchMode(page, "Type");
 
   await startTypedLine(page);
   // Grow the stack line by line so the fix has something to scroll. Each
