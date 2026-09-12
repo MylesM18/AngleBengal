@@ -74,9 +74,40 @@ test.afterEach(async ({ page }, testInfo) => {
   // whenever the layout is condensed (Sketchpad.tsx:259), so a test that
   // fails while condensed would otherwise time out on the wait below and
   // skip resetSketchPages entirely, leaking that test's pages into the
-  // shared database for every later spec and run (final-review.md I3). Both
-  // catches below are deliberate: cleanup must run no matter why the test
+  // shared database for every later spec and run (final-review.md I3). Every
+  // catch below is deliberate: cleanup must run no matter why the test
   // failed, and the test's own verdict already carries the failure.
+  //
+  // Draw mode is what makes that deterministic (D-189). Hiding the keyboard
+  // is not enough on its own: the typed line's math field stays MOUNTED, and
+  // a few hundred ms after being blurred it takes focus back by itself (the
+  // same WebKit remount churn waitForSettledMathFieldFocus documents below,
+  // re-running autoFocus), with MathLive's auto policy raising its keyboard
+  // again alongside it. Either one re-condenses the layout, which unmounts
+  // PageBar and with it the rename popover resetSketchPages drives, so the
+  // reset retries a detached "Rename page" until the test times out. The
+  // OS-keyboard test makes that permanent rather than merely likely: its
+  // innerHeight override leaves useKeyboardInset's OS branch reporting a
+  // keyboard for as long as ANY math field holds focus, so there is no
+  // settled un-condensed state to wait for at all.
+  //
+  // Switching modes removes what both branches key on instead of racing
+  // them: TypedLinesLayer renders a MathField only while typing, so Draw
+  // unmounts every one of them and leaves nothing that can re-focus or raise
+  // a keyboard. The Mode group lives in the condensed strip as well as the
+  // full toolbar (CondensedToolbar.tsx), so it is reachable whether or not
+  // the test left the layout condensed, which is exactly why this and not an
+  // un-condense-then-act sequence. Instrumented on iphone-webkit: math
+  // fields 1 -> 0, condensed off, held for the whole reset with the
+  // override still armed. Mode is per page and every test here sets its own
+  // (openTypedSketch ends on Type), so the resting mode carries nothing.
+  //
+  // The settle before it is not padding. Clicking Draw while the layout is
+  // still flipping delivers mousedown and mouseup to different elements, so
+  // the toggle's handler never runs at all: the click reports success and
+  // the mode simply stays Type. See waitForSettledCondenseState.
+  await waitForSettledCondenseState(page).catch(() => {});
+  await setSketchMode(page, "Draw").catch(() => {});
   await hideMathKeyboard(page).catch(() => {});
   await expect(page.getByRole("radiogroup", { name: "Pages" }))
     .toBeVisible()
@@ -84,6 +115,40 @@ test.afterEach(async ({ page }, testInfo) => {
   await resetSketchPages(page);
   await page.waitForTimeout(2500);
 });
+
+/**
+ * Waits for the condensed layout to stop flipping between its two forms.
+ *
+ * A blurred typed line takes focus back a few hundred ms later and can lose
+ * it again (see the afterEach), and each flip swaps the whole toolbar row:
+ * CondensedToolbar out, SketchToolbar and PageBar in, or the reverse. A
+ * click dispatched into that window lands its mousedown and mouseup on
+ * different elements, so no click event reaches the button and the handler
+ * never runs. Playwright reports nothing, because the mouse events were
+ * delivered; the only symptom is a control that stays unpressed (measured:
+ * the Draw toggle's aria-pressed stuck at "false" for a full 15s expect).
+ *
+ * Same shape as waitForSettledMathFieldFocus below, and for the same reason:
+ * one read of a flipping value is not evidence it has stopped flipping.
+ * Several agreeing reads in a row, spaced by expect.poll's own escalating
+ * ticks, span enough wall clock to tell a settled layout from a transient.
+ */
+async function waitForSettledCondenseState(page: Page): Promise<void> {
+  let consecutive = 0;
+  let previous: boolean | null = null;
+  await expect
+    .poll(
+      async () => {
+        const condensed =
+          (await page.getByRole("button", { name: "More", exact: true }).count()) > 0;
+        consecutive = condensed === previous ? consecutive + 1 : 0;
+        previous = condensed;
+        return consecutive;
+      },
+      { message: "The condensed layout never stopped flipping." },
+    )
+    .toBeGreaterThanOrEqual(5);
+}
 
 /** Practice served, overlay open, one clean empty "Page 1", Type mode. */
 async function openTypedSketch(page: Page): Promise<void> {
