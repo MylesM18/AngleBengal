@@ -3672,3 +3672,64 @@ Two things rejected along the way. Removing the override in the cleanup
 which poisons the inset arithmetic to `NaN` and only looks like a fix because
 `NaN > 0` is false. Reloading does not help either, because Playwright replays
 `addInitScript` on every document, so the override comes straight back.
+
+### D-190. Unsplit compact gives the graph rail's height back to the keyboard
+
+`e2e/sketch-keyboard-condense.spec.ts:377` ("unsplit typing pads the layer and
+keeps the active line above the keyboard") read as a 1-in-4 iphone-webkit flake.
+It is not a flake. It was decided outright by one uncontrolled variable, and when
+it failed it was reporting a real fault.
+
+Normalization manages page count and surface CONTENT but never surface CHOICE
+(D-169), and `servePracticeProblem` serves whichever pooled problem the API
+returns, so the test inherited whatever background that problem was last left on.
+Measured on iPhone 13 (390x664), same problem, background forced:
+
+| | surface = graph | surface = blank |
+|---|---|---|
+| typed-lines layer top | 454 | 313 |
+| layer clientHeight | 218 | 351 |
+| visible band | 0 | 133 |
+| active line bottom | 664 (fails) | 446 (passes, ceiling 447) |
+
+The rail costs 141px. On graph that leaves the layer exactly as tall as
+MathLive's keyboard, so `typedLinesScrollTop`'s zero-band guard returns
+`scrollTop` unchanged. That guard is right: there is no band to scroll into. The
+assertion was therefore UNSATISFIABLE on graph rather than slow, which no
+timeout or extra polling could ever have fixed. Off graph it passed. With 3 of
+the 4 pooled problems sitting on graph, and this file's first test flipping
+another problem onto graph on every run, the failure rate was quietly ratcheting
+toward permanent. pixel-chromium never saw it: Pixel 7 is 412x915, so its band
+stays positive at any background, which is why the rig's baseline only ever
+listed this failure under iphone-webkit.
+
+The product fault behind it. In unsplit type mode on a compact viewport with the
+rail up, the typed-lines layer spans 454 to 672 and the keyboard covers 446 to
+664: the line being typed is entirely behind the keyboard, and nothing can scroll
+it into view. The condensed layout is what normally reclaims that height, and its
+trigger is split-only (`condensedLayoutActive` requires two panes), so unsplit had
+no mechanism at all.
+
+So `Sketchpad` now hides `GraphRail` while the keyboard is up on compact unsplit.
+The rail is the right strip to take the height from: it is graph-tool chrome that
+types nothing, condense already hides it for exactly this reason on split (spec
+section 4), and hiding it restores the same geometry a non-graph page already
+had. Keyed on the inset rather than on type mode, because the inset is what costs
+the height; the rail's own units field cannot trigger it, since this hook runs
+with `mathFieldOnly` (D-174), so editing the rail can never make the rail vanish.
+
+The test is pinned to Graph, not to Plain. Plain would have been green for the
+wrong reason, steering the test away from the only configuration that exposes the
+fault. Pinned to Graph it covers the fix: reverting the `Sketchpad` change with
+the pin in place fails it 2 of 2 at exactly the original numbers (664.203125
+against a 447 ceiling), and with the change it passes 4 of 4 alone and 3 of 3 in
+file order, in a third of the wall clock because it no longer burns a 15s timeout.
+
+One trap the pin had to avoid, which the file's first test does not hit because it
+never counts lines: content is per SURFACE (`page.content[page.surface]`), so
+`openTypedSketch`'s wipe only empties whichever surface the recycled page arrived
+on. Switching to Graph afterwards uncovers the graph surface's own leftover typed
+lines and the count loop then asserts against the wrong total, which showed up as
+an intermittent fast failure. The pin therefore re-wipes after the switch, and
+restores Type mode, since `wipeActiveSketchSurface` needs a throwaway stroke and
+leaves Draw behind.
