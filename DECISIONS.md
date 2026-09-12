@@ -3546,3 +3546,57 @@ ink all but touches the disc edge. 100 is the heaviest weight that leaves both
 the counters and the ring of plum intact.
 
 Icon URLs bump to ?v=9 per D-152, since ?v=8 shipped with D-186.
+
+### D-188. A typed line blurs its math field in a layout cleanup, before React unmounts it
+
+Owner-visible fault on the practice sketchpad in Type mode: committing a typed
+line, with the keyboard's "+ line" key or with Enter, logged an unhandled
+rejection every time, `TypeError: Cannot read properties of undefined (reading
+'options')` out of MathLive's `Model.atomToString`. The rig now covers both
+triggers in `e2e/sketch-math-input.spec.ts`, and they failed on iphone-webkit
+before this change and pass after it.
+
+The fault is not cosmetic, which is what the rig pinned down. Only the active
+line is a live MathField (spec Q2), so committing a line unmounts one field and
+mounts another. MathLive's teardown, which `remove()` starts by way of
+`disconnectedCallback`, disposes the internal mathfield and nulls its model's
+back-pointer to it, but leaves that dead instance registered as MathLive's one
+globally focused mathfield with its `blurred` flag still false. The next field
+to focus therefore calls `onBlur` on the corpse, which reads the missing
+back-pointer and throws. The throw lands part way through the NEW field's own
+`focus()`, before the step that hands the keyboard over, so the line the user
+just opened never receives the cursor: `document.activeElement` is the body and
+the next keystroke goes nowhere. On a phone that reads as a dead new line.
+
+The fix is one blur, placed where the field is still alive:
+
+1. A layout-effect cleanup, not the mount effect's cleanup. React flushes
+   passive cleanups AFTER the DOM mutations, so by the time the mount effect's
+   cleanup runs the element is already disconnected and MathLive has already
+   disposed it: instrumenting that cleanup showed `_mathfield` null and
+   `hasFocus()` false, with nothing left to blur. A layout cleanup runs in the
+   mutation phase, with the field still connected, still holding focus, and its
+   internals still alive.
+2. The keyboard sink, not the element. `MathfieldElement.blur()` reaches the
+   bookkeeping only through a handler MathLive skips on a touch device whenever
+   its virtual keyboard is up, which is exactly this surface on a phone.
+   Blurring whatever holds focus inside the field's own shadow root runs
+   MathLive's blur handler on every engine. `field.blur()` stays as the
+   fallback for a field that holds no inner focus.
+3. Guarded on `hasFocus()`, which is false once MathLive has disposed a field,
+   so a field some earlier teardown already settled is left alone and the
+   answer box's own unmount is untouched.
+
+Why this and not the alternatives. Deferring the old field's removal until the
+new one has focused would make the handover work by MathLive's own path, but it
+turns a deterministic teardown into a timing race, on the engine whose remount
+churn the rig already documents as the flakiest. Keeping one field mounted and
+moving it between lines would remove the remount altogether and is the better
+shape long term, but it is a redesign of the typed-lines layer, not a fix to
+this fault.
+
+The rig gained one more thing worth recording: a keycap declared with
+`class: "action"`, which "+ line" is, gets MathLive's `action` class INSTEAD of
+`MLK__keycap`, so the spec's existing `keycap()` locator cannot see it. Its
+label reaches the DOM as the aria-label, which is what the new `actionKey()`
+locator uses.
