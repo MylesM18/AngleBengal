@@ -107,6 +107,16 @@ function keycap(page: Page, text: string) {
   });
 }
 
+/** A command key of the visible layer, by its label. MathLive gives a keycap
+ *  declared with `class: "action"` the `action` class INSTEAD of
+ *  `MLK__keycap`, so keycap() above cannot see "+ line"; the label it renders
+ *  reaches the DOM as the aria-label. */
+function actionKey(page: Page, label: string) {
+  return page.locator(
+    `.ML__keyboard .MLK__layer:visible .action[aria-label="${label}"]`,
+  );
+}
+
 test.describe("exact coordinates (graph rail)", () => {
   test("typed coordinates place a point with no chip armed, and clear the inputs", async ({
     page,
@@ -196,4 +206,77 @@ test.describe("math keyboard (typed lines)", () => {
     await hideMathKeyboard(page);
     await wipeActiveSketchSurface(page);
   });
+
+  /**
+   * Committing a line unmounts the old line's MathField and mounts the new
+   * one, because only the active line is a live field. MathLive's teardown
+   * (remove -> disconnectedCallback -> dispose) nulls the model's
+   * back-pointer to the mathfield but leaves the dead instance registered as
+   * its globally focused mathfield with `blurred` still false, so the next
+   * field to focus calls onBlur on the corpse and throws inside its own
+   * focus() (D-188). Two symptoms, both asserted here: an unhandled
+   * rejection, and a new line that never receives the cursor.
+   *
+   * Both owner-reported triggers are kept because the fault is engine
+   * specific, not trigger specific: before the fix both failed on
+   * iphone-webkit, on the focus assertion, and both passed on pixel-chromium,
+   * where the engine happens to blur the old field before it is disposed. The
+   * target platform is the one that breaks, so neither trigger is redundant.
+   */
+  for (const trigger of ["Enter", "+ line"] as const) {
+    test(`committing a line with ${trigger} opens the next line without a MathLive teardown fault`, async ({
+      page,
+    }) => {
+      const unhandled = () =>
+        page.evaluate(
+          () => (window as unknown as { __unhandled?: string[] }).__unhandled ?? [],
+        );
+
+      await page.addInitScript(() => {
+        const store: string[] = [];
+        (window as unknown as { __unhandled: string[] }).__unhandled = store;
+        window.addEventListener("unhandledrejection", (event) => {
+          const reason = event.reason as { stack?: string } | undefined;
+          store.push(String(reason?.stack ?? event.reason));
+        });
+      });
+
+      await openCleanSketch(page, "Graph");
+      await setSketchMode(page, "Type");
+      await startTypedLine(page);
+      await expect
+        .poll(() => page.evaluate(() => document.activeElement?.tagName ?? null), {
+          message: "The first typed line's math field never took focus.",
+        })
+        .toBe("MATH-FIELD");
+      await page.keyboard.type("x=1");
+      await expect.poll(() => mathFieldValue(page)).toBe("x=1");
+
+      // The typed-lines keyboard swaps the return key for "+ line" (D-129).
+      // Both run MathLive's commit command, which reaches onEnter.
+      if (trigger === "Enter") {
+        await page.keyboard.press("Enter");
+      } else {
+        await showMathKeyboard(page);
+        await actionKey(page, "+ line").click();
+      }
+
+      await expect(page.locator("[data-typed-lines] ol li")).toHaveCount(2);
+      // The cursor belongs to the new, empty line, not the committed one.
+      await expect
+        .poll(() => page.evaluate(() => document.activeElement?.tagName ?? null), {
+          message: "The new typed line never took focus after the commit.",
+        })
+        .toBe("MATH-FIELD");
+      await expect.poll(() => mathFieldValue(page)).toBe("");
+
+      expect(
+        await unhandled(),
+        "MathLive threw while tearing the committed line down.",
+      ).toEqual([]);
+
+      await hideMathKeyboard(page);
+      await wipeActiveSketchSurface(page);
+    });
+  }
 });

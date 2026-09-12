@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { MathfieldElement, VirtualKeyboardKeycap, VirtualKeyboardLayout } from "mathlive";
 
 import { cx } from "@/lib/cx";
@@ -301,6 +301,43 @@ export function MathField({
     // Mount once; value/readOnly sync in the effects below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * Settle MathLive's global focus bookkeeping BEFORE React takes the field
+   * out of the DOM (D-188). Removing the element runs MathLive's
+   * disconnectedCallback, which disposes the internal mathfield and nulls its
+   * model's back-pointer to it, but leaves that dead instance registered as
+   * MathLive's one globally focused mathfield with its blurred flag still
+   * false. The next field to focus then calls onBlur on the corpse, which
+   * reads the missing back-pointer and throws part way through the NEW
+   * field's own focus(), so the line the user just opened never receives the
+   * cursor and the fault surfaces as an unhandled rejection. Blurring first is
+   * MathLive's ordinary field-to-field handover.
+   *
+   * A layout effect rather than the mount effect above: React flushes passive
+   * cleanups AFTER the DOM mutations, and by then the element is already
+   * disconnected and disposed, so there is nothing left to blur. Layout
+   * cleanups run while the field is still connected and focused.
+   *
+   * The keyboard sink rather than the element: MathfieldElement.blur() reaches
+   * that bookkeeping only through a handler MathLive skips on a touch device
+   * whenever its virtual keyboard is up, which is exactly the stacked typed
+   * lines on a phone. The sink is whatever holds focus inside the field's own
+   * shadow root, so blurring it directly runs MathLive's blur handler on every
+   * engine.
+   */
+  useLayoutEffect(
+    () => () => {
+      const field = fieldRef.current;
+      // hasFocus() is false once MathLive has disposed the field, so this also
+      // skips a field that some earlier teardown already settled.
+      if (!field?.hasFocus()) return;
+      const focused = field.shadowRoot?.activeElement;
+      if (focused instanceof HTMLElement) focused.blur();
+      else field.blur();
+    },
+    [],
+  );
 
   useEffect(() => {
     const field = fieldRef.current;
