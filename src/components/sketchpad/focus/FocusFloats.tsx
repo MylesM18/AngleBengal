@@ -47,7 +47,7 @@ export function FocusFloats() {
   return (
     <div className="pointer-events-none absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))] z-10 flex flex-col items-end gap-3">
       {paletteOpen && mode === "draw" && (
-        <Sheet tone="paper-0" lift className="pointer-events-auto flex flex-col gap-3 p-3">
+        <Sheet tone="paper-0" lift className="pointer-events-auto flex flex-col gap-3 max-lg:gap-5 p-3">
           <div className="flex gap-1 max-lg:gap-3" role="group" aria-label="Tool">
             {TOOLS.map(({ value, label, icon }) => (
               <button
@@ -98,7 +98,7 @@ export function FocusFloats() {
           </div>
         </Sheet>
       )}
-      <div className="pointer-events-auto flex flex-col gap-3" role="group" aria-label="Mode">
+      <div className="pointer-events-auto flex flex-col gap-3 max-lg:gap-5" role="group" aria-label="Mode">
         <button
           type="button"
           aria-pressed={mode === "draw"}
