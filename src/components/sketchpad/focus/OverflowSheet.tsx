@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -41,6 +41,23 @@ export function OverflowSheet({
   const [confirmingClear, setConfirmingClear] = useState(false);
   const titleId = useId();
   const clearTitleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const keepButtonRef = useRef<HTMLButtonElement>(null);
+
+  // The Escape handler below only fires on the focused element and its
+  // ancestors, and nothing else here ever moves focus into the sheet: right
+  // after it opens, focus is still wherever it was before (the toggle that
+  // opened it, or the document). Mirrors SketchToolbar.tsx's Clear popover,
+  // which focuses its last button (Keep) whenever it opens. There is no
+  // single obvious default control up front here (background, Clear and
+  // Clean up are peers), so the dialog container itself (tabIndex={-1}
+  // below) takes focus on mount instead; once the Clear confirm is showing,
+  // Keep (the safe default) does, and dismissing it hands focus back to the
+  // container so Escape keeps working either way.
+  useEffect(() => {
+    if (confirmingClear) keepButtonRef.current?.focus();
+    else dialogRef.current?.focus();
+  }, [confirmingClear]);
 
   return (
     <>
@@ -51,8 +68,10 @@ export function OverflowSheet({
         className="fixed inset-0 z-20 cursor-default bg-ink/20"
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-labelledby={titleId}
+        tabIndex={-1}
         onKeyDown={(event) => {
           if (event.key !== "Escape") return;
           event.stopPropagation();
@@ -106,6 +125,7 @@ export function OverflowSheet({
                   Clear
                 </Button>
                 <Button
+                  ref={keepButtonRef}
                   size="sm"
                   variant="tertiary"
                   className="max-lg:tap-target"
