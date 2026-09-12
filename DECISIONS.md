@@ -3600,3 +3600,75 @@ The rig gained one more thing worth recording: a keycap declared with
 `MLK__keycap`, so the spec's existing `keycap()` locator cannot see it. Its
 label reaches the DOM as the aria-label, which is what the new `actionKey()`
 locator uses.
+
+### D-189. The condense spec's cleanup leaves Draw mode, rather than trying to un-condense
+
+`e2e/sketch-keyboard-condense.spec.ts:416` ("a simulated OS keyboard ignores the
+rename field but still condenses for a typed line") flaked on iphone-webkit at
+roughly 1 run in 4, and did so on the code before PR 43 as well as after it, so
+it was never that PR's doing. The test body always passed. What timed out was
+the file's shared `test.afterEach`: `resetSketchPages` kept retrying a "Rename
+page" button that was "detached from the DOM", and the Pages radiogroup's radio
+count flipped between 0 and 2, until the 90s test timeout. Once it failed, the
+extra page stayed in the shared database for later specs and runs.
+
+Instrumenting the page during cleanup (a temporary focus and layout recorder,
+reverted) found the cause, and it is not a product fault. `hideMathKeyboard`
+does blur the field, and the blur lands: focus reaches BODY every time. But the
+typed line's math field stays MOUNTED, and about 400 to 500ms later it takes
+focus back on its own, the same WebKit remount churn
+`waitForSettledMathFieldFocus` already documents, re-running `autoFocus`.
+MathLive's auto policy raises its virtual keyboard again alongside it. Either
+one on its own puts `useKeyboardInset`'s inset back above zero, which
+re-condenses the layout, and a condensed layout unmounts `PageBar` and the
+rename popover the reset drives. In 4 of 6 recorded runs the field had focus
+again, and the layout was condensed, at exactly the point the reset needed the
+page bar.
+
+This one test makes that permanent rather than merely likely. Its
+`addInitScript` inflates `window.innerHeight` for the page's whole life, so the
+OS branch reports a keyboard for as long as ANY math field holds focus. That is
+the correct reading of the simulation, which never "dismisses": a real OS
+keyboard closing restores `visualViewport.height` and the gap shuts, while this
+gap cannot. So there is no settled un-condensed state for the cleanup to wait
+for, and no amount of blurring or waiting creates one.
+
+The fix is therefore not to un-condense and then act, and not to fight the
+simulation. The cleanup switches to Draw mode first. `TypedLinesLayer` renders a
+`MathField` only while typing, so Draw unmounts every one of them and leaves
+nothing that can re-focus or raise a keyboard; both branches of the inset go
+quiet because the thing they key on is gone. The Mode group is in the condensed
+strip as well as the full toolbar (`CondensedToolbar.tsx`), so it is reachable
+whether or not the test left the layout condensed, which matters because the
+failing state is precisely the condensed one. Measured on iphone-webkit: math
+fields 1 to 0, condensed off, and held for the whole reset with the override
+still armed.
+
+Switching modes has its own precondition, which the first attempt at this fix
+missed and which is worth recording because nothing reports it. Clicking Draw
+the instant the cleanup starts does not change the mode. The click itself
+succeeds, Playwright raises nothing, and the toggle just stays on Type: while
+the layout is still flipping, each flip swaps the whole toolbar row
+(`CondensedToolbar` out, `SketchToolbar` and `PageBar` in, or the reverse), so
+the mousedown and the mouseup land on different elements and no click event ever
+reaches the button. The only visible symptom was `aria-pressed` stuck at
+`"false"` for a full 15s expect, and the swallowed failure cost 15s per test
+while leaving the flake in place. So the cleanup waits for the condensed state
+to read the same several polls running (`waitForSettledCondenseState`, the same
+shape as `waitForSettledMathFieldFocus` and for the same reason) before it
+clicks. With that in front of it: 6 of 6 clean, and the per-test time fell from
+28s back to 18s because the 15s swallowed timeout is gone.
+
+Test-side and not a product change, deliberately. The condensed layout persisting
+while a math field holds focus under a permanently simulated keyboard is the
+component behaving correctly. No test assertion was touched: the change is two
+calls plus comment in the `afterEach`, which runs after every test's own verdict.
+Mode is per page and every test in the file sets its own (`openTypedSketch` ends
+on Type), so the resting mode carries nothing into the next test.
+
+Two things rejected along the way. Removing the override in the cleanup
+(`delete window.innerHeight`) does not restore the real value on WebKit, where
+`innerHeight` is an own property of the window: deleting it leaves `undefined`,
+which poisons the inset arithmetic to `NaN` and only looks like a fix because
+`NaN > 0` is false. Reloading does not help either, because Playwright replays
+`addInitScript` on every document, so the override comes straight back.
