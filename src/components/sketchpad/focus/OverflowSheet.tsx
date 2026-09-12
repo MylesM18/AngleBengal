@@ -78,7 +78,7 @@ export function OverflowSheet({
           if (confirmingClear) setConfirmingClear(false);
           else onClose();
         }}
-        className="absolute right-3 top-full z-30 mt-2 w-64"
+        className="absolute right-3 top-full z-30 mt-2 w-64 outline-none"
       >
         <Sheet tone="paper-0" lift className="flex flex-col gap-3 p-3">
           <p id={titleId} className="text-meta text-ink-soft">
