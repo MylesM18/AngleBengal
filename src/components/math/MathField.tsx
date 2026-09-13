@@ -277,10 +277,10 @@ export function MathField({
       // Focus moving between the sink and the menu stays inside the shadow
       // tree and never reaches the host, so the menu keeps the override
       // while it is open.
-      const setContainerPointerEvents = (value: "auto" | null) => {
+      const setContainerPointerEvents = (mode: "auto" | null) => {
         const container = field.shadowRoot?.querySelector<HTMLElement>('[part="container"]');
         if (!container) return;
-        if (value) container.style.setProperty("pointer-events", value);
+        if (mode) container.style.setProperty("pointer-events", mode);
         else container.style.removeProperty("pointer-events");
       };
       field.addEventListener("focusin", () => {

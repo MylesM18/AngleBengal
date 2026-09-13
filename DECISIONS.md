@@ -3770,8 +3770,8 @@ deleting the only line leaves the "Tap the paper to start line 1" hint.
 MathField sets it through mathlive 0.110's menuItems setter right after
 appending the field, because the menu accessors throw before
 connectedCallback builds the internal mathfield; the setter swaps only the
-item list, with no option or render path. Other math fields (the answer
-box, the tutor chat, the calculator) keep the stock menu. Its e2e test
+item list, with no option or render path. Other math fields (today only
+the practice answer box) keep the stock menu. Its e2e test
 waits for MathLive's virtual keyboard to report hidden before tapping the
 paper after the last line is gone, because MathLive hides the keyboard
 300ms after the last field loses focus and the keyboard covers that spot
