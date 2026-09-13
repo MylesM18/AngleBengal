@@ -421,7 +421,10 @@ export function Sketchpad({
             <SketchCanvas onSizeChange={reportActiveSize} />
             <TypedLinesLayer />
             <GraphLayer />
-            {focus && <FocusFloats />}
+            {/* The clean-copy slip owns the bottom edge while it is open; the floats
+                yield rather than fight it for the same corner (z-10 vs z-10, later
+                sibling wins). */}
+            {focus && !(blocks && blocks.length > 0) && <FocusFloats />}
           </div>
         </PaneContext.Provider>
       )}
