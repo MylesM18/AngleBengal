@@ -17,6 +17,7 @@ import {
   PEEK_STRIP_PX,
   swapCondensedPanes,
 } from "@/lib/sketch/condense";
+import { focusModeActive } from "@/lib/sketch/focus";
 import { latexToPlain } from "@/lib/sketch/latexToPlain";
 import {
   DEFAULT_PANE_VIEWPORT,
@@ -46,6 +47,8 @@ import { useKeyboardInset } from "@/lib/useKeyboardInset";
 
 import { CleanCopyPanel } from "./CleanCopyPanel";
 import { CondensedToolbar } from "./CondensedToolbar";
+import { FocusBar } from "./focus/FocusBar";
+import { FocusFloats } from "./focus/FocusFloats";
 import { GraphLayer } from "./GraphLayer";
 import { GraphRail } from "./GraphRail";
 import { PageBar } from "./PageBar";
@@ -65,7 +68,15 @@ import { TypedLinesLayer } from "./TypedLinesLayer";
  * (A15), because a split pane's canvas backing store is laid out at the
  * reference size and only visually scaled down.
  */
-export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) => void }) {
+export function Sketchpad({
+  onInsertAnswer,
+  statementMd = null,
+  onDone = null,
+}: {
+  onInsertAnswer: (latex: string) => void;
+  statementMd?: string | null;
+  onDone?: (() => void) | null;
+}) {
   const [cleaning, setCleaning] = useState(false);
   const [toast, setToast] = useState<{ kind: NoticeKind; message: string } | null>(null);
 
@@ -117,6 +128,11 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     activePageId,
     insetBottom: keyboardInset.bottom,
   });
+
+  // Board focus mode (spec 2026-09-12): compact unsplit renders the slim
+  // focus chrome. condensed can never be true here (its trigger requires
+  // two panes), so the branch below replaces only the full-strip arm.
+  const focus = focusModeActive({ isDesktop, paneCount: paneIds.length });
 
   // PR 1's keyboard condense outranks maximize while the keyboard is up
   // (spec section 6): while condensed, PR 1's layout renders and
@@ -321,7 +337,19 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
           permanent stacking context on this wrapper (the D-059 family).
           The 200ms height motion lives on the pane grid rows and the
           container padding (D-173). */}
-      {condensed ? (
+      {focus ? (
+        <div
+          key="focus-bar"
+          className="shrink-0 max-lg:relative max-lg:z-20 max-lg:animate-cue-fade"
+        >
+          <FocusBar
+            statementMd={statementMd}
+            cleaning={cleaning}
+            onCleanUp={() => void cleanUp()}
+            onDone={onDone}
+          />
+        </div>
+      ) : condensed ? (
         <div
           key="condensed-strip"
           className="shrink-0 max-lg:relative max-lg:z-20 max-lg:animate-cue-fade"
@@ -393,6 +421,7 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
             <SketchCanvas onSizeChange={reportActiveSize} />
             <TypedLinesLayer />
             <GraphLayer />
+            {focus && <FocusFloats />}
           </div>
         </PaneContext.Provider>
       )}
