@@ -1,13 +1,14 @@
 import type { SVGProps } from "react";
 
 /**
- * The app's icon set (spec 1f, D-048): fourteen 16px glyphs drawn as 1.5px
+ * The app's icon set (spec 1f, D-048): fifteen 16px glyphs drawn as 1.5px
  * strokes in currentColor. No icon dependency. Paths live on a 16x16 grid.
  */
 export type IconName =
   | "pen"
   | "eraser"
   | "undo"
+  | "redo"
   | "clear"
   | "grid"
   | "graph"
@@ -24,6 +25,8 @@ const PATHS: Record<IconName, string> = {
   pen: "M11.5 2.5l2 2L5 13H3v-2l8.5-8.5z M10 4l2 2",
   eraser: "M9.5 3l3.5 3.5L8 11.5H4.5L2.5 9.5 9.5 3z M5 13h8",
   undo: "M3 7h7a3 3 0 0 1 0 6H6 M3 7l3-3 M3 7l3 3",
+  // undo mirrored across x = 8
+  redo: "M13 7H6a3 3 0 0 0 0 6h4 M13 7l-3-3 M13 7l-3 3",
   clear: "M3 4.5h10 M6 4.5V3h4v1.5 M4.5 4.5l.7 8.5h5.6l.7-8.5",
   grid: "M3 3h10v10H3z M3 8h10 M8 3v10",
   graph: "M8 2v12 M2 8h12 M4.5 11.5l2.5-3 2 1.5 2.5-4",

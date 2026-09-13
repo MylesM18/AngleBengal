@@ -166,6 +166,7 @@ export function TypedLinesLayer() {
                   onChange={(latex) => updateTypedLine(pageId, line.id, latex)}
                   onEnter={() => addTypedLineAfter(pageId, line.id)}
                   onEmptyBackspace={() => removeTypedLine(pageId, line.id)}
+                  onDelete={() => removeTypedLine(pageId, line.id)}
                   compact
                   autoFocus
                   keyboardVariant="lines"

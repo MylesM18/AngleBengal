@@ -5,15 +5,25 @@ import { useEffect, useId, useRef, useState } from "react";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { Chip, chipClasses } from "@/components/ui/Chip";
 import { Sheet } from "@/components/ui/Sheet";
-import { useSketchStore } from "@/lib/sketch/store";
+import { activePage, useSketchStore, type Background } from "@/lib/sketch/store";
 
 import { OverflowSheet } from "./OverflowSheet";
 
+/** Text only, no icons: the row has to fit a 360px phone (revision spec section 4). */
+const BACKGROUNDS: { value: Background; label: string }[] = [
+  { value: "blank", label: "Plain" },
+  { value: "grid", label: "Grid" },
+  { value: "graph", label: "Graph" },
+];
+
 /**
- * The one-row chrome of board focus mode (spec section 4): Done, the Problem
- * chip, Undo, and the overflow trigger. The Problem panel and the overflow
- * sheet are top-anchored dialogs over the board; at most one is open, and
- * each closes on Escape, on its scrim, or on its own chip.
+ * The one-row chrome of board focus mode (spec section 4, as revised by
+ * 2026-09-12-board-focus-mode-revision-design.md section 4): Done, the
+ * Problem chip, the Background radio group, and the overflow trigger. Undo
+ * and Redo live in HistoryFloats at the bottom left of the board. The Problem
+ * panel and the overflow sheet are top-anchored dialogs over the board; at
+ * most one is open, and each closes on Escape, on its scrim, or on its own
+ * chip.
  */
 export function FocusBar({
   statementMd,
@@ -27,7 +37,8 @@ export function FocusBar({
   onDone: (() => void) | null;
 }) {
   const activePageId = useSketchStore((state) => state.activePageId);
-  const undo = useSketchStore((state) => state.undo);
+  const background = useSketchStore((state) => activePage(state).surface);
+  const setSurface = useSketchStore((state) => state.setSurface);
   const [open, setOpen] = useState<"problem" | "overflow" | null>(null);
   const problemTitleId = useId();
   const problemPanelRef = useRef<HTMLDivElement>(null);
@@ -58,21 +69,34 @@ export function FocusBar({
           Problem
         </Chip>
       )}
-      <Chip
-        variant="action"
-        icon="undo"
-        className="ml-auto"
-        onClick={() => undo(activePageId)}
-      >
-        Undo
-      </Chip>
+      <div className="flex gap-1" role="radiogroup" aria-label="Background">
+        {BACKGROUNDS.map(({ value, label }) => {
+          const checked = background === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={checked}
+              onClick={() => setSurface(activePageId, value)}
+              className={chipClasses({ variant: "toggle", active: checked })}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
       <button
         type="button"
         aria-label="More controls"
         aria-haspopup="dialog"
         aria-expanded={open === "overflow"}
         onClick={() => setOpen((current) => (current === "overflow" ? null : "overflow"))}
-        className={chipClasses({ variant: "toggle", active: open === "overflow" })}
+        className={chipClasses({
+          variant: "toggle",
+          active: open === "overflow",
+          className: "ml-auto",
+        })}
       >
         &#8943;
       </button>

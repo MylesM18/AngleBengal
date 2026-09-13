@@ -76,6 +76,15 @@ export type GraphShade = { id: string; testPoint: WorldPoint };
 /** One unified undo stack over ink and graph ops (spec §7.2). */
 export type OpEntry = { kind: "stroke" | "graphObject" | "graphShade"; id: string };
 
+/**
+ * What undo took off a surface, kept whole so redo can put it back (board
+ * focus mode revision spec section 5.2). Session-only, like the opLog.
+ */
+export type RedoEntry =
+  | { kind: "stroke"; stroke: Stroke }
+  | { kind: "graphObject"; object: GraphObject }
+  | { kind: "graphShade"; shade: GraphShade };
+
 /** docs/06 §4 requires an undo depth of at least 50. Per (page, surface). */
 const UNDO_DEPTH = 80;
 
@@ -95,8 +104,8 @@ export const INK_COLORS: Record<InkColor, string> = {
 /**
  * Everything drawable on one (page, surface) pair (R2). Switching surface
  * swaps the whole document; content never carries across, in either
- * direction. The opLog lives here too, so undo is per (page, surface) and
- * is never persisted.
+ * direction. The opLog and redoLog live here too, so undo and redo are per
+ * (page, surface) and neither is ever persisted.
  */
 export type SurfaceContent = {
   strokes: Stroke[];
@@ -105,6 +114,9 @@ export type SurfaceContent = {
   graphShades: GraphShade[];
   ocrBlocks: OcrBlock[] | null;
   opLog: OpEntry[];
+  /** Undo's removals, newest last. Emptied by every action that records or
+   *  removes undoable content. */
+  redoLog: RedoEntry[];
 };
 
 export type SketchPage = {
@@ -220,8 +232,10 @@ export type SketchState = {
   setGraphStep: (pageId: string, step: number) => void;
   addStroke: (pageId: string, points: StrokePoint[]) => void;
   eraseStrokes: (pageId: string, ids: string[]) => void;
-  /** Pops that page's ACTIVE surface opLog. */
+  /** Pops that page's ACTIVE surface opLog, keeping the removal for redo. */
   undo: (pageId: string) => void;
+  /** Re-applies the newest entry undo removed from that page's ACTIVE surface. */
+  redo: (pageId: string) => void;
   /** Clears that page's ACTIVE surface only (all fields incl. ocrBlocks). */
   clear: (pageId: string) => void;
   /** Inserts an empty line after afterId (null appends at the end), activates
@@ -307,6 +321,7 @@ export function emptySurfaceContent(): SurfaceContent {
     graphShades: [],
     ocrBlocks: null,
     opLog: [],
+    redoLog: [],
   };
 }
 
@@ -679,6 +694,7 @@ export const useSketchStore = create<SketchState>((set, get) => {
             ...content,
             strokes: strokes.length > UNDO_DEPTH ? strokes.slice(-UNDO_DEPTH) : strokes,
             opLog: pushOp(content.opLog, { kind: "stroke", id: stroke.id }),
+            redoLog: [],
           };
         });
       }),
@@ -693,6 +709,7 @@ export const useSketchStore = create<SketchState>((set, get) => {
           opLog: content.opLog.filter(
             (op) => !(op.kind === "stroke" && doomed.has(op.id)),
           ),
+          redoLog: [],
         }));
       }),
 
@@ -703,23 +720,70 @@ export const useSketchStore = create<SketchState>((set, get) => {
           if (!last) return content;
           const opLog = content.opLog.slice(0, -1);
           if (last.kind === "stroke") {
+            const stroke = content.strokes.find((item) => item.id === last.id);
             return {
               ...content,
               opLog,
-              strokes: content.strokes.filter((stroke) => stroke.id !== last.id),
+              strokes: content.strokes.filter((item) => item.id !== last.id),
+              redoLog: stroke ? [...content.redoLog, { kind: "stroke", stroke }] : content.redoLog,
             };
           }
           if (last.kind === "graphObject") {
+            const object = content.graphObjects.find((item) => item.id === last.id);
             return {
               ...content,
               opLog,
-              graphObjects: content.graphObjects.filter((object) => object.id !== last.id),
+              graphObjects: content.graphObjects.filter((item) => item.id !== last.id),
+              redoLog: object
+                ? [...content.redoLog, { kind: "graphObject", object }]
+                : content.redoLog,
             };
           }
+          const shade = content.graphShades.find((item) => item.id === last.id);
           return {
             ...content,
             opLog,
-            graphShades: content.graphShades.filter((shade) => shade.id !== last.id),
+            graphShades: content.graphShades.filter((item) => item.id !== last.id),
+            redoLog: shade ? [...content.redoLog, { kind: "graphShade", shade }] : content.redoLog,
+          };
+        }),
+      ),
+
+    redo: (pageId) =>
+      set((state) =>
+        withActiveSurface(state, pageId, (content) => {
+          const next = content.redoLog[content.redoLog.length - 1];
+          if (!next) return content;
+          const redoLog = content.redoLog.slice(0, -1);
+          // Each kind comes back by the rule of the action that first made it,
+          // under its original id (the id counters only grow).
+          if (next.kind === "stroke") {
+            const strokes = [...content.strokes, next.stroke];
+            return {
+              ...content,
+              redoLog,
+              strokes: strokes.length > UNDO_DEPTH ? strokes.slice(-UNDO_DEPTH) : strokes,
+              opLog: pushOp(content.opLog, { kind: "stroke", id: next.stroke.id }),
+            };
+          }
+          if (next.kind === "graphObject") {
+            return {
+              ...content,
+              redoLog,
+              graphObjects: [...content.graphObjects, next.object],
+              opLog: pushOp(content.opLog, { kind: "graphObject", id: next.object.id }),
+            };
+          }
+          // addGraphShade's one-shade invariant: a redone shade replaces, and
+          // its op replaces any other shade op.
+          return {
+            ...content,
+            redoLog,
+            graphShades: [next.shade],
+            opLog: pushOp(
+              content.opLog.filter((op) => op.kind !== "graphShade"),
+              { kind: "graphShade", id: next.shade.id },
+            ),
           };
         }),
       ),
@@ -814,6 +878,7 @@ export const useSketchStore = create<SketchState>((set, get) => {
           ...content,
           graphObjects: [...content.graphObjects, { id, kind, dashed, points }],
           opLog: pushOp(content.opLog, { kind: "graphObject", id }),
+          redoLog: [],
         })),
         pendingGraphPoints: [],
       }));
@@ -851,6 +916,7 @@ export const useSketchStore = create<SketchState>((set, get) => {
             content.opLog.filter((op) => op.kind !== "graphShade"),
             { kind: "graphShade", id },
           ),
+          redoLog: [],
         })),
       );
       return id;
@@ -864,6 +930,7 @@ export const useSketchStore = create<SketchState>((set, get) => {
           opLog: content.opLog.filter(
             (op) => !(op.kind === "graphObject" && op.id === id),
           ),
+          redoLog: [],
         })),
       ),
 
@@ -875,6 +942,7 @@ export const useSketchStore = create<SketchState>((set, get) => {
           opLog: content.opLog.filter(
             (op) => !(op.kind === "graphShade" && op.id === id),
           ),
+          redoLog: [],
         })),
       ),
 
@@ -980,8 +1048,9 @@ export const useSketchStore = create<SketchState>((set, get) => {
               // The one-shade invariant (addGraphShade) holds on restore too.
               graphShades: savedContent.graphShades.slice(0, 1),
               ocrBlocks: savedContent.ocrBlocks,
-              // History starts clean: undo cannot reach a previous sitting.
+              // History starts clean: undo and redo cannot reach a previous sitting.
               opLog: [],
+              redoLog: [],
             };
             strokeCounter = Math.max(
               strokeCounter,

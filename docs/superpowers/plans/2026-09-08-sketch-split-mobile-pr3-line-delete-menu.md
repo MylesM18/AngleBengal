@@ -1,5 +1,7 @@
 # PR 3: Typed-Line Delete Menu Implementation Plan
 
+> **SUPERSEDED, never executed (2026-09-12):** the owner asked for the delete option inside the math field's own ≡ menu instead. See section 8 of `docs/superpowers/specs/2026-09-12-board-focus-mode-revision-design.md` and its PR 2 plan. Do not execute this plan.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox ('- [ ]') syntax for tracking.
 
 **Goal:** Give typed solution lines a delete affordance: a three-lines handle on the active line (hover-revealed on desktop) and a long-press on any line, both opening a single-item "Delete line" popover, per `docs/superpowers/specs/2026-09-07-sketch-split-mobile-design.md` §7.
