@@ -57,6 +57,15 @@ import { GESTURE_WINDOW_MS, penHasBeenSeen, SketchCanvas, type Size } from "./Sk
 import { SketchToolbar } from "./SketchToolbar";
 import { TypedLinesLayer } from "./TypedLinesLayer";
 
+function isTextEntry(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.isContentEditable
+  );
+}
+
 /**
  * The sketchpad panel: toolbar, graph rail, page bar, and either one page's
  * layer stack or the 2-4 pane split grid (docs/06 §4, D-172), with the
@@ -312,8 +321,39 @@ export function Sketchpad({
     state.setOcrBlocks(state.activePageId, null);
   }, []);
 
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // Cmd/Ctrl+Z undoes the last stroke while focus is inside the sketchpad.
+  // A pointerdown inside the sketchpad focuses its root so drawing arms it.
+  // Lives on the Sketchpad root itself, not a toolbar strip, so every strip
+  // variant (focus, condensed, full) inherits the shortcut: this div is the
+  // one thing all three mount.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const onPointerDown = () => {
+      if (!root.contains(document.activeElement)) root.focus({ preventScroll: true });
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey) return;
+      if (event.key !== "z" && event.key !== "Z") return;
+      if (!root.contains(document.activeElement)) return;
+      if (isTextEntry(event.target)) return;
+      event.preventDefault();
+      const state = useSketchStore.getState();
+      state.undo(state.activePageId);
+    };
+    root.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      root.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
   return (
     <div
+      ref={rootRef}
       data-sketchpad
       tabIndex={-1}
       className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0 outline-none transition-[padding-bottom] duration-200 ease-out"
