@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { SPLIT_DEFAULT } from "@/lib/practice/splitRatio";
 import { usePracticeSession } from "@/lib/practiceSession";
+import { focusModeActive } from "@/lib/sketch/focus";
 import { insertionValue } from "@/lib/sketch/latexToPlain";
 import { useSketchStore } from "@/lib/sketch/store";
 import { useIsDesktop } from "@/lib/useIsDesktop";
@@ -56,6 +57,8 @@ export function PracticeWorkspace({
   const split = useSplitRatio(rootRef);
 
   const isDesktop = useIsDesktop();
+  const splitCount = useSketchStore((state) => state.splitPageIds.length);
+  const focusChrome = focusModeActive({ isDesktop, paneCount: splitCount });
   const [sketchOpen, setSketchOpen] = useState(false);
   const [pageZoomed, setPageZoomed] = useState(false);
   const [statementMd, setStatementMd] = useState<string | null>(null);
@@ -267,21 +270,27 @@ export function PracticeWorkspace({
           data-sketch-overlay
           className="fixed inset-0 z-30 flex flex-col overscroll-contain bg-paper-0 pt-safe pb-safe"
         >
-          <header className="flex h-12 shrink-0 items-center gap-2 bg-paper-1 pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] shadow-sheet">
-            <Chip variant="action" icon="close" onClick={closeSketch}>
-              Done
-            </Chip>
-            <span className="flex-1" />
-            {pageZoomed ? (
-              <span role="status" className="text-meta font-semibold text-ink">
-                Zoomed in. Pinch this bar to re-fit.
-              </span>
-            ) : (
-              <span className="text-meta text-ink-soft">Clean copy inserts your answer</span>
-            )}
-          </header>
-          {statementMd && <ProblemRibbon statementMd={statementMd} />}
-          <Sketchpad onInsertAnswer={insertAnswer} />
+          {!focusChrome && (
+            <header className="flex h-12 shrink-0 items-center gap-2 bg-paper-1 pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] shadow-sheet">
+              <Chip variant="action" icon="close" onClick={closeSketch}>
+                Done
+              </Chip>
+              <span className="flex-1" />
+              {pageZoomed ? (
+                <span role="status" className="text-meta font-semibold text-ink">
+                  Zoomed in. Pinch this bar to re-fit.
+                </span>
+              ) : (
+                <span className="text-meta text-ink-soft">Clean copy inserts your answer</span>
+              )}
+            </header>
+          )}
+          {!focusChrome && statementMd && <ProblemRibbon statementMd={statementMd} />}
+          <Sketchpad
+            onInsertAnswer={insertAnswer}
+            statementMd={statementMd}
+            onDone={closeSketch}
+          />
         </div>
       )}
 

@@ -30,8 +30,9 @@ import {
  * The kraft utility strip at the top of the sketchpad: the screen's single
  * kraft surface (spec 4b). Tool, width, ink and background controls on the
  * left, Undo and Clear (with its confirm popover) in the middle, the one
- * "Clean up" button on the right. Cmd/Ctrl+Z undoes while focus is inside
- * the element marked `data-sketchpad` (the Sketchpad root).
+ * "Clean up" button on the right. The Cmd/Ctrl+Z undo shortcut lives on the
+ * Sketchpad root itself (Sketchpad.tsx), not here, so every strip variant
+ * inherits it.
  *
  * Every control here drives the ACTIVE page (D-172): mode, surface, undo and
  * clear all read and write the page the toolbar's selectors follow, so in
@@ -57,15 +58,6 @@ const BACKGROUNDS: { value: Background; label: string; icon: IconName | null }[]
 ];
 
 const CLEAR_QUESTION = "Clear this surface? This cannot be undone.";
-
-function isTextEntry(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.isContentEditable
-  );
-}
 
 export function SketchToolbar({
   cleaning,
@@ -158,31 +150,6 @@ export function SketchToolbar({
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [clearOpen]);
-
-  // Cmd/Ctrl+Z undoes the last stroke while focus is inside the sketchpad.
-  // A pointerdown inside the sketchpad focuses its root so drawing arms it.
-  useEffect(() => {
-    const root = stripRef.current?.closest<HTMLElement>("[data-sketchpad]");
-    if (!root) return;
-    const onPointerDown = () => {
-      if (!root.contains(document.activeElement)) root.focus({ preventScroll: true });
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey) return;
-      if (event.key !== "z" && event.key !== "Z") return;
-      if (!root.contains(document.activeElement)) return;
-      if (isTextEntry(event.target)) return;
-      event.preventDefault();
-      const state = useSketchStore.getState();
-      state.undo(state.activePageId);
-    };
-    root.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      root.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, []);
 
   return (
     <div

@@ -17,6 +17,7 @@ import {
   PEEK_STRIP_PX,
   swapCondensedPanes,
 } from "@/lib/sketch/condense";
+import { focusModeActive } from "@/lib/sketch/focus";
 import { latexToPlain } from "@/lib/sketch/latexToPlain";
 import {
   DEFAULT_PANE_VIEWPORT,
@@ -46,6 +47,8 @@ import { useKeyboardInset } from "@/lib/useKeyboardInset";
 
 import { CleanCopyPanel } from "./CleanCopyPanel";
 import { CondensedToolbar } from "./CondensedToolbar";
+import { FocusBar } from "./focus/FocusBar";
+import { FocusFloats } from "./focus/FocusFloats";
 import { GraphLayer } from "./GraphLayer";
 import { GraphRail } from "./GraphRail";
 import { PageBar } from "./PageBar";
@@ -53,6 +56,15 @@ import { PaneContext, type PaneInfo } from "./PaneContext";
 import { GESTURE_WINDOW_MS, penHasBeenSeen, SketchCanvas, type Size } from "./SketchCanvas";
 import { SketchToolbar } from "./SketchToolbar";
 import { TypedLinesLayer } from "./TypedLinesLayer";
+
+function isTextEntry(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.isContentEditable
+  );
+}
 
 /**
  * The sketchpad panel: toolbar, graph rail, page bar, and either one page's
@@ -65,7 +77,15 @@ import { TypedLinesLayer } from "./TypedLinesLayer";
  * (A15), because a split pane's canvas backing store is laid out at the
  * reference size and only visually scaled down.
  */
-export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) => void }) {
+export function Sketchpad({
+  onInsertAnswer,
+  statementMd = null,
+  onDone = null,
+}: {
+  onInsertAnswer: (latex: string) => void;
+  statementMd?: string | null;
+  onDone?: (() => void) | null;
+}) {
   const [cleaning, setCleaning] = useState(false);
   const [toast, setToast] = useState<{ kind: NoticeKind; message: string } | null>(null);
 
@@ -117,6 +137,11 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     activePageId,
     insetBottom: keyboardInset.bottom,
   });
+
+  // Board focus mode (spec 2026-09-12): compact unsplit renders the slim
+  // focus chrome. condensed can never be true here (its trigger requires
+  // two panes), so the branch below replaces only the full-strip arm.
+  const focus = focusModeActive({ isDesktop, paneCount: paneIds.length });
 
   // PR 1's keyboard condense outranks maximize while the keyboard is up
   // (spec section 6): while condensed, PR 1's layout renders and
@@ -296,8 +321,39 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
     state.setOcrBlocks(state.activePageId, null);
   }, []);
 
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // Cmd/Ctrl+Z undoes the last stroke while focus is inside the sketchpad.
+  // A pointerdown inside the sketchpad focuses its root so drawing arms it.
+  // Lives on the Sketchpad root itself, not a toolbar strip, so every strip
+  // variant (focus, condensed, full) inherits the shortcut: this div is the
+  // one thing all three mount.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const onPointerDown = () => {
+      if (!root.contains(document.activeElement)) root.focus({ preventScroll: true });
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey) return;
+      if (event.key !== "z" && event.key !== "Z") return;
+      if (!root.contains(document.activeElement)) return;
+      if (isTextEntry(event.target)) return;
+      event.preventDefault();
+      const state = useSketchStore.getState();
+      state.undo(state.activePageId);
+    };
+    root.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      root.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
   return (
     <div
+      ref={rootRef}
       data-sketchpad
       tabIndex={-1}
       className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-paper-0 outline-none transition-[padding-bottom] duration-200 ease-out"
@@ -321,7 +377,19 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
           permanent stacking context on this wrapper (the D-059 family).
           The 200ms height motion lives on the pane grid rows and the
           container padding (D-173). */}
-      {condensed ? (
+      {focus ? (
+        <div
+          key="focus-bar"
+          className="shrink-0 max-lg:relative max-lg:z-20 max-lg:animate-cue-fade"
+        >
+          <FocusBar
+            statementMd={statementMd}
+            cleaning={cleaning}
+            onCleanUp={() => void cleanUp()}
+            onDone={onDone}
+          />
+        </div>
+      ) : condensed ? (
         <div
           key="condensed-strip"
           className="shrink-0 max-lg:relative max-lg:z-20 max-lg:animate-cue-fade"
@@ -393,6 +461,10 @@ export function Sketchpad({ onInsertAnswer }: { onInsertAnswer: (latex: string) 
             <SketchCanvas onSizeChange={reportActiveSize} />
             <TypedLinesLayer />
             <GraphLayer />
+            {/* The clean-copy slip owns the bottom edge while it is open; the floats
+                yield rather than fight it for the same corner (z-10 vs z-10, later
+                sibling wins). */}
+            {focus && !(blocks && blocks.length > 0) && <FocusFloats />}
           </div>
         </PaneContext.Provider>
       )}

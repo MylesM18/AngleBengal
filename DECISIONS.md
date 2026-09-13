@@ -3733,3 +3733,14 @@ lines and the count loop then asserts against the wrong total, which showed up a
 an intermittent fast failure. The pin therefore re-wipes after the switch, and
 restores Type mode, since `wipeActiveSketchSurface` needs a throwaway stroke and
 leaves Draw behind.
+
+### D-191. Board focus mode replaces the compact unsplit sketch chrome
+
+The compact unsplit sketch overlay renders one slim focus bar (Done, Problem
+chip, Undo, overflow), Draw and Type floats with the ink palette, and an
+overflow sheet holding Background, Clear, and Clean up, in place of the Done
+row, problem ribbon, and kraft toolbar. GraphRail and PageBar stay mounted on
+compact for now: the graph tools sheet and the pages relocation land in later
+slices of the same spec (docs/superpowers/specs/2026-09-12-board-focus-mode-design.md).
+Desktop and split view are unchanged. Trigger: focusModeActive, compact and
+fewer than two panes.
