@@ -3744,3 +3744,102 @@ compact for now: the graph tools sheet and the pages relocation land in later
 slices of the same spec (docs/superpowers/specs/2026-09-12-board-focus-mode-design.md).
 Desktop and split view are unchanged. Trigger: focusModeActive, compact and
 fewer than two panes.
+
+### D-192. Board focus mode is revised after the owner's device test of PR 1
+
+The owner tested PR #53 on an iPhone and redirected the rest of the series
+(docs/superpowers/specs/2026-09-12-board-focus-mode-revision-design.md). On
+compact unsplit: typed work moves to a strip under the page bar, replacing
+the composer docked above the keyboard and the Work (n) chip; the graph
+tools move to a Plot tab beside Draw and Type, replacing the plus float, and
+the "1 sq =" scale chip is dropped because the scale lives in the Plot
+sheet; the Background radio group sits in the focus bar, and the overflow
+sheet keeps Clear and Clean up; Undo leaves the bar for bottom-left arrows
+with a new Redo. PageBar keeps mounting on compact. PR 2 ships the
+Background, Undo and Redo, and Delete line changes; the Plot tab and the
+typed strip follow in PR 3 and PR 4. The Background radios are text only so
+the bar fits a 360px phone.
+
+### D-193. Delete line lives in the typed line's own math field menu
+
+Every typed solution line's MathLive menu now starts with a "Delete line"
+command and a divider, ahead of MathLive's own items, on desktop, split
+panes, and compact alike. It deletes at once, with no confirm, through
+removeTypedLine, so the active line falls back to the line above and
+deleting the only line leaves the "Tap the paper to start line 1" hint.
+MathField sets it through mathlive 0.110's menuItems setter right after
+appending the field, because the menu accessors throw before
+connectedCallback builds the internal mathfield; the setter swaps only the
+item list, with no option or render path. Other math fields (the answer
+box, the tutor chat, the calculator) keep the stock menu. Its e2e test
+waits for MathLive's virtual keyboard to report hidden before tapping the
+paper after the last line is gone, because MathLive hides the keyboard
+300ms after the last field loses focus and the keyboard covers that spot
+until then. This supersedes the unexecuted three-lines handle and
+long-press popover plan
+(docs/superpowers/plans/2026-09-08-sketch-split-mobile-pr3-line-delete-menu.md)
+and section 7 of the 2026-09-07 sketch split mobile spec.
+
+### D-194. Undo and Redo become bottom-left arrows backed by a redo history
+
+In board focus mode, Undo and Redo are icon-only buttons in a History group
+at the bottom left of the board, disabled when the active page's active
+surface has nothing to undo or redo, and hidden while the clean-copy slip
+shows, like the Draw and Type floats. Undo now keeps what it removes in a
+per (page, surface) redoLog beside the opLog, and redo re-applies the newest
+entry by its original action's rule (strokes and graph objects append, a
+shade replaces, keeping the one-shade invariant). Every action that records
+or removes undoable content (addStroke, eraseStrokes, addGraphObject,
+addGraphShade, removeGraphObject, removeGraphShade, and clear) empties the
+redoLog; typed-line actions, toggleGraphObjectDashed, and surface, mode,
+step, and OCR changes leave it. Like the opLog it is session-only: never
+serialized, and empty after hydrate. Cmd or Ctrl plus Shift plus Z redoes in
+every sketchpad variant. The desktop toolbar keeps its Undo button and gains
+no Redo button.
+
+### D-195. Next's dev indicator is turned off
+
+next.config.ts sets devIndicators to false. Under next dev, Next 16 floats
+its dev indicator in the bottom-left corner of every page, and on the
+compact sketch overlay every corner now holds a control: the Undo and Redo
+arrows bottom left (D-194), Draw and Type bottom right, Done top left, and
+the overflow button top right. The indicator sat over the Undo arrow and
+intercepted the e2e rig's clicks, and the rig runs against next dev. Moving
+the indicator to another corner would cover a different control, moving the
+arrows would override the owner's layout, and forcing the clicks would stop
+the e2e tests proving the arrows can be clicked. With the indicator off,
+Next still surfaces compile and runtime errors (Next 16's devIndicators
+docs, in node_modules/next/dist/docs/), and production builds never render
+it.
+
+### D-196. A typed line keeps its last keystrokes when Enter commits it
+
+On a hardware Enter, MathField hands the field's current value to onChange
+before it calls onEnter. MathLive 0.110 reports content changes from a
+zero-delay timer that it drops once the field is disposed, and a typed
+line's onEnter tears that field down in the same task, so the last
+keystrokes of a line committed with Enter never reached the sketch store.
+The flush only helps callers whose onEnter reads state that updates
+synchronously, like the sketch store: the practice answer box submits the
+answer from its last render's React state, so its Enter is unchanged.
+
+### D-197. A focused math field's container takes taps on touch screens
+
+MathField sets an inline pointer-events auto on the field's container part
+when the host receives focusin, which fires once MathLive's keyboard sink
+holds DOM focus, and removes it on the host's focusout. Under a coarse
+pointer MathLive makes an unfocused field's container inert (pointer-events
+none), and WebKit, in the e2e rig's iPhone project, applied that rule while
+focus sat on the sink, which left the menu toggle untappable while typing.
+Tying the override to focus keeps MathLive's intent that a swipe starting
+on an idle field scrolls the page (the container sets touch-action none);
+while a field has focus, a swipe that starts on it goes to MathLive instead
+of scrolling the page. Moving focus between the sink and the menu fires no
+focusout on the host, so the override holds while the menu is open. An
+always-on override was tried first and rejected: it also let the toggle
+take a tap in the 60ms between MathLive marking a new field focused and
+focusing its sink, a menu opened then had no focus to hand back, and Delete
+line left MathLive counting a removed field as focused, where D-188's blur
+cannot settle it, so the keyboard stayed up over an empty page. With the
+override tied to focusin, the container stays inert under a coarse pointer
+until the sink holds focus, so a tap cannot open the menu in that gap.
