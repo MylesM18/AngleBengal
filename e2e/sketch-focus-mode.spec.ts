@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { STORAGE_STATE } from "./constants";
 import { discoverRoutes, type DiscoveredRoutes } from "./helpers/routes";
@@ -6,9 +6,14 @@ import {
   drawSketchStroke,
   expectSketchStrokeCount,
   hideMathKeyboard,
+  mathFieldValue,
   openCleanSketch,
+  recordUnhandledRejections,
   resetSketchPages,
+  setSketchMode,
   sketchCanvas,
+  startTypedLine,
+  wipeActiveSketchSurface,
 } from "./helpers/sketch";
 
 /**
@@ -42,6 +47,20 @@ test.afterEach(async ({ page }, testInfo) => {
   await resetSketchPages(page);
   await page.waitForTimeout(2500);
 });
+
+/**
+ * Opens the live field's own menu and picks Delete line, asserting it heads
+ * the menu. The toggle and the menu both live in the math-field's open shadow
+ * root, which Playwright's CSS and role locators pierce. MathLive opens the
+ * menu on the toggle's pointerdown, and a pointerup within 120ms keeps it
+ * open, so a plain click opens it for the next click to choose from.
+ */
+async function deleteLineFromMenu(page: Page): Promise<void> {
+  await page.locator("math-field").locator('[part="menu-toggle"]').click();
+  const first = page.getByRole("menuitem").first();
+  await expect(first, "Delete line does not head the math field menu.").toHaveText("Delete line");
+  await first.click();
+}
 
 test.describe("undo and redo arrows", () => {
   test("round-trip a stroke with the right disabled states, and redo from the keyboard", async ({
@@ -137,5 +156,63 @@ test.describe("background in the focus bar", () => {
         { message: "The focus bar does not fit a 360px phone." },
       )
       .toBe("fits");
+  });
+});
+
+test.describe("Delete line in the math field menu", () => {
+  test("removes the active line, hands the cursor up, and typing still works after", async ({
+    page,
+  }) => {
+    const unhandled = await recordUnhandledRejections(page);
+    const lines = page.locator("[data-typed-lines] ol li");
+    const field = page.locator("math-field");
+
+    await openCleanSketch(page, discovered, "Plain");
+    await setSketchMode(page, "Type");
+    await startTypedLine(page);
+    await expect(field).toBeFocused();
+    await page.keyboard.type("x=1");
+    await expect.poll(() => mathFieldValue(page)).toBe("x=1");
+    await page.keyboard.press("Enter");
+    await expect(lines).toHaveCount(2);
+    await expect(field).toBeFocused();
+    await page.keyboard.type("y=2");
+    await expect.poll(() => mathFieldValue(page)).toBe("y=2");
+
+    // Deleting line 2 hands the live field to line 1 (removeTypedLine's fallback).
+    await deleteLineFromMenu(page);
+    await expect(lines).toHaveCount(1);
+    await expect.poll(() => mathFieldValue(page)).toBe("x=1");
+
+    // Deleting the only line leaves the empty-page hint and no live field.
+    await deleteLineFromMenu(page);
+    await expect(lines).toHaveCount(0);
+    await expect(field).toHaveCount(0);
+    await expect(page.getByText("Tap the paper to start line 1")).toBeVisible();
+
+    // MathLive lowers its keyboard 300ms after the last field's focusout, and
+    // until then the keyboard covers the paper where startTypedLine taps, for
+    // a finger as much as for the rig. Wait for MathLive's own hide.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const w = window as unknown as { mathVirtualKeyboard?: { visible: boolean } };
+            return w.mathVirtualKeyboard?.visible ?? false;
+          }),
+        { message: "MathLive's keyboard stayed up after the last typed line was deleted." },
+      )
+      .toBe(false);
+
+    // The D-188 failure mode: after the teardowns, a new field still takes
+    // focus and input.
+    await startTypedLine(page);
+    await expect(field).toBeFocused();
+    await page.keyboard.type("z");
+    await expect.poll(() => mathFieldValue(page)).toBe("z");
+
+    expect(await unhandled(), "MathLive threw around the menu deletions.").toEqual([]);
+    await hideMathKeyboard(page);
+    await wipeActiveSketchSurface(page);
   });
 });

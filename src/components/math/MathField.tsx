@@ -5,6 +5,7 @@ import type { MathfieldElement, VirtualKeyboardKeycap, VirtualKeyboardLayout } f
 
 import { cx } from "@/lib/cx";
 import { pathKeepsKeyboard } from "@/lib/math/keyboardDismiss";
+import { withDeleteLineItem } from "@/lib/math/mathMenu";
 
 /**
  * App-tailored virtual keyboard layouts (D-128, D-129). MathLive's default
@@ -164,6 +165,7 @@ export function MathField({
   onChange,
   onEnter,
   onEmptyBackspace,
+  onDelete,
   readOnly = false,
   compact = false,
   autoFocus = false,
@@ -176,6 +178,11 @@ export function MathField({
   onEnter?: () => void;
   /** Fired when Backspace is pressed while the field is empty (stacked lines). */
   onEmptyBackspace?: () => void;
+  /** Heads the field's own MathLive menu with a "Delete line" command
+   *  (revision spec section 8). Static per usage site, like keyboardVariant:
+   *  whether the item exists is decided when the field mounts, and the
+   *  handler itself stays fresh through a ref. */
+  onDelete?: () => void;
   readOnly?: boolean;
   compact?: boolean;
   /** Focus the field as soon as it mounts. Only for fields the user just
@@ -203,10 +210,12 @@ export function MathField({
   const onChangeRef = useRef(onChange);
   const onEnterRef = useRef(onEnter);
   const onEmptyBackspaceRef = useRef(onEmptyBackspace);
+  const onDeleteRef = useRef(onDelete);
   useEffect(() => {
     onChangeRef.current = onChange;
     onEnterRef.current = onEnter;
     onEmptyBackspaceRef.current = onEmptyBackspace;
+    onDeleteRef.current = onDelete;
   });
 
   useEffect(() => {
@@ -227,6 +236,9 @@ export function MathField({
       // to a plain space for the grader and the clean copy (D-182).
       field.mathModeSpace = "\\;";
       field.value = value;
+      // The last value onChange carried, so the Enter path below can tell a
+      // keystroke MathLive has not reported yet from one it has.
+      let reported = value;
       field.setAttribute("aria-label", ariaLabel);
       field.style.display = "block";
       field.style.width = "100%";
@@ -240,17 +252,63 @@ export function MathField({
           onEnterRef.current?.();
           return;
         }
-        onChangeRef.current(field.value);
+        reported = field.value;
+        onChangeRef.current(reported);
       });
-      // Swap the keyboard's math layer for this surface whenever the field
-      // gains focus; guarded inside, so same-surface refocus is a no-op.
-      field.addEventListener("focusin", () => applyKeyboardLayouts(keyboardVariant));
+      // MathLive's touch stylesheet makes an unfocused field's container
+      // inert (pointer-events none under a coarse pointer, gated on
+      // :host(:not(:focus))), so a swipe that starts on an idle field can
+      // still scroll the page. WebKit evaluates that :host(:focus) as false
+      // while the focus sits on the keyboard sink inside the shadow root,
+      // which is where a focused field keeps it, so on an iPhone a focused
+      // field's container, its menu toggle and the menu MathLive appends
+      // inside the toggle never take a tap (verified against mathlive 0.110
+      // on the iphone-webkit rig; Chromium matches the host). The container
+      // is a documented part and an inline value outranks the shadow rule,
+      // so the override follows the focus: on while the field has it, gone
+      // when focus leaves, which is what MathLive's rule intends. It must
+      // not be always on: MathLive marks a field focused 60ms before it
+      // hands DOM focus to the sink, and a menu opened in that gap (reachable
+      // only through an always-on override) records nothing to give focus
+      // back to, so Delete line then removes a field that MathLive still
+      // counts as focused, its blur() cannot reach onBlur, no focusout arms
+      // the keyboard's hide timer, and the keyboard stays up over an empty
+      // page while the next field's focus trips over the disposed one.
+      // Focus moving between the sink and the menu stays inside the shadow
+      // tree and never reaches the host, so the menu keeps the override
+      // while it is open.
+      const setContainerPointerEvents = (value: "auto" | null) => {
+        const container = field.shadowRoot?.querySelector<HTMLElement>('[part="container"]');
+        if (!container) return;
+        if (value) container.style.setProperty("pointer-events", value);
+        else container.style.removeProperty("pointer-events");
+      };
+      field.addEventListener("focusin", () => {
+        // Swap the keyboard's math layer for this surface whenever the field
+        // gains focus; guarded inside, so same-surface refocus is a no-op.
+        applyKeyboardLayouts(keyboardVariant);
+        setContainerPointerEvents("auto");
+      });
+      field.addEventListener("focusout", () => setContainerPointerEvents(null));
       field.addEventListener(
         "keydown",
         (event) => {
           if (event.key === "Enter") {
             event.preventDefault();
             event.stopPropagation();
+            // MathLive reports a content change from a setTimeout(0) and
+            // drops it once the field is disposed (contentDidChange in
+            // mathlive 0.110), while this handler runs synchronously at
+            // keydown and onEnter can tear the field down in the same task
+            // (a typed line's addTypedLineAfter). Keystrokes still in that
+            // queue would never reach onChange, and the line would keep its
+            // stale text, so hand the field's current value over first. The
+            // "+ line" key needs none of this: its commit arrives as an
+            // insertLineBreak input event, queued behind the text it follows.
+            if (field.value !== reported) {
+              reported = field.value;
+              onChangeRef.current(reported);
+            }
             onEnterRef.current?.();
           }
           if (event.key === "Backspace" && field.value === "") {
@@ -284,6 +342,13 @@ export function MathField({
         { capture: true },
       );
       hostRef.current.appendChild(field);
+      // MathLive's menu accessors throw "Mathfield not mounted" until
+      // connectedCallback has built the internal mathfield, which the append
+      // above just did, synchronously. The setter only swaps the menu's item
+      // list; no option or render path runs (verified against mathlive 0.110).
+      if (onDeleteRef.current) {
+        field.menuItems = withDeleteLineItem(field.menuItems, () => onDeleteRef.current?.());
+      }
       fieldRef.current = field;
       if (mathfieldRef) mathfieldRef.current = field;
       if (autoFocus) {
