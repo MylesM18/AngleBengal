@@ -31,6 +31,20 @@ export async function openSketchMode(page: Page): Promise<void> {
 }
 
 /**
+ * Board focus mode (PR 1) moved Background, Clear, and Clean up into the
+ * focus bar's overflow sheet on compact unsplit. Opens it when present;
+ * resolves false on layouts that still show the inline toolbar (desktop,
+ * split), where the sheet does not exist and the old locators work as is.
+ */
+export async function openFocusOverflow(page: Page): Promise<boolean> {
+  const trigger = page.getByRole("button", { name: "More controls" });
+  if ((await trigger.count()) === 0) return false;
+  const expanded = await trigger.getAttribute("aria-expanded");
+  if (expanded !== "true") await trigger.click();
+  return true;
+}
+
+/**
  * Chooses a sketch background. `graph` is the store's default (D-154 puts the
  * graph tools with the background rather than making them a mode), and it is
  * the only value that mounts `GraphRail`, a whole extra row of chips and
@@ -44,12 +58,14 @@ export async function setSketchBackground(
   page: Page,
   label: "Plain" | "Grid" | "Graph",
 ): Promise<void> {
+  const opened = await openFocusOverflow(page);
   const chip = page
     .getByRole("radiogroup", { name: "Background" })
     .getByRole("radio", { name: label });
   await expect(chip, `No ${label} background chip in the sketch toolbar.`).toBeVisible();
   await chip.click();
   await expect(chip).toHaveAttribute("aria-checked", "true");
+  if (opened) await page.keyboard.press("Escape");
 }
 
 /**
@@ -138,6 +154,7 @@ export async function drawSketchStroke(page: Page, canvas: Locator): Promise<voi
 export async function clearSketchSurface(page: Page): Promise<void> {
   const canvas = sketchCanvas(page);
   if ((await sketchStrokeCount(canvas)) === 0) return;
+  await openFocusOverflow(page);
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   // Named, not bare: an unscoped getByRole("dialog") also matches the outer
   // Sketchpad overlay (PracticeWorkspace.tsx, role="dialog" aria-label=
