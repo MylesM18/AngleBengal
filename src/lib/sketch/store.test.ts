@@ -155,6 +155,133 @@ describe("undo per (page, surface)", () => {
   });
 });
 
+describe("redo per (page, surface) (revision spec 5.2)", () => {
+  it("round-trips a stroke, keeping its id and points", () => {
+    const id = activeId();
+    store().addStroke(id, POINTS);
+    const stroke = surface(id).strokes[0];
+
+    store().undo(id);
+    expect(surface(id).strokes).toEqual([]);
+    expect(surface(id).redoLog).toEqual([{ kind: "stroke", stroke }]);
+
+    store().redo(id);
+    expect(surface(id).strokes).toEqual([stroke]);
+    expect(surface(id).opLog).toEqual([{ kind: "stroke", id: stroke.id }]);
+    expect(surface(id).redoLog).toEqual([]);
+  });
+
+  it("re-applies graph objects and the shade newest-undone first", () => {
+    const id = activeId();
+    const objectId = store().addGraphObject(id, "point", [[1, 1]], false);
+    const shadeId = store().addGraphShade(id, [0.5, 0.5]);
+    store().undo(id);
+    store().undo(id);
+    expect(surface(id).graphObjects).toEqual([]);
+    expect(surface(id).graphShades).toEqual([]);
+
+    store().redo(id);
+    expect(surface(id).graphObjects.map((object) => object.id)).toEqual([objectId]);
+    expect(surface(id).graphShades).toEqual([]);
+
+    store().redo(id);
+    expect(surface(id).graphShades).toEqual([{ id: shadeId, testPoint: [0.5, 0.5] }]);
+    expect(surface(id).opLog).toEqual([
+      { kind: "graphObject", id: objectId },
+      { kind: "graphShade", id: shadeId },
+    ]);
+  });
+
+  it("no-ops on an empty history in either direction", () => {
+    const id = activeId();
+    store().addStroke(id, POINTS);
+    store().undo(id);
+    const afterUndo = surface(id);
+    store().undo(id);
+    expect(surface(id)).toBe(afterUndo);
+
+    store().redo(id);
+    const afterRedo = surface(id);
+    store().redo(id);
+    expect(surface(id)).toBe(afterRedo);
+    expect(surface(id).strokes).toHaveLength(1);
+  });
+
+  it("empties when content is recorded or removed", () => {
+    const id = activeId();
+    const objectId = store().addGraphObject(id, "point", [[2, 2]], false);
+    const shadeId = store().addGraphShade(id, [0.5, 0.5]);
+    store().addStroke(id, POINTS);
+    const strokeId = surface(id).strokes[0].id;
+
+    const primeRedo = () => {
+      store().addStroke(id, [[7, 7, 0.5]]);
+      store().undo(id);
+      expect(surface(id).redoLog).toHaveLength(1);
+    };
+
+    primeRedo();
+    store().addStroke(id, [[8, 8, 0.5]]);
+    expect(surface(id).redoLog).toEqual([]);
+
+    primeRedo();
+    store().addGraphObject(id, "point", [[3, 3]], false);
+    expect(surface(id).redoLog).toEqual([]);
+
+    primeRedo();
+    store().eraseStrokes(id, [strokeId]);
+    expect(surface(id).redoLog).toEqual([]);
+
+    primeRedo();
+    store().removeGraphObject(id, objectId);
+    expect(surface(id).redoLog).toEqual([]);
+
+    primeRedo();
+    store().removeGraphShade(id, shadeId);
+    expect(surface(id).redoLog).toEqual([]);
+
+    primeRedo();
+    store().addGraphShade(id, [1.5, 1.5]);
+    expect(surface(id).redoLog).toEqual([]);
+
+    primeRedo();
+    store().clear(id);
+    expect(surface(id).redoLog).toEqual([]);
+  });
+
+  it("is left alone by actions outside the undo history", () => {
+    const id = activeId();
+    const objectId = store().addGraphObject(id, "segment", [[0, 0], [1, 1]], false);
+    store().addStroke(id, POINTS);
+    store().undo(id);
+    expect(surface(id).redoLog).toHaveLength(1);
+
+    const lineId = store().addTypedLineAfter(id, null);
+    store().updateTypedLine(id, lineId, "x=1");
+    store().removeTypedLine(id, lineId);
+    store().toggleGraphObjectDashed(id, objectId);
+    store().setGraphStep(id, 2);
+    store().setMode(id, "type");
+    store().setOcrBlocks(id, [{ kind: "text", text: "note" }]);
+    expect(surface(id).redoLog).toHaveLength(1);
+  });
+
+  it("keeps a separate redo history per surface", () => {
+    const id = activeId();
+    store().addStroke(id, POINTS);
+    store().undo(id);
+
+    store().setSurface(id, "blank");
+    expect(surface(id).redoLog).toEqual([]);
+    store().redo(id);
+    expect(surface(id).strokes).toEqual([]);
+
+    store().setSurface(id, "graph");
+    store().redo(id);
+    expect(surface(id).strokes).toHaveLength(1);
+  });
+});
+
 describe("clear", () => {
   it("clears only the page's ACTIVE surface, all fields included", () => {
     const id = activeId();
@@ -173,6 +300,7 @@ describe("clear", () => {
       graphShades: [],
       ocrBlocks: null,
       opLog: [],
+      redoLog: [],
     });
     expect(page(id).content.blank.strokes).toHaveLength(1);
   });
@@ -726,9 +854,10 @@ describe("hydrateForProblem (D-156, v2)", () => {
     expect(restored.content.graph.graphObjects.map((object) => object.id)).toEqual(["g900"]);
     // The one-shade invariant holds on restore too.
     expect(restored.content.graph.graphShades).toEqual([{ id: "h901", testPoint: [1, 1] }]);
-    // History starts clean: undo cannot reach into a previous sitting.
+    // History starts clean: undo and redo cannot reach into a previous sitting.
     for (const surfaceName of ["blank", "grid", "graph"] as const) {
       expect(restored.content[surfaceName].opLog).toEqual([]);
+      expect(restored.content[surfaceName].redoLog).toEqual([]);
     }
     expect(page("p901").content.grid.typedLines[0].latex).toBe("x=1");
     expect(activePage(store())).toBe(page("p901"));
