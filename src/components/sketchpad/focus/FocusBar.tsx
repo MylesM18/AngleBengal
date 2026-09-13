@@ -5,15 +5,15 @@ import { useEffect, useId, useRef, useState } from "react";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { Chip, chipClasses } from "@/components/ui/Chip";
 import { Sheet } from "@/components/ui/Sheet";
-import { useSketchStore } from "@/lib/sketch/store";
 
 import { OverflowSheet } from "./OverflowSheet";
 
 /**
  * The one-row chrome of board focus mode (spec section 4): Done, the Problem
- * chip, Undo, and the overflow trigger. The Problem panel and the overflow
- * sheet are top-anchored dialogs over the board; at most one is open, and
- * each closes on Escape, on its scrim, or on its own chip.
+ * chip, and the overflow trigger. Undo and Redo live in HistoryFloats at the
+ * bottom left of the board (revision spec section 5). The Problem panel and
+ * the overflow sheet are top-anchored dialogs over the board; at most one is
+ * open, and each closes on Escape, on its scrim, or on its own chip.
  */
 export function FocusBar({
   statementMd,
@@ -26,8 +26,6 @@ export function FocusBar({
   onCleanUp: () => void;
   onDone: (() => void) | null;
 }) {
-  const activePageId = useSketchStore((state) => state.activePageId);
-  const undo = useSketchStore((state) => state.undo);
   const [open, setOpen] = useState<"problem" | "overflow" | null>(null);
   const problemTitleId = useId();
   const problemPanelRef = useRef<HTMLDivElement>(null);
@@ -58,21 +56,17 @@ export function FocusBar({
           Problem
         </Chip>
       )}
-      <Chip
-        variant="action"
-        icon="undo"
-        className="ml-auto"
-        onClick={() => undo(activePageId)}
-      >
-        Undo
-      </Chip>
       <button
         type="button"
         aria-label="More controls"
         aria-haspopup="dialog"
         aria-expanded={open === "overflow"}
         onClick={() => setOpen((current) => (current === "overflow" ? null : "overflow"))}
-        className={chipClasses({ variant: "toggle", active: open === "overflow" })}
+        className={chipClasses({
+          variant: "toggle",
+          active: open === "overflow",
+          className: "ml-auto",
+        })}
       >
         &#8943;
       </button>

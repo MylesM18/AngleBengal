@@ -49,6 +49,7 @@ import { CleanCopyPanel } from "./CleanCopyPanel";
 import { CondensedToolbar } from "./CondensedToolbar";
 import { FocusBar } from "./focus/FocusBar";
 import { FocusFloats } from "./focus/FocusFloats";
+import { HistoryFloats } from "./focus/HistoryFloats";
 import { GraphLayer } from "./GraphLayer";
 import { GraphRail } from "./GraphRail";
 import { PageBar } from "./PageBar";
@@ -323,7 +324,8 @@ export function Sketchpad({
 
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  // Cmd/Ctrl+Z undoes the last stroke while focus is inside the sketchpad.
+  // Cmd/Ctrl+Z undoes the last stroke while focus is inside the sketchpad,
+  // and Cmd/Ctrl+Shift+Z redoes it (revision spec section 5.2).
   // A pointerdown inside the sketchpad focuses its root so drawing arms it.
   // Lives on the Sketchpad root itself, not a toolbar strip, so every strip
   // variant (focus, condensed, full) inherits the shortcut: this div is the
@@ -335,13 +337,14 @@ export function Sketchpad({
       if (!root.contains(document.activeElement)) root.focus({ preventScroll: true });
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey) return;
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
       if (event.key !== "z" && event.key !== "Z") return;
       if (!root.contains(document.activeElement)) return;
       if (isTextEntry(event.target)) return;
       event.preventDefault();
       const state = useSketchStore.getState();
-      state.undo(state.activePageId);
+      if (event.shiftKey) state.redo(state.activePageId);
+      else state.undo(state.activePageId);
     };
     root.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("keydown", onKeyDown);
@@ -461,10 +464,15 @@ export function Sketchpad({
             <SketchCanvas onSizeChange={reportActiveSize} />
             <TypedLinesLayer />
             <GraphLayer />
-            {/* The clean-copy slip owns the bottom edge while it is open; the floats
-                yield rather than fight it for the same corner (z-10 vs z-10, later
-                sibling wins). */}
-            {focus && !(blocks && blocks.length > 0) && <FocusFloats />}
+            {/* The clean-copy slip owns the bottom edge while it is open; both float
+                clusters yield rather than fight it for the corners (z-10 vs z-10,
+                later sibling wins). */}
+            {focus && !(blocks && blocks.length > 0) && (
+              <>
+                <HistoryFloats />
+                <FocusFloats />
+              </>
+            )}
           </div>
         </PaneContext.Provider>
       )}

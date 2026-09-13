@@ -1,4 +1,8 @@
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+
+import { servePracticeProblem } from "./practice";
+import type { DiscoveredRoutes, Route } from "./routes";
+import { settle } from "./settle";
 
 /**
  * Compact sketch mode (mobile fix plan Appendix A rung 1, which names sketch
@@ -368,4 +372,59 @@ export async function hideMathKeyboard(page: Page): Promise<void> {
       { message: "MathLive's virtual keyboard did not hide." },
     )
     .toBe(0);
+}
+
+/**
+ * Practice served, overlay open, one clean empty "Page 1" on the given
+ * paper, for specs that drive one surface from a known empty state. The
+ * paper is set BEFORE the wipe: content is per surface (R2), so wiping Plain
+ * would leave a previous run's graph objects on Graph. The wipe ends on
+ * Clear, which also empties the undo and redo histories. Skips the calling
+ * test when the library has no practice topic.
+ */
+export async function openCleanSketch(
+  page: Page,
+  discovered: DiscoveredRoutes,
+  background: "Plain" | "Grid" | "Graph",
+): Promise<void> {
+  test.skip(
+    discovered.practice === null,
+    `SKIPPED, EMPTY LIBRARY: no practice topic. ${discovered.notes.join(" ")}`,
+  );
+  await page.goto((discovered.practice as Route).path);
+  await settle(page);
+  await servePracticeProblem(page);
+  await openSketchMode(page);
+  await settle(page);
+  await resetSketchPages(page);
+  await setSketchBackground(page, background);
+  await wipeActiveSketchSurface(page);
+}
+
+/** The MathLive value of the one live math field on screen. */
+export function mathFieldValue(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const field = document.querySelector("math-field") as { value?: string } | null;
+    return field?.value ?? "";
+  });
+}
+
+/**
+ * Records unhandled promise rejections from the next navigation on and
+ * returns a reader for them. Call it before page.goto: the listener is an
+ * init script. MathLive's teardown faults surface this way (D-188).
+ */
+export async function recordUnhandledRejections(
+  page: Page,
+): Promise<() => Promise<string[]>> {
+  await page.addInitScript(() => {
+    const store: string[] = [];
+    (window as unknown as { __unhandled: string[] }).__unhandled = store;
+    window.addEventListener("unhandledrejection", (event) => {
+      const reason = event.reason as { stack?: string } | undefined;
+      store.push(String(reason?.stack ?? event.reason));
+    });
+  });
+  return () =>
+    page.evaluate(() => (window as unknown as { __unhandled?: string[] }).__unhandled ?? []);
 }

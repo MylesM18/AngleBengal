@@ -10,6 +10,17 @@ const nextConfig: NextConfig = {
    * the authoritative docs are in `node_modules/next/dist/docs/`.
    */
   agentRules: false,
+  /**
+   * Hides Next's dev-mode indicator. It floats in a corner of every page in
+   * `next dev`, and every corner is taken on the compact sketch overlay: the
+   * Undo and Redo arrows bottom left (D-194), Draw and Type bottom right,
+   * Done top left, the overflow button top right. It sat over the Undo arrow
+   * and blocked the e2e rig's clicks, and the rig runs against `next dev`.
+   * Compile and runtime errors still surface (Next 16 devIndicators docs:
+   * node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/devIndicators.md),
+   * and production never renders the indicator.
+   */
+  devIndicators: false,
 };
 
 export default nextConfig;

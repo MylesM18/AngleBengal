@@ -1,19 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { STORAGE_STATE } from "./constants";
-import { servePracticeProblem } from "./helpers/practice";
-import { discoverRoutes, type DiscoveredRoutes, type Route } from "./helpers/routes";
+import { discoverRoutes, type DiscoveredRoutes } from "./helpers/routes";
 import {
   hideMathKeyboard,
-  openSketchMode,
+  mathFieldValue,
+  openCleanSketch,
+  recordUnhandledRejections,
   resetSketchPages,
-  setSketchBackground,
   setSketchMode,
   showMathKeyboard,
   startTypedLine,
   wipeActiveSketchSurface,
 } from "./helpers/sketch";
-import { settle } from "./helpers/settle";
 
 /**
  * Two owner reports on the sketchpad's typing surfaces (D-182): the math
@@ -49,26 +48,6 @@ test.afterEach(async ({ page }, testInfo) => {
   await page.waitForTimeout(2500);
 });
 
-/**
- * Practice served, overlay open, one clean empty "Page 1" on the given
- * paper. The paper is set BEFORE the wipe: content is per surface (R2), so
- * wiping Plain would leave a previous run's graph objects on Graph.
- */
-async function openCleanSketch(page: Page, background: "Plain" | "Grid" | "Graph"): Promise<void> {
-  test.skip(
-    discovered.practice === null,
-    `SKIPPED, EMPTY LIBRARY: no practice topic. ${discovered.notes.join(" ")}`,
-  );
-  await page.goto((discovered.practice as Route).path);
-  await settle(page);
-  await servePracticeProblem(page);
-  await openSketchMode(page);
-  await settle(page);
-  await resetSketchPages(page);
-  await setSketchBackground(page, background);
-  await wipeActiveSketchSurface(page);
-}
-
 /** The graph layer's own count, the one signal that an object was drawn. */
 function graphPaper(page: Page) {
   return page.getByRole("application", { name: /^Graph paper\./ });
@@ -85,14 +64,6 @@ async function openExactPoint(page: Page) {
   const dialog = page.getByRole("dialog", { name: "Exact point" });
   await expect(dialog).toBeVisible();
   return dialog;
-}
-
-/** The MathLive value of the one live math field on screen. */
-function mathFieldValue(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const field = document.querySelector("math-field") as { value?: string } | null;
-    return field?.value ?? "";
-  });
 }
 
 function escapeRegExp(text: string): string {
@@ -121,7 +92,7 @@ test.describe("exact coordinates (graph rail)", () => {
   test("typed coordinates place a point with no chip armed, and clear the inputs", async ({
     page,
   }) => {
-    await openCleanSketch(page, "Graph");
+    await openCleanSketch(page, discovered, "Graph");
     await expect(graphPaper(page)).toHaveAttribute("aria-label", "Graph paper. 0 objects placed.");
 
     const dialog = await openExactPoint(page);
@@ -139,14 +110,19 @@ test.describe("exact coordinates (graph rail)", () => {
     );
 
     // The rail's own Undo takes it back, so the shared database is left as found.
-    await page.getByRole("button", { name: "Undo", exact: true }).last().click();
+    // Scoped to the rail: focus mode's History arrows carry an Undo too.
+    await page
+      .getByRole("group", { name: "Units per grid square" })
+      .locator("..")
+      .getByRole("button", { name: "Undo", exact: true })
+      .click();
     await expect(graphPaper(page)).toHaveAttribute("aria-label", "Graph paper. 0 objects placed.");
   });
 
   test("Eraser armed keeps the typed entry beside a hint instead of eating it", async ({
     page,
   }) => {
-    await openCleanSketch(page, "Graph");
+    await openCleanSketch(page, discovered, "Graph");
     const dialog = await openExactPoint(page);
 
     // The rail's Eraser chip, not the toolbar's ink eraser: scoped to the
@@ -174,7 +150,7 @@ test.describe("math keyboard (typed lines)", () => {
   test("the space bar inserts a space, and the 123 layer has slash and space keys", async ({
     page,
   }) => {
-    await openCleanSketch(page, "Graph");
+    await openCleanSketch(page, discovered, "Graph");
     await setSketchMode(page, "Type");
     await startTypedLine(page);
     await expect
@@ -227,21 +203,9 @@ test.describe("math keyboard (typed lines)", () => {
     test(`committing a line with ${trigger} opens the next line without a MathLive teardown fault`, async ({
       page,
     }) => {
-      const unhandled = () =>
-        page.evaluate(
-          () => (window as unknown as { __unhandled?: string[] }).__unhandled ?? [],
-        );
+      const unhandled = await recordUnhandledRejections(page);
 
-      await page.addInitScript(() => {
-        const store: string[] = [];
-        (window as unknown as { __unhandled: string[] }).__unhandled = store;
-        window.addEventListener("unhandledrejection", (event) => {
-          const reason = event.reason as { stack?: string } | undefined;
-          store.push(String(reason?.stack ?? event.reason));
-        });
-      });
-
-      await openCleanSketch(page, "Graph");
+      await openCleanSketch(page, discovered, "Graph");
       await setSketchMode(page, "Type");
       await startTypedLine(page);
       await expect
