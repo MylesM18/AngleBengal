@@ -3,6 +3,8 @@
 Date: 2026-09-12. Status: approved direction, awaiting owner review of this document.
 Brainstorm artifacts: `.superpowers/brainstorm/51182-1789250719/content/` (four screens; the owner picked direction A, docked typing, and the bottom sheet, then extended scope to Plain).
 
+**Revised after PR 1 shipped:** sections 4, 6, 7, 8 and 9 are replaced in part by `docs/superpowers/specs/2026-09-12-board-focus-mode-revision-design.md` (typed strip at the top, Plot tab, Background in the top bar, Undo and Redo arrows bottom left, Delete line in the math field menu). Where the two disagree, the revision wins.
+
 ## 1. Problem
 
 On a phone the sketch overlay stacks a problem ribbon, the kraft toolbar (2 to 3 wrapped rows at 390px), the graph rail when Graph paper is on, and the page bar before the board starts. Roughly 40 percent of the height is chrome. In type mode the typed lines render on top of the paper, colliding with the plot, and the math keyboard then covers the bottom 218px. D-190 bought the rail's height back while the keyboard is up, but the board is still small and the collision remains.
