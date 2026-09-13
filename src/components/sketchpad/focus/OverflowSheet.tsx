@@ -3,23 +3,16 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
-import { Icon, type IconName } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
-import { chipClasses } from "@/components/ui/Chip";
-import { activePage, useSketchStore, type Background } from "@/lib/sketch/store";
-
-const BACKGROUNDS: { value: Background; label: string; icon: IconName | null }[] = [
-  { value: "blank", label: "Plain", icon: null },
-  { value: "grid", label: "Grid", icon: "grid" },
-  { value: "graph", label: "Graph", icon: "graph" },
-];
+import { activePage, useSketchStore } from "@/lib/sketch/store";
 
 const CLEAR_QUESTION = "Clear this surface? This cannot be undone.";
 
 /**
- * The focus bar's overflow (spec section 9, PR 1 slice): background switch,
- * Clear surface with its confirm, and Clean up. Pages stay in the PageBar
- * until the slice that retires it; the tools sheet arrives in PR 3.
+ * The focus bar's overflow (spec section 9, as revised by the revision
+ * spec's section 4): Clear surface with its confirm, and Clean up. The
+ * Background group lives in the focus bar itself, and pages stay in the
+ * PageBar.
  */
 export function OverflowSheet({
   cleaning,
@@ -31,12 +24,10 @@ export function OverflowSheet({
   onClose: () => void;
 }) {
   const activePageId = useSketchStore((state) => state.activePageId);
-  const background = useSketchStore((state) => activePage(state).surface);
   const strokeCount = useSketchStore((state) => {
     const page = activePage(state);
     return page.content[page.surface].strokes.length;
   });
-  const setSurface = useSketchStore((state) => state.setSurface);
   const clear = useSketchStore((state) => state.clear);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const titleId = useId();
@@ -49,8 +40,8 @@ export function OverflowSheet({
   // after it opens, focus is still wherever it was before (the toggle that
   // opened it, or the document). Mirrors SketchToolbar.tsx's Clear popover,
   // which focuses its last button (Keep) whenever it opens. There is no
-  // single obvious default control up front here (background, Clear and
-  // Clean up are peers), so the dialog container itself (tabIndex={-1}
+  // single obvious default control up front here (Clear and Clean up are
+  // peers), so the dialog container itself (tabIndex={-1}
   // below) takes focus on mount instead; once the Clear confirm is showing,
   // Keep (the safe default) does, and dismissing it hands focus back to the
   // container so Escape keeps working either way.
@@ -84,28 +75,6 @@ export function OverflowSheet({
           <p id={titleId} className="text-meta text-ink-soft">
             Sketch controls
           </p>
-          <div className="flex gap-1" role="radiogroup" aria-label="Background">
-            {BACKGROUNDS.map(({ value, label, icon }) => {
-              const checked = background === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={checked}
-                  onClick={() => setSurface(activePageId, value)}
-                  className={chipClasses({ variant: "toggle", active: checked })}
-                >
-                  {icon ? (
-                    <Icon name={icon} />
-                  ) : (
-                    <span aria-hidden="true" className="block h-3 w-3 rounded-chip border border-current" />
-                  )}
-                  {label}
-                </button>
-              );
-            })}
-          </div>
           {confirmingClear ? (
             <div role="dialog" aria-labelledby={clearTitleId} className="flex flex-col gap-2">
               <p id={clearTitleId} className="text-ui text-ink">

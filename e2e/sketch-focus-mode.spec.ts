@@ -90,3 +90,52 @@ test.describe("undo and redo arrows", () => {
     await expectSketchStrokeCount(canvas, 1, "Cmd/Ctrl+Shift+Z did not redo.");
   });
 });
+
+test.describe("background in the focus bar", () => {
+  test("switches paper from the bar, and the overflow keeps only Clear and Clean up", async ({
+    page,
+  }) => {
+    await openCleanSketch(page, discovered, "Graph");
+    const overlay = page.locator("[data-sketch-overlay]");
+    const backgrounds = overlay.getByRole("radiogroup", { name: "Background" });
+    const more = overlay.getByRole("button", { name: "More controls" });
+
+    // In the bar itself: reachable with the overflow closed.
+    await expect(more).toHaveAttribute("aria-expanded", "false");
+    await expect(backgrounds).toBeVisible();
+
+    for (const label of ["Grid", "Plain", "Graph"] as const) {
+      const radio = backgrounds.getByRole("radio", { name: label, exact: true });
+      await radio.click();
+      await expect(radio).toHaveAttribute("aria-checked", "true");
+    }
+
+    await more.click();
+    const sheet = overlay.getByRole("dialog", { name: "Sketch controls" });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByRole("radiogroup", { name: "Background" })).toHaveCount(0);
+    await expect(sheet.getByRole("button", { name: "Clear", exact: true })).toBeVisible();
+    await expect(sheet.getByRole("button", { name: "Clean up", exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+
+    // The bar fits a 360px phone: the overflow button stays on screen and
+    // clear of the last radio.
+    await page.setViewportSize({ width: 360, height: 800 });
+    const graph = backgrounds.getByRole("radio", { name: "Graph", exact: true });
+    await expect
+      .poll(
+        async () => {
+          const graphBox = await graph.boundingBox();
+          const moreBox = await more.boundingBox();
+          if (!graphBox || !moreBox) return "a control has no box";
+          const moreRight = moreBox.x + moreBox.width;
+          if (moreRight > 360) return `the overflow button ends at ${moreRight}px`;
+          if (graphBox.x + graphBox.width > moreBox.x) return "Graph runs into the overflow button";
+          return "fits";
+        },
+        { message: "The focus bar does not fit a 360px phone." },
+      )
+      .toBe("fits");
+  });
+});

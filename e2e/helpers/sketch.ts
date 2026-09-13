@@ -35,10 +35,11 @@ export async function openSketchMode(page: Page): Promise<void> {
 }
 
 /**
- * Board focus mode (PR 1) moved Background, Clear, and Clean up into the
- * focus bar's overflow sheet on compact unsplit. Opens it when present;
- * resolves false on layouts that still show the inline toolbar (desktop,
- * split), where the sheet does not exist and the old locators work as is.
+ * Board focus mode (PR 1) moved Clear and Clean up into the focus bar's
+ * overflow sheet on compact unsplit (Background went there too, then moved
+ * into the bar itself in revision PR 2). Opens it when present; resolves
+ * false on layouts that still show the inline toolbar (desktop, split),
+ * where the sheet does not exist and the old locators work as is.
  */
 export async function openFocusOverflow(page: Page): Promise<boolean> {
   const trigger = page.getByRole("button", { name: "More controls" });
@@ -62,14 +63,14 @@ export async function setSketchBackground(
   page: Page,
   label: "Plain" | "Grid" | "Graph",
 ): Promise<void> {
-  const opened = await openFocusOverflow(page);
+  // Inline on every layout now: the focus bar on compact unsplit (revision
+  // PR 2), the toolbar on desktop and split. No overflow to open.
   const chip = page
     .getByRole("radiogroup", { name: "Background" })
     .getByRole("radio", { name: label });
-  await expect(chip, `No ${label} background chip in the sketch toolbar.`).toBeVisible();
+  await expect(chip, `No ${label} background chip in the sketch chrome.`).toBeVisible();
   await chip.click();
   await expect(chip).toHaveAttribute("aria-checked", "true");
-  if (opened) await page.keyboard.press("Escape");
 }
 
 /**
