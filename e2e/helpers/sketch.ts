@@ -305,22 +305,49 @@ export async function wipeActiveSketchSurface(page: Page): Promise<void> {
 }
 
 /**
- * Starts (or reactivates) a typed line by tapping the typing paper of the
- * given canvas. Requires that canvas's page to be ACTIVE and in Type mode:
- * only then is TypedLinesLayer interactive over the canvas. Lands at 75% of
- * the pane height, below the short line stack a normalized test builds, so
- * the tap hits the layer itself (which is what starts a line) rather than an
- * existing line button.
+ * Starts (or re-activates) a typed line and waits for its live field. On the
+ * paper layer (desktop, split) that is a tap on empty paper. In board focus
+ * mode (compact unsplit) there is no paper layer: typed work lives in the
+ * strip and the Type button applies the same tap rule (revision spec section
+ * 7), so this clicks Type instead, unless a live field already exists (the
+ * MathLive keyboard would cover the button, and the postcondition holds).
  */
 export async function startTypedLine(page: Page, canvasIndex = 0): Promise<void> {
-  const canvas = sketchCanvas(page, canvasIndex);
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error("The canvas has no bounding box to tap a typed line on.");
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.75);
-  await expect(
-    page.locator("math-field"),
-    "Tapping the typing paper did not produce a live math field.",
-  ).toHaveCount(1);
+  const field = page.locator("math-field");
+  if ((await page.locator("[data-typed-lines]").count()) === 0) {
+    if ((await field.count()) === 0) {
+      await page
+        .getByRole("group", { name: "Mode" })
+        .getByRole("button", { name: "Type", exact: true })
+        .click();
+    }
+  } else {
+    const canvas = sketchCanvas(page, canvasIndex);
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("The canvas has no bounding box to tap a typed line on.");
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.75);
+  }
+  await expect(field, "Starting a typed line did not produce a live math field.").toHaveCount(1);
+}
+
+/** The strip's active line sits inside its rows scroller's visible band. */
+export async function expectActiveLineInStrip(page: Page): Promise<void> {
+  const scrollerBox = await page.locator("[data-typed-work-rows]").boundingBox();
+  if (!scrollerBox) throw new Error("The strip's rows scroller has no box.");
+  await expect
+    .poll(
+      async () => {
+        const box = await page.locator("[data-active-line]").boundingBox();
+        if (!box) return "no active line box";
+        const top = scrollerBox.y - 1;
+        const bottom = scrollerBox.y + scrollerBox.height + 1;
+        return box.y >= top && box.y + box.height <= bottom
+          ? "in view"
+          : `line ${box.y}..${box.y + box.height} outside ${top}..${bottom}`;
+      },
+      { message: "The active line never settled inside the strip's visible band." },
+    )
+    .toBe("in view");
 }
 
 /**

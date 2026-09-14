@@ -57,6 +57,7 @@ import { PaneContext, type PaneInfo } from "./PaneContext";
 import { GESTURE_WINDOW_MS, penHasBeenSeen, SketchCanvas, type Size } from "./SketchCanvas";
 import { SketchToolbar } from "./SketchToolbar";
 import { TypedLinesLayer } from "./TypedLinesLayer";
+import { TypedWorkStrip } from "./TypedWorkStrip";
 
 function isTextEntry(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -409,6 +410,9 @@ export function Sketchpad({
       )}
       {railVisible && !condensed && !railYieldsToKeyboard && <GraphRail />}
       {!condensed && <PageBar />}
+      {/* Focus mode types in a strip under the page bar, never on the paper
+          (revision spec section 7, D-199). */}
+      {focus && <TypedWorkStrip />}
 
       {split ? (
         <div
@@ -462,7 +466,8 @@ export function Sketchpad({
         <PaneContext.Provider value={singlePane}>
           <div className="relative flex min-h-0 flex-1 flex-col">
             <SketchCanvas onSizeChange={reportActiveSize} />
-            <TypedLinesLayer />
+            {/* Desktop keeps the paper layer; focus mode's lines live in TypedWorkStrip above. */}
+            {!focus && <TypedLinesLayer />}
             <GraphLayer />
             {/* The clean-copy slip owns the bottom edge while it is open; both float
                 clusters yield rather than fight it for the corners (z-10 vs z-10,

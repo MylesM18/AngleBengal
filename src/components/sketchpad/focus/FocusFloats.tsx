@@ -28,8 +28,10 @@ const WIDTHS: StrokeWidth[] = ["S", "M", "L"];
  * The floating mode cluster of board focus mode (spec sections 4 and 8):
  * Draw and Type chips bottom right over the board. Tapping Draw when it is
  * already the mode toggles the ink palette (tool, width, color), the same
- * session-global hand settings the desktop toolbar drives. Type mirrors the
- * toolbar's MathLive gating, including the failed-plus-retry state.
+ * session-global hand settings the desktop toolbar drives; leaving type mode
+ * drops blank lines on the way out. Type sets type mode and starts, extends
+ * or re-activates the trailing line (revision spec section 7). Type mirrors
+ * the toolbar's MathLive gating, including the failed-plus-retry state.
  */
 export function FocusFloats() {
   const activePageId = useSketchStore((state) => state.activePageId);
@@ -38,6 +40,8 @@ export function FocusFloats() {
   const width = useSketchStore((state) => state.width);
   const color = useSketchStore((state) => state.color);
   const setMode = useSketchStore((state) => state.setMode);
+  const startTyping = useSketchStore((state) => state.startTyping);
+  const discardEmptyTypedLines = useSketchStore((state) => state.discardEmptyTypedLines);
   const setTool = useSketchStore((state) => state.setTool);
   const setWidth = useSketchStore((state) => state.setWidth);
   const setColor = useSketchStore((state) => state.setColor);
@@ -105,6 +109,9 @@ export function FocusFloats() {
           onClick={() => {
             if (mode === "draw") setPaletteOpen((current) => !current);
             else {
+              // Leaving type mode drops blank lines first, so an untouched
+              // Type tap leaves nothing in the strip (revision spec section 7).
+              discardEmptyTypedLines(activePageId);
               setMode(activePageId, "draw");
               setPaletteOpen(true);
             }
@@ -120,7 +127,10 @@ export function FocusFloats() {
           title={mathLive.status === "failed" ? "Typed input failed to load" : "Type"}
           onClick={() => {
             setPaletteOpen(false);
-            setMode(activePageId, "type");
+            // Type mode plus the paper's tap rule: the strip has no empty
+            // paper to tap, so the button starts, extends or re-activates
+            // the line itself (revision spec section 7).
+            startTyping(activePageId);
           }}
           className={chipClasses({ variant: "toggle", active: mode === "type" })}
         >

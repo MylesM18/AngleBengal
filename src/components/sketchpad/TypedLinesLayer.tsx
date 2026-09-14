@@ -82,6 +82,9 @@ export function TypedLinesLayer() {
       }}
     >
       {typing && typedLines.length === 0 && (
+        // pointer-events-none so the tap still lands on the layer div and
+        // starts line 1; without this hint a phone shows an empty page with
+        // no affordance at all.
         <p className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 font-mono text-meta text-ink-faint">
           Tap the paper to start line 1
         </p>

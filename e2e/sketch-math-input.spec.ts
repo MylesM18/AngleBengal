@@ -225,7 +225,7 @@ test.describe("math keyboard (typed lines)", () => {
         await actionKey(page, "+ line").click();
       }
 
-      await expect(page.locator("[data-typed-lines] ol li")).toHaveCount(2);
+      await expect(page.locator("[data-typed-work-strip] li")).toHaveCount(2);
       // The cursor belongs to the new, empty line, not the committed one.
       await expect
         .poll(() => page.evaluate(() => document.activeElement?.tagName ?? null), {

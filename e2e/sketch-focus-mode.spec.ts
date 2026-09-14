@@ -4,24 +4,26 @@ import { STORAGE_STATE } from "./constants";
 import { discoverRoutes, type DiscoveredRoutes } from "./helpers/routes";
 import {
   drawSketchStroke,
+  expectActiveLineInStrip,
   expectSketchStrokeCount,
   hideMathKeyboard,
   mathFieldValue,
   openCleanSketch,
   recordUnhandledRejections,
   resetSketchPages,
+  setSketchBackground,
   setSketchMode,
   sketchCanvas,
-  startTypedLine,
   wipeActiveSketchSurface,
 } from "./helpers/sketch";
 
 /**
  * Board focus mode, revision PR 2 (docs/superpowers/specs/
- * 2026-09-12-board-focus-mode-revision-design.md sections 4, 5 and 8): the
- * compact unsplit overlay's Undo and Redo arrows, the Background group in
- * the focus bar, and Delete line in a typed line's math field menu. Runs on
- * both mobile projects (the desktop project matches desktop-*.spec.ts only).
+ * 2026-09-12-board-focus-mode-revision-design.md sections 4, 5, 6, 7 and 8):
+ * the compact unsplit overlay's Undo and Redo arrows, the Background group
+ * in the focus bar, Delete line in a typed line's math field menu, and the
+ * typed-work strip under the page bar. Runs on both mobile projects (the
+ * desktop project matches desktop-*.spec.ts only).
  *
  * Every test starts from a served problem, one clean "Page 1" and a wiped
  * surface, because pages and their content are per-problem persisted work
@@ -160,16 +162,15 @@ test.describe("background in the focus bar", () => {
 });
 
 test.describe("Delete line in the math field menu", () => {
-  test("removes the active line, hands the cursor up, and typing still works after", async ({
+  test("removes the active line, hands the cursor up, returns to Draw on the last one, and typing still works after", async ({
     page,
   }) => {
     const unhandled = await recordUnhandledRejections(page);
-    const lines = page.locator("[data-typed-lines] ol li");
+    const lines = page.locator("[data-typed-work-strip] li");
     const field = page.locator("math-field");
 
     await openCleanSketch(page, discovered, "Plain");
     await setSketchMode(page, "Type");
-    await startTypedLine(page);
     await expect(field).toBeFocused();
     await page.keyboard.type("x=1");
     await expect.poll(() => mathFieldValue(page)).toBe("x=1");
@@ -184,15 +185,17 @@ test.describe("Delete line in the math field menu", () => {
     await expect(lines).toHaveCount(1);
     await expect.poll(() => mathFieldValue(page)).toBe("x=1");
 
-    // Deleting the only line leaves the empty-page hint and no live field.
+    // Deleting the only line hands the page back to Draw and unmounts the strip.
     await deleteLineFromMenu(page);
-    await expect(lines).toHaveCount(0);
+    await expect(page.locator("[data-typed-work-strip]")).toHaveCount(0);
     await expect(field).toHaveCount(0);
-    await expect(page.getByText("Tap the paper to start line 1")).toBeVisible();
+    await expect(
+      page.getByRole("group", { name: "Mode" }).getByRole("button", { name: "Draw", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
 
     // MathLive lowers its keyboard 300ms after the last field's focusout, and
-    // until then the keyboard covers the paper where startTypedLine taps, for
-    // a finger as much as for the rig. Wait for MathLive's own hide.
+    // until then the keyboard covers the Type button the re-entry below taps,
+    // for a finger as much as for the rig. Wait for MathLive's own hide.
     await expect
       .poll(
         () =>
@@ -206,12 +209,129 @@ test.describe("Delete line in the math field menu", () => {
 
     // The D-188 failure mode: after the teardowns, a new field still takes
     // focus and input.
-    await startTypedLine(page);
+    await setSketchMode(page, "Type");
     await expect(field).toBeFocused();
     await page.keyboard.type("z");
     await expect.poll(() => mathFieldValue(page)).toBe("z");
 
     expect(await unhandled(), "MathLive threw around the menu deletions.").toEqual([]);
+    await hideMathKeyboard(page);
+    await wipeActiveSketchSurface(page);
+  });
+});
+
+test.describe("typed strip", () => {
+  const strip = (page: Page) => page.locator("[data-typed-work-strip]");
+  const rows = (page: Page) => page.locator("[data-typed-work-strip] li");
+  const modeButton = (page: Page, label: "Draw" | "Type") =>
+    page.getByRole("group", { name: "Mode" }).getByRole("button", { name: label, exact: true });
+
+  test("typing lands in the strip and never on the paper, on every background", async ({
+    page,
+  }) => {
+    const unhandled = await recordUnhandledRejections(page);
+    const field = page.locator("math-field");
+    await openCleanSketch(page, discovered, "Plain");
+
+    for (const background of ["Plain", "Grid", "Graph"] as const) {
+      await setSketchBackground(page, background);
+      // Content is per surface: empty the one this pass types on.
+      await wipeActiveSketchSurface(page);
+      await expect(strip(page)).toHaveCount(0);
+
+      // Type starts line 1 itself; there is no paper layer to tap.
+      await setSketchMode(page, "Type");
+      await expect(rows(page)).toHaveCount(1);
+      await expect(page.locator("[data-typed-lines]")).toHaveCount(0);
+      await expect(field).toBeFocused();
+      await page.keyboard.type("x=1");
+      await expect.poll(() => mathFieldValue(page)).toBe("x=1");
+      await page.keyboard.press("Enter");
+      await expect(rows(page)).toHaveCount(2);
+      await expect(field).toBeFocused();
+
+      // Draw keeps the line with content, drops the untouched trailing line,
+      // and leaves no live field.
+      await hideMathKeyboard(page);
+      await setSketchMode(page, "Draw");
+      await expect(rows(page)).toHaveCount(1);
+      await expect(field).toHaveCount(0);
+      await expect(rows(page).getByRole("button", { name: "Edit solution line 1" })).toBeEnabled();
+
+      // Type again: the last line has content, so a new trailing line opens.
+      await setSketchMode(page, "Type");
+      await expect(rows(page)).toHaveCount(2);
+      await expect(field).toBeFocused();
+      await expect.poll(() => mathFieldValue(page)).toBe("");
+
+      // A static line tapped from Draw mode re-enters typing on that line.
+      await hideMathKeyboard(page);
+      await setSketchMode(page, "Draw");
+      await rows(page).getByRole("button", { name: "Edit solution line 1" }).click();
+      await expect(modeButton(page, "Type")).toHaveAttribute("aria-pressed", "true");
+      await expect.poll(() => mathFieldValue(page)).toBe("x=1");
+
+      await hideMathKeyboard(page);
+      await wipeActiveSketchSurface(page);
+      await expect(strip(page)).toHaveCount(0);
+    }
+
+    expect(await unhandled(), "MathLive threw around the strip.").toEqual([]);
+  });
+
+  test("an untouched Type tap leaves nothing behind", async ({ page }) => {
+    await openCleanSketch(page, discovered, "Grid");
+    await setSketchMode(page, "Type");
+    await expect(rows(page)).toHaveCount(1);
+    await expect(page.locator("math-field")).toBeFocused();
+    await hideMathKeyboard(page);
+    await setSketchMode(page, "Draw");
+    await expect(strip(page)).toHaveCount(0);
+    await expect(page.locator("math-field")).toHaveCount(0);
+  });
+
+  test("Backspace keeps a lone empty line and removes an empty second one", async ({ page }) => {
+    const field = page.locator("math-field");
+    await openCleanSketch(page, discovered, "Plain");
+    await setSketchMode(page, "Type");
+    await expect(field).toBeFocused();
+    await page.keyboard.press("Backspace");
+    await expect(rows(page)).toHaveCount(1);
+    await expect(field).toBeFocused();
+
+    await page.keyboard.type("a");
+    await expect.poll(() => mathFieldValue(page)).toBe("a");
+    await page.keyboard.press("Enter");
+    await expect(rows(page)).toHaveCount(2);
+    await expect(field).toBeFocused();
+    await page.keyboard.press("Backspace");
+    await expect(rows(page)).toHaveCount(1);
+    await expect.poll(() => mathFieldValue(page)).toBe("a");
+
+    await hideMathKeyboard(page);
+    await wipeActiveSketchSurface(page);
+  });
+
+  test("shows at most three rows and keeps the active line in view", async ({ page }) => {
+    const field = page.locator("math-field");
+    await openCleanSketch(page, discovered, "Plain");
+    await setSketchMode(page, "Type");
+    for (let count = 2; count <= 6; count += 1) {
+      // Each new line mounts a fresh field whose focus lands asynchronously;
+      // an Enter sent before that is swallowed (condense spec precedent).
+      await expect(field).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(rows(page)).toHaveCount(count);
+    }
+
+    const scroller = page.locator("[data-typed-work-rows]");
+    const scrollerBox = await scroller.boundingBox();
+    if (!scrollerBox) throw new Error("The strip's rows scroller has no box.");
+    expect(scrollerBox.height, "The strip shows more than three rows.").toBeLessThanOrEqual(
+      3 * 38 + 8 + 1,
+    );
+    await expectActiveLineInStrip(page);
+
     await hideMathKeyboard(page);
     await wipeActiveSketchSurface(page);
   });
