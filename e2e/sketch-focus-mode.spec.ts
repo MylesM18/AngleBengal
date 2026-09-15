@@ -160,6 +160,57 @@ test.describe("background in the focus bar", () => {
       )
       .toBe("fits");
   });
+
+  test("the Background radios are one tab stop and rove with the arrow keys", async ({ page }) => {
+    await openCleanSketch(page, discovered, "Plain");
+    const overlay = page.locator("[data-sketch-overlay]");
+    const group = overlay.getByRole("radiogroup", { name: "Background" });
+    const radio = (name: "Plain" | "Grid" | "Graph") =>
+      group.getByRole("radio", { name, exact: true });
+    // Plot mounts only while the active page is on graph paper (revision spec
+    // section 6), so it is the paper's own tell: an arrow that moved only
+    // aria-checked and not the surface would leave this hidden.
+    const plot = overlay.getByRole("button", { name: "Plot", exact: true });
+
+    // One tab stop. Asserted through tabindex rather than a literal Tab
+    // press: whether a <button> takes Tab focus is engine and OS dependent
+    // (WebKit honors Full Keyboard Access), so a traversal assertion would
+    // measure the browser rather than the component.
+    await expect(radio("Plain")).toHaveAttribute("tabindex", "0");
+    await expect(radio("Grid")).toHaveAttribute("tabindex", "-1");
+    await expect(radio("Graph")).toHaveAttribute("tabindex", "-1");
+
+    // ArrowRight moves the check, the focus, and the paper.
+    await radio("Plain").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(radio("Grid")).toHaveAttribute("aria-checked", "true");
+    await expect(radio("Grid")).toBeFocused();
+    await expect(radio("Plain")).toHaveAttribute("tabindex", "-1");
+    await expect(radio("Grid")).toHaveAttribute("tabindex", "0");
+    await expect(plot).toBeHidden();
+
+    await page.keyboard.press("ArrowRight");
+    await expect(radio("Graph")).toHaveAttribute("aria-checked", "true");
+    await expect(radio("Graph")).toBeFocused();
+    await expect(plot, "Arrowing to Graph checked the radio but not the paper.").toBeVisible();
+
+    // Past the end it wraps to the start, and the paper follows back off Graph.
+    await page.keyboard.press("ArrowRight");
+    await expect(radio("Plain")).toHaveAttribute("aria-checked", "true");
+    await expect(radio("Plain")).toBeFocused();
+    await expect(plot).toBeHidden();
+
+    // And backwards off the start wraps to the end.
+    await page.keyboard.press("ArrowLeft");
+    await expect(radio("Graph")).toHaveAttribute("aria-checked", "true");
+    await expect(radio("Graph")).toBeFocused();
+
+    // ArrowDown and ArrowUp fold into the same two steps.
+    await page.keyboard.press("ArrowDown");
+    await expect(radio("Plain")).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("ArrowUp");
+    await expect(radio("Graph")).toHaveAttribute("aria-checked", "true");
+  });
 });
 
 test.describe("Delete line in the math field menu", () => {

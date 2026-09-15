@@ -14,6 +14,7 @@ import { Chip, chipClasses } from "@/components/ui/Chip";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Sheet } from "@/components/ui/Sheet";
 import { cx } from "@/lib/cx";
+import { rovingRadioKeyDown } from "@/lib/sketch/roving";
 import {
   activePage,
   INK_COLORS,
@@ -119,23 +120,6 @@ export function SketchToolbar({
     if (event.key !== "Escape") return;
     event.stopPropagation();
     keepSurface();
-  }
-
-  function onBackgroundKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
-    const delta =
-      event.key === "ArrowRight" || event.key === "ArrowDown"
-        ? 1
-        : event.key === "ArrowLeft" || event.key === "ArrowUp"
-          ? -1
-          : 0;
-    if (delta === 0) return;
-    event.preventDefault();
-    const index = BACKGROUNDS.findIndex((item) => item.value === background);
-    const nextIndex = (index + delta + BACKGROUNDS.length) % BACKGROUNDS.length;
-    setSurface(activePageId, BACKGROUNDS[nextIndex].value);
-    event.currentTarget
-      .querySelectorAll<HTMLButtonElement>('[role="radio"]')
-      [nextIndex]?.focus();
   }
 
   // While the popover is open: focus Keep (the safe default) and close on any
@@ -288,7 +272,11 @@ export function SketchToolbar({
         className="flex gap-1"
         role="radiogroup"
         aria-label="Background"
-        onKeyDown={onBackgroundKeyDown}
+        onKeyDown={rovingRadioKeyDown(
+          BACKGROUNDS.map((item) => item.value),
+          background,
+          (value) => setSurface(activePageId, value),
+        )}
       >
         {BACKGROUNDS.map(({ value, label, icon }) => {
           const checked = background === value;
