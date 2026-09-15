@@ -225,6 +225,39 @@ test.describe("background in the focus bar", () => {
     await page.keyboard.press("ArrowUp");
     await expect(radio("Graph")).toHaveAttribute("aria-checked", "true");
   });
+
+  test("arrowing off a fresh empty line drops it, like a tap does (D-199)", async ({ page }) => {
+    await openCleanSketch(page, discovered, "Plain");
+    const overlay = page.locator("[data-sketch-overlay]");
+    const group = overlay.getByRole("radiogroup", { name: "Background" });
+    const radio = (name: "Plain" | "Grid" | "Graph") =>
+      group.getByRole("radio", { name, exact: true });
+    const strip = page.locator("[data-typed-work-strip]");
+
+    // Type starts line 1 with a live, focused field. Blurring it keeps the
+    // empty line (only Draw or a surface change drops it), which is the state
+    // an arrow has to clean up after.
+    await setSketchMode(page, "Type");
+    await expect(strip.locator("li")).toHaveCount(1);
+    await expect(page.locator("math-field")).toBeFocused();
+    await hideMathKeyboard(page);
+    await expect(strip.locator("li")).toHaveCount(1);
+
+    // Leave Plain with an arrow, then come straight back. Content is per
+    // surface, so the strip being empty on Grid proves nothing; the strip
+    // being empty back on Plain proves selectBackground discarded the line
+    // on the way out, exactly as a tap on Grid would have.
+    await radio("Plain").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(radio("Grid")).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("ArrowLeft");
+    await expect(radio("Plain")).toHaveAttribute("aria-checked", "true");
+    await expect(
+      strip,
+      "The empty typed line survived an arrow off its surface: D-199's discard is not on the arrow path.",
+    ).toHaveCount(0);
+    await expect(page.locator("math-field")).toHaveCount(0);
+  });
 });
 
 test.describe("Delete line in the math field menu", () => {

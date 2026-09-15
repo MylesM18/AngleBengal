@@ -304,13 +304,16 @@ test("typing in the bottom pane condenses, the peek swaps, closing restores", as
   await expect(page.getByRole("button", { name: /^Switch to / })).toBeHidden();
 });
 
+// This test changes the persisted surface CHOICE (Grid via the arrows), which
+// D-169 keeps per problem across tests, and restores Graph only on success.
 test("the condensed overflow popover holds the parked controls", async ({ page }) => {
   await openTypedSketch(page);
   // Explicit, not assumed: normalization (resetSketchPages, wipeActiveSketchSurface)
   // manages page count and surface CONTENT, never surface CHOICE, so a page
   // recycled from an earlier run can persist on a non-graph background
   // (D-169, per-problem persisted work, same cause as the sibling test at
-  // :242). This test reads the Background group itself, so a leftover
+  // "typing in the bottom pane condenses, the peek swaps, closing restores").
+  // This test reads the Background group itself, so a leftover
   // non-Graph start does not just skew an unrelated assertion, it fails the
   // group's own first check outright. Reproduced live: iphone-webkit landed
   // on a non-Graph background here in one run of this suite.
@@ -326,10 +329,12 @@ test("the condensed overflow popover holds the parked controls", async ({ page }
   const backgrounds = dialog.getByRole("radiogroup", { name: "Background" });
   await expect(backgrounds).toBeVisible();
 
-  // CondensedToolbar's onBackgroundKeyDown is byte-identical to
-  // SketchToolbar's, and this is its only reachable rendering. Covered here,
-  // inside the test that already has the popover open, so the shared
-  // extraction has a pin on BOTH copies without a second condense().
+  // The condensed popover is the only reachable rendering of
+  // CondensedToolbar's Background group, which shares rovingRadioKeyDown
+  // (src/lib/sketch/roving.ts) with the split toolbar and the focus bar.
+  // Covered here, inside the test that already has the popover open, so the
+  // shared helper has a pin on this call site beside the split toolbar's in
+  // sketch-pages.spec.ts, without a second condense().
   const graph = backgrounds.getByRole("radio", { name: "Graph", exact: true });
   await expect(graph).toHaveAttribute("aria-checked", "true");
   await expect(graph).toHaveAttribute("tabindex", "0");
@@ -347,11 +352,13 @@ test("the condensed overflow popover holds the parked controls", async ({ page }
   await expect(grid).toBeFocused();
   // Deliberately NOT arrowed back to Graph: re-mounting graph paper while
   // this popover is open makes the Escape below close the whole sketch or
-  // drop focus instead of restoring it to More (a real race, bisected in
-  // the rig hardening ledger and filed for the owner; the split toolbar
-  // does not show it). The page goes back to Graph after the keyboard
-  // hides, at the end of this test, so the tests after it see what they
-  // saw before.
+  // drop focus instead of restoring it to More. Pre-existing, reproduced
+  // 4 of 4 with the round trip on both engines and isolated to exactly that
+  // round trip (focus alone, one arrow, and two arrows ending on Grid all
+  // pass); recorded in the rig hardening ledger and filed for the owner.
+  // The split toolbar does not show it. The page goes back to Graph after
+  // the keyboard hides, at the end of this test, so the tests after it see
+  // what they saw before.
   await expect(dialog.getByRole("button", { name: "Clear", exact: true })).toBeVisible();
 
   // Escape closes the popover WITHOUT tearing down sketch mode (the nested
