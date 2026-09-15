@@ -152,6 +152,10 @@ export function TypedLinePalette({
  * rather than the scroller means this cannot feed back on itself. Instant
  * assignment, not smooth scrolling: deterministic for the e2e rig and never
  * fights the user's own scroll.
+ *
+ * Precondition: the scroller is positioned (relative or absolute), so it is
+ * the rows' offsetParent and line.offsetTop is measured inside its scroll
+ * content.
  */
 export function useKeepActiveLineInView({
   scrollerRef,

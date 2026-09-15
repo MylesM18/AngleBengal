@@ -3863,20 +3863,21 @@ removed; its test now proves the typed strip (D-199). Owner feedback items
 
 ### D-199. Typed work lives in a strip under the page bar in focus mode
 
-TypedLinesLayer does not mount in focus mode on any background. A
-TypedWorkStrip renders between PageBar and the board while the active
-surface holds at least one typed line: at most three rows visible, more
-scrolling inside with the active line kept in view, the symbol palette
-below the rows while a line is live. The line rows, the palette and the
-keep-in-view scrolling moved into a shared TypedLineList, so the paper
-shell's DOM on desktop and split is unchanged. With no paper to tap, the
-Type button applies the paper's tap rule through the store's startTyping
-(no lines, start line 1; the last line has content, open a trailing line;
-it is empty, activate it), and Draw drops blank lines first through
-discardEmptyTypedLines so an untouched Type tap leaves nothing behind.
-Backspace on a lone empty line keeps it, so one press too many cannot close
-the keyboard; Delete line on the last line hands the page back to Draw.
-Owner feedback item 1 of the revision spec, in the top strip the owner chose.
+TypedLinesLayer does not mount in focus mode on any background. A TypedWorkStrip
+renders between PageBar and the board while the active surface holds at least one
+typed line: at most three rows visible, more scrolling inside with the active line
+kept in view, the symbol palette below the rows while a line is live. The line
+rows, the palette and the keep-in-view scrolling moved into a shared
+TypedLineList, so the paper shell's DOM on desktop and split is unchanged. With no
+paper to tap, the Type button applies the paper's tap rule through the store's
+startTyping (no lines, start line 1; the last line has content, open a trailing
+line; it is empty, activate it), and Draw drops blank lines first through
+discardEmptyTypedLines so an untouched Type tap leaves nothing behind. Backspace
+on a lone empty line keeps it, so one press too many cannot close the keyboard;
+Delete line on the last line hands the page back to Draw. Switching background
+from the focus bar drops the blank line the same way, so a surface never keeps an
+untouched line behind the user's back. Owner feedback item 1 of the revision spec,
+in the top strip the owner chose.
 
 ### D-200. Revision PR 3 and PR 4 ship as one PR
 

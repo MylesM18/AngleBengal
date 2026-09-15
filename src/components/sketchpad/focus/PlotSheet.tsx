@@ -72,6 +72,7 @@ export function PlotSheet({ onClose }: { onClose: () => void }) {
       <div
         ref={dialogRef}
         role="dialog"
+        aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={(event) => {
@@ -86,7 +87,7 @@ export function PlotSheet({ onClose }: { onClose: () => void }) {
         <Sheet
           tone="paper-0"
           lift
-          className="flex flex-col gap-3 rounded-b-none p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-lg:gap-5"
+          className="flex flex-col gap-3 rounded-b-none pt-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pb-[max(0.75rem,env(safe-area-inset-bottom))] max-lg:gap-5"
         >
           <p id={titleId} className="text-meta text-ink-soft">
             Plot

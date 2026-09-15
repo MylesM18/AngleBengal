@@ -151,7 +151,7 @@ async function waitForSettledCondenseState(page: Page): Promise<void> {
     .toBeGreaterThanOrEqual(5);
 }
 
-/** Practice served, overlay open, one clean empty "Page 1", Type mode. */
+/** Practice served, overlay open, one clean empty "Page 1", Draw mode with Type proven available. */
 async function openTypedSketch(page: Page): Promise<void> {
   test.skip(
     discovered.practice === null,
@@ -165,6 +165,12 @@ async function openTypedSketch(page: Page): Promise<void> {
   await resetSketchPages(page);
   await wipeActiveSketchSurface(page);
   await setSketchMode(page, "Type");
+  // Focus mode's Type starts line 1 with a live field and raises the
+  // keyboard (revision spec section 7), which would cover the pane a test
+  // taps next. Draw drops the untouched line; each test sets Type again
+  // from the split toolbar, which only sets the mode.
+  await hideMathKeyboard(page);
+  await setSketchMode(page, "Draw");
 }
 
 /**
@@ -217,6 +223,10 @@ async function condense(page: Page) {
     bottomBox.y + bottomBox.height / 2,
   );
   await expect(sketchPageChips(page).nth(1)).toHaveAttribute("aria-checked", "true");
+
+  // The split toolbar's Type sets the active (bottom) page's mode; the
+  // paper tap in startTypedLine starts the line.
+  await setSketchMode(page, "Type");
 
   // Second tap starts line 1 in the bottom pane and mounts the math field.
   await startTypedLine(page, 1);
@@ -331,6 +341,7 @@ test("the peek header's page select keeps the keyboard and the condensed layout"
     bottomBox.y + bottomBox.height / 2,
   );
   await expect(sketchPageChips(page).nth(1)).toHaveAttribute("aria-checked", "true");
+  await setSketchMode(page, "Type");
   await startTypedLine(page, 1);
   await showMathKeyboard(page);
   const more = page.getByRole("button", { name: "More", exact: true });
@@ -363,6 +374,7 @@ test("typing in the top pane leaves the layout alone", async ({ page }) => {
 
   // The split fills from the active page, so Page 1 is already active in
   // the TOP pane; one tap starts its line.
+  await setSketchMode(page, "Type");
   await startTypedLine(page, 0);
   await showMathKeyboard(page);
 
@@ -465,12 +477,9 @@ test("a simulated OS keyboard ignores the rename field but still condenses for a
   }, OS_KEYBOARD_PX);
 
   await openTypedSketch(page);
-  // Focus mode's Type button starts line 1 with a live field (revision spec
-  // section 7). Direction (a) needs no field yet, so leave Draw with the
-  // keyboard down (Draw drops the untouched line); the split toolbar's Type
-  // below sets the mode without starting a line.
-  await hideMathKeyboard(page);
-  await setSketchMode(page, "Draw");
+  // Direction (a) needs no field yet, so the helper's own Draw mode and
+  // hidden keyboard already satisfy it; the split toolbar's Type below sets
+  // the mode without starting a line for direction (b).
   await setSketchSplit(page, 2);
   const canvases = page.getByRole("img", { name: /^Scratch canvas/ });
   await expect(canvases).toHaveCount(2);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useMathLive } from "@/components/math/MathField";
 import { Chip, chipClasses } from "@/components/ui/Chip";
@@ -56,6 +56,7 @@ export function FocusFloats() {
   const mathLive = useMathLive();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [plotOpen, setPlotOpen] = useState(false);
+  const plotButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Leaving graph paper closes the sheet, so it cannot pop back unbidden
   // when the surface returns (GraphRail's coordsOpen precedent).
@@ -162,6 +163,7 @@ export function FocusFloats() {
         </div>
         {surfaceIsGraph && (
           <button
+            ref={plotButtonRef}
             type="button"
             aria-haspopup="dialog"
             aria-expanded={plotOpen}
@@ -179,7 +181,16 @@ export function FocusFloats() {
           </button>
         )}
       </div>
-      {surfaceIsGraph && plotOpen && <PlotSheet onClose={() => setPlotOpen(false)} />}
+      {surfaceIsGraph && plotOpen && (
+        <PlotSheet
+          onClose={() => {
+            // Escape, the scrim, and a tool pick all return focus to the
+            // button, so a hardware-keyboard user does not land on body.
+            setPlotOpen(false);
+            plotButtonRef.current?.focus();
+          }}
+        />
+      )}
       {surfaceIsGraph && !plotOpen && <ArmedChip />}
     </>
   );

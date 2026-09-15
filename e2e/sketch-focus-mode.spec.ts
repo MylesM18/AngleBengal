@@ -333,6 +333,34 @@ test.describe("typed strip", () => {
     );
     await expectActiveLineInStrip(page);
 
+    // A non-append activation must scroll the cursor line fully into view:
+    // the scroller, not the sketchpad root, is the rows' offsetParent.
+    await hideMathKeyboard(page);
+    await rows(page).getByRole("button", { name: "Edit solution line 1" }).click();
+    await expect(rows(page).nth(0)).toHaveAttribute("data-active-line", "");
+    await expectActiveLineInStrip(page);
+    await expect(field).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(rows(page)).toHaveCount(7);
+    await expect(rows(page).nth(1)).toHaveAttribute("data-active-line", "");
+    await expectActiveLineInStrip(page);
+
+    // Deleting a line at the top of the band hands the cursor to the line
+    // above it, which must scroll into view rather than sit hidden above
+    // the band: line 7 at the bottom shows 5 to 7, then line 5 goes.
+    await hideMathKeyboard(page);
+    await rows(page).getByRole("button", { name: "Edit solution line 7" }).click();
+    await expect(rows(page).nth(6)).toHaveAttribute("data-active-line", "");
+    await expectActiveLineInStrip(page);
+    await hideMathKeyboard(page);
+    await rows(page).getByRole("button", { name: "Edit solution line 5" }).click();
+    await expect(rows(page).nth(4)).toHaveAttribute("data-active-line", "");
+    await expectActiveLineInStrip(page);
+    await deleteLineFromMenu(page);
+    await expect(rows(page)).toHaveCount(6);
+    await expect(rows(page).nth(3)).toHaveAttribute("data-active-line", "");
+    await expectActiveLineInStrip(page);
+
     await hideMathKeyboard(page);
     await wipeActiveSketchSurface(page);
   });
