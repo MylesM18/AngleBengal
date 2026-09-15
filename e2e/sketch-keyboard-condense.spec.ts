@@ -177,11 +177,18 @@ async function openTypedSketch(page: Page): Promise<void> {
   // keyboard raising again, over the Draw button this then clicks. Observed
   // once under load on iphone-webkit as a 90s intercepted click in "typing
   // in the bottom pane condenses, the peek swaps, closing restores".
+  // The wait is bounded, see below.
   await expect(
     page.locator("math-field"),
     "Focus mode's Type never started a typed line.",
   ).toHaveCount(1);
-  await waitForSettledMathFieldFocus(page);
+  // Bounded, and allowed to fall through. On Chromium the mount churn can end
+  // with the live field genuinely unfocused (waitForSettledMathFieldFocus
+  // documents it); then no late focus is left to race the hide, and a strict
+  // wait only times out, which a full run on pixel-chromium showed (0 settled
+  // reads in 15 s). Settle the focus if it is coming; otherwise carry on as
+  // this helper always did, hiding with the field unfocused.
+  await waitForSettledMathFieldFocus(page, 8_000).catch(() => {});
   await hideMathKeyboard(page);
   await setSketchMode(page, "Draw");
 }
@@ -204,7 +211,7 @@ async function openTypedSketch(page: Page): Promise<void> {
  * expect.poll's own ticks so this spans real wall-clock time rather than a
  * handful of back-to-back synchronous reads, confirms it actually has.
  */
-async function waitForSettledMathFieldFocus(page: Page): Promise<void> {
+async function waitForSettledMathFieldFocus(page: Page, timeout?: number): Promise<void> {
   let consecutive = 0;
   await expect
     .poll(
@@ -213,7 +220,7 @@ async function waitForSettledMathFieldFocus(page: Page): Promise<void> {
         consecutive = tag === "MATH-FIELD" ? consecutive + 1 : 0;
         return consecutive;
       },
-      { message: "The typed line's math field never settled into stable focus." },
+      { message: "The typed line's math field never settled into stable focus.", timeout },
     )
     .toBeGreaterThanOrEqual(5);
 }
