@@ -52,9 +52,11 @@ export async function openFocusOverflow(page: Page): Promise<boolean> {
 /**
  * Chooses a sketch background. `graph` is the store's default (D-154 puts the
  * graph tools with the background rather than making them a mode), and it is
- * the only value that mounts `GraphRail`, a whole extra row of chips and
- * number inputs. Both values are worth measuring: with the rail for the
- * crowded case, without it for the toolbar on its own.
+ * the only value that mounts `GraphRail` on desktop and split, a whole extra
+ * row of chips and number inputs; on compact unsplit (focus mode) it mounts
+ * the Plot button instead (revision spec section 6). Both values are worth
+ * measuring: with the graph controls for the crowded case, without them for
+ * the toolbar on its own.
  *
  * Set explicitly rather than relied on, so a later change to the default
  * cannot quietly halve what this rig covers.
@@ -74,11 +76,16 @@ export async function setSketchBackground(
 }
 
 /**
- * True when GraphRail is mounted. Keyed on its own "Units per grid square"
- * group, which nothing else on the screen has.
+ * Opens focus mode's Plot sheet (revision spec section 6) and returns its
+ * dialog. Plot renders only while the active page is on graph paper.
  */
-export async function graphRailVisible(page: Page): Promise<boolean> {
-  return (await page.getByRole("group", { name: "Units per grid square" }).count()) > 0;
+export async function openPlotSheet(page: Page): Promise<Locator> {
+  const plot = page.getByRole("button", { name: "Plot", exact: true });
+  await expect(plot, "No Plot button: not focus mode, or the page is not on graph paper.").toBeVisible();
+  await plot.click();
+  const sheet = page.getByRole("dialog", { name: "Plot" });
+  await expect(sheet).toBeVisible();
+  return sheet;
 }
 
 /*

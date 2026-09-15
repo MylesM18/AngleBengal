@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useMathLive } from "@/components/math/MathField";
 import { Chip, chipClasses } from "@/components/ui/Chip";
@@ -17,6 +17,9 @@ import {
   type Tool,
 } from "@/lib/sketch/store";
 
+import { ArmedChip } from "./ArmedChip";
+import { PlotSheet } from "./PlotSheet";
+
 const TOOLS: { value: Tool; label: string; icon: "pen" | "eraser" }[] = [
   { value: "pen", label: "Pen", icon: "pen" },
   { value: "eraser", label: "Eraser", icon: "eraser" },
@@ -26,12 +29,15 @@ const WIDTHS: StrokeWidth[] = ["S", "M", "L"];
 
 /**
  * The floating mode cluster of board focus mode (spec sections 4 and 8):
- * Draw and Type chips bottom right over the board. Tapping Draw when it is
- * already the mode toggles the ink palette (tool, width, color), the same
- * session-global hand settings the desktop toolbar drives; leaving type mode
- * drops blank lines on the way out. Type sets type mode and starts, extends
- * or re-activates the trailing line (revision spec section 7). Type mirrors
- * the toolbar's MathLive gating, including the failed-plus-retry state.
+ * Draw, Type and Plot chips bottom right over the board (Plot only on Graph
+ * paper). Tapping Draw when it is already the mode toggles the ink palette
+ * (tool, width, color), the same session-global hand settings the desktop
+ * toolbar drives; leaving type mode drops blank lines on the way out. Type
+ * sets type mode and starts, extends or re-activates the trailing line
+ * (revision spec section 7). Type mirrors the toolbar's MathLive gating,
+ * including the failed-plus-retry state. Plot opens the sheet holding the
+ * graph tools (revision spec section 6) and shows active while the sheet is
+ * open or a tool is armed.
  */
 export function FocusFloats() {
   const activePageId = useSketchStore((state) => state.activePageId);
@@ -39,6 +45,8 @@ export function FocusFloats() {
   const tool = useSketchStore((state) => state.tool);
   const width = useSketchStore((state) => state.width);
   const color = useSketchStore((state) => state.color);
+  const surfaceIsGraph = useSketchStore((state) => activePage(state).surface === "graph");
+  const graphTool = useSketchStore((state) => state.graphTool);
   const setMode = useSketchStore((state) => state.setMode);
   const startTyping = useSketchStore((state) => state.startTyping);
   const discardEmptyTypedLines = useSketchStore((state) => state.discardEmptyTypedLines);
@@ -47,101 +55,132 @@ export function FocusFloats() {
   const setColor = useSketchStore((state) => state.setColor);
   const mathLive = useMathLive();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [plotOpen, setPlotOpen] = useState(false);
+
+  // Leaving graph paper closes the sheet, so it cannot pop back unbidden
+  // when the surface returns (GraphRail's coordsOpen precedent).
+  useEffect(() => {
+    return useSketchStore.subscribe((state) => {
+      if (activePage(state).surface !== "graph") setPlotOpen(false);
+    });
+  }, []);
 
   return (
-    <div className="pointer-events-none absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))] z-10 flex flex-col items-end gap-3">
-      {paletteOpen && mode === "draw" && (
-        <Sheet tone="paper-0" lift className="pointer-events-auto flex flex-col gap-3 max-lg:gap-5 p-3">
-          <div className="flex gap-1 max-lg:gap-3" role="group" aria-label="Tool">
-            {TOOLS.map(({ value, label, icon }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setTool(value)}
-                aria-pressed={tool === value}
-                aria-label={label}
-                title={label}
-                className={chipClasses({ variant: "toggle", active: tool === value })}
-              >
-                <Icon name={icon} />
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-1 max-lg:gap-3" role="group" aria-label="Stroke width">
-            {WIDTHS.map((option) => (
-              <Chip
-                key={option}
-                variant="toggle"
-                pressed={width === option}
-                aria-label={`Stroke width ${option}`}
-                onClick={() => setWidth(option)}
-              >
-                <span
-                  aria-hidden="true"
-                  className="block rounded-full bg-current"
-                  style={{ width: STROKE_SIZES[option], height: STROKE_SIZES[option] }}
+    <>
+      <div className="pointer-events-none absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))] z-10 flex flex-col items-end gap-3 max-lg:gap-5">
+        {paletteOpen && mode === "draw" && (
+          <Sheet tone="paper-0" lift className="pointer-events-auto flex flex-col gap-3 max-lg:gap-5 p-3">
+            <div className="flex gap-1 max-lg:gap-3" role="group" aria-label="Tool">
+              {TOOLS.map(({ value, label, icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setTool(value)}
+                  aria-pressed={tool === value}
+                  aria-label={label}
+                  title={label}
+                  className={chipClasses({ variant: "toggle", active: tool === value })}
+                >
+                  <Icon name={icon} />
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-1 max-lg:gap-3" role="group" aria-label="Stroke width">
+              {WIDTHS.map((option) => (
+                <Chip
+                  key={option}
+                  variant="toggle"
+                  pressed={width === option}
+                  aria-label={`Stroke width ${option}`}
+                  onClick={() => setWidth(option)}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="block rounded-full bg-current"
+                    style={{ width: STROKE_SIZES[option], height: STROKE_SIZES[option] }}
+                  />
+                </Chip>
+              ))}
+            </div>
+            <div className="flex items-center gap-1 max-lg:gap-5" role="group" aria-label="Ink color">
+              {(Object.keys(INK_COLORS) as InkColor[]).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setColor(option)}
+                  aria-pressed={color === option}
+                  aria-label={`${option} ink`}
+                  className={cx(
+                    "h-6 w-6 rounded-full border-2 max-lg:tap-target",
+                    color === option ? "border-ink inset-ring-2 inset-ring-paper-0" : "border-paper-0",
+                  )}
+                  style={{ backgroundColor: INK_COLORS[option] }}
                 />
-              </Chip>
-            ))}
-          </div>
-          <div className="flex items-center gap-1 max-lg:gap-5" role="group" aria-label="Ink color">
-            {(Object.keys(INK_COLORS) as InkColor[]).map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setColor(option)}
-                aria-pressed={color === option}
-                aria-label={`${option} ink`}
-                className={cx(
-                  "h-6 w-6 rounded-full border-2 max-lg:tap-target",
-                  color === option ? "border-ink inset-ring-2 inset-ring-paper-0" : "border-paper-0",
-                )}
-                style={{ backgroundColor: INK_COLORS[option] }}
-              />
-            ))}
-          </div>
-        </Sheet>
-      )}
-      <div className="pointer-events-auto flex flex-col gap-3 max-lg:gap-5" role="group" aria-label="Mode">
-        <button
-          type="button"
-          aria-pressed={mode === "draw"}
-          onClick={() => {
-            if (mode === "draw") setPaletteOpen((current) => !current);
-            else {
-              // Leaving type mode drops blank lines first, so an untouched
-              // Type tap leaves nothing in the strip (revision spec section 7).
-              discardEmptyTypedLines(activePageId);
-              setMode(activePageId, "draw");
-              setPaletteOpen(true);
-            }
-          }}
-          className={chipClasses({ variant: "toggle", active: mode === "draw" })}
-        >
-          Draw
-        </button>
-        <button
-          type="button"
-          aria-pressed={mode === "type"}
-          disabled={mathLive.status === "failed"}
-          title={mathLive.status === "failed" ? "Typed input failed to load" : "Type"}
-          onClick={() => {
-            setPaletteOpen(false);
-            // Type mode plus the paper's tap rule: the strip has no empty
-            // paper to tap, so the button starts, extends or re-activates
-            // the line itself (revision spec section 7).
-            startTyping(activePageId);
-          }}
-          className={chipClasses({ variant: "toggle", active: mode === "type" })}
-        >
-          Type
-        </button>
-        {mathLive.status === "failed" && (
-          <button type="button" onClick={mathLive.retry} className={chipClasses({ variant: "action" })}>
-            Retry
+              ))}
+            </div>
+          </Sheet>
+        )}
+        <div className="pointer-events-auto flex flex-col gap-3 max-lg:gap-5" role="group" aria-label="Mode">
+          <button
+            type="button"
+            aria-pressed={mode === "draw"}
+            onClick={() => {
+              if (mode === "draw") setPaletteOpen((current) => !current);
+              else {
+                // Leaving type mode drops blank lines first, so an untouched
+                // Type tap leaves nothing in the strip (revision spec section 7).
+                discardEmptyTypedLines(activePageId);
+                setMode(activePageId, "draw");
+                setPaletteOpen(true);
+              }
+            }}
+            className={chipClasses({ variant: "toggle", active: mode === "draw" })}
+          >
+            Draw
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === "type"}
+            disabled={mathLive.status === "failed"}
+            title={mathLive.status === "failed" ? "Typed input failed to load" : "Type"}
+            onClick={() => {
+              setPaletteOpen(false);
+              // Type mode plus the paper's tap rule: the strip has no empty
+              // paper to tap, so the button starts, extends or re-activates
+              // the line itself (revision spec section 7).
+              startTyping(activePageId);
+            }}
+            className={chipClasses({ variant: "toggle", active: mode === "type" })}
+          >
+            Type
+          </button>
+          {mathLive.status === "failed" && (
+            <button type="button" onClick={mathLive.retry} className={chipClasses({ variant: "action" })}>
+              Retry
+            </button>
+          )}
+        </div>
+        {surfaceIsGraph && (
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={plotOpen}
+            onClick={() => {
+              setPaletteOpen(false);
+              setPlotOpen((current) => !current);
+            }}
+            className={chipClasses({
+              variant: "toggle",
+              active: plotOpen || graphTool !== null,
+              className: "pointer-events-auto",
+            })}
+          >
+            Plot
           </button>
         )}
       </div>
-    </div>
+      {surfaceIsGraph && plotOpen && <PlotSheet onClose={() => setPlotOpen(false)} />}
+      {surfaceIsGraph && !plotOpen && <ArmedChip />}
+    </>
   );
 }

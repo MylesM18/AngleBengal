@@ -6,6 +6,7 @@ import {
   hideMathKeyboard,
   mathFieldValue,
   openCleanSketch,
+  openPlotSheet,
   recordUnhandledRejections,
   resetSketchPages,
   setSketchMode,
@@ -53,17 +54,15 @@ function graphPaper(page: Page) {
   return page.getByRole("application", { name: /^Graph paper\./ });
 }
 
-/** The exact-coordinates dialog, opened from the rail's "x,y" chip. */
+/** The Plot sheet, skipped when the served problem declares no graph tools
+ *  (the sheet then holds only the scale). */
 async function openExactPoint(page: Page) {
-  const opener = page.getByRole("button", { name: "x,y", exact: true });
+  const sheet = await openPlotSheet(page);
   test.skip(
-    (await opener.count()) === 0,
-    "SKIPPED: the served problem's toolset declares no graph tools, so the rail has no placement chips.",
+    (await sheet.getByRole("group", { name: "Exact point" }).count()) === 0,
+    "SKIPPED: the served problem's toolset declares no graph tools, so the sheet has no placement controls.",
   );
-  await opener.click();
-  const dialog = page.getByRole("dialog", { name: "Exact point" });
-  await expect(dialog).toBeVisible();
-  return dialog;
+  return sheet;
 }
 
 function escapeRegExp(text: string): string {
@@ -88,7 +87,7 @@ function actionKey(page: Page, label: string) {
   );
 }
 
-test.describe("exact coordinates (graph rail)", () => {
+test.describe("exact coordinates (Plot sheet)", () => {
   test("typed coordinates place a point with no chip armed, and clear the inputs", async ({
     page,
   }) => {
@@ -104,16 +103,17 @@ test.describe("exact coordinates (graph rail)", () => {
     await expect(dialog.getByLabel("X coordinate")).toHaveValue("");
     await expect(dialog.getByLabel("Y coordinate")).toHaveValue("");
     // Placing by coordinates arms nothing: the pen keeps the paper (D-154).
-    await expect(page.getByRole("button", { name: "Point", exact: true })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+    await expect(
+      dialog.getByRole("group", { name: "Tools" }).getByRole("button", { name: "Point", exact: true }),
+    ).toHaveAttribute("aria-pressed", "false");
 
-    // The rail's own Undo takes it back, so the shared database is left as found.
-    // Scoped to the rail: focus mode's History arrows carry an Undo too.
+    // The scrim covers the History arrows while the sheet is open, so Undo
+    // closes it first; that takes the point back, leaving the shared
+    // database as found.
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
     await page
-      .getByRole("group", { name: "Units per grid square" })
-      .locator("..")
+      .getByRole("group", { name: "History" })
       .getByRole("button", { name: "Undo", exact: true })
       .click();
     await expect(graphPaper(page)).toHaveAttribute("aria-label", "Graph paper. 0 objects placed.");
@@ -125,24 +125,28 @@ test.describe("exact coordinates (graph rail)", () => {
     await openCleanSketch(page, discovered, "Graph");
     const dialog = await openExactPoint(page);
 
-    // The rail's Eraser chip, not the toolbar's ink eraser: scoped to the
-    // dialog's parent, the rail.
-    const rail = page.getByRole("group", { name: "Units per grid square" }).locator("..");
-    const eraser = rail.getByRole("button", { name: "Eraser", exact: true });
-    await eraser.click();
-    await expect(eraser).toHaveAttribute("aria-pressed", "true");
+    // Arming Eraser from the sheet's Tools group closes the sheet (every arm
+    // does), so what is left to check is the chip it hands off to.
+    const tools = dialog.getByRole("group", { name: "Tools" });
+    await tools.getByRole("button", { name: "Eraser", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    const chip = page.getByRole("status", { name: "Plot tool" });
+    await expect(chip).toContainText("Eraser");
 
-    await dialog.getByLabel("X coordinate").fill("5");
-    await dialog.getByLabel("Y coordinate").fill("6");
-    await dialog.getByRole("button", { name: "Place" }).click();
+    const sheet = await openPlotSheet(page);
+    await sheet.getByLabel("X coordinate").fill("5");
+    await sheet.getByLabel("Y coordinate").fill("6");
+    await sheet.getByRole("button", { name: "Place" }).click();
 
-    await expect(rail.getByRole("status").filter({ hasText: /tap it on the grid/ })).toBeVisible();
+    await expect(sheet.getByRole("status").filter({ hasText: /tap it on the grid/ })).toBeVisible();
     await expect(graphPaper(page)).toHaveAttribute("aria-label", "Graph paper. 0 objects placed.");
-    await expect(dialog.getByLabel("X coordinate")).toHaveValue("5");
-    await expect(dialog.getByLabel("Y coordinate")).toHaveValue("6");
+    await expect(sheet.getByLabel("X coordinate")).toHaveValue("5");
+    await expect(sheet.getByLabel("Y coordinate")).toHaveValue("6");
 
-    await eraser.click();
-    await expect(eraser).toHaveAttribute("aria-pressed", "false");
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+    await chip.getByRole("button", { name: "Stop placing" }).click();
+    await expect(chip).toHaveCount(0);
   });
 });
 

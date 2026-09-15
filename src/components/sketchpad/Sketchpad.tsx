@@ -181,41 +181,13 @@ export function Sketchpad({
   // A13: single-pane, the rail shows for the active page's surface; split,
   // it shows when ANY rendered pane is on graph paper, so activating a pane
   // never adds or removes a whole strip mid-gesture. GraphRail itself
-  // disables its controls when the active page is not on graph paper.
+  // disables its controls when the active page is not on graph paper. In
+  // focus mode the rail never mounts; the Plot sheet holds its controls.
   const railVisible = split
     ? isDesktop === false
       ? splitGraphFirstTwo
       : splitGraphAll
     : activeSurfaceIsGraph;
-
-  /**
-   * Unsplit compact reclaims the rail's height while the keyboard is up
-   * (D-190).
-   *
-   * The condensed layout is the mechanism that normally makes room, and its
-   * trigger is split-only (condensedLayoutActive requires two panes), so
-   * unsplit had nothing at all: toolbar, rail and PageBar all stayed while
-   * the keyboard took the bottom half of the screen. Measured on a 390x664
-   * phone, the rail costs 141px, which leaves the typed-lines layer 218px
-   * tall against a 218px keyboard. typedLinesScrollTop's zero-band guard
-   * then returns scrollTop unchanged, correctly (there is no band to scroll
-   * into), and the line being typed sits behind the keyboard with no scroll
-   * position that could rescue it. Padding the layer cannot help either:
-   * the whole layer is covered.
-   *
-   * So the fix has to give height back, and the rail is the right strip to
-   * take it from: it is graph-tool chrome that types nothing, condense
-   * already hides it for exactly this reason on split (spec section 4), and
-   * hiding it restores the same geometry a non-graph page already had (band
-   * 133px, enough for the 78px active line).
-   *
-   * Keyed on the inset rather than on type mode because the inset is what
-   * actually costs the height, and it cannot be raised by the rail's own
-   * units field: this hook runs with mathFieldOnly, so only a MATH-FIELD or
-   * MathLive's own panel opens the gate (D-174). Editing the rail can never
-   * make the rail disappear.
-   */
-  const railYieldsToKeyboard = isDesktop === false && !split && keyboardInset.bottom > 0;
 
   const singlePane = useMemo<PaneInfo>(
     () => ({ pageId: activePageId, scale: 1, offsetX: 0, offsetY: 0 }),
@@ -408,7 +380,9 @@ export function Sketchpad({
           <SketchToolbar cleaning={cleaning} onCleanUp={() => void cleanUp()} />
         </div>
       )}
-      {railVisible && !condensed && !railYieldsToKeyboard && <GraphRail />}
+      {/* Focus mode has no rail: its graph tools live in the Plot sheet
+          (revision spec section 6, D-198). Desktop and split keep it. */}
+      {railVisible && !condensed && !focus && <GraphRail />}
       {!condensed && <PageBar />}
       {/* Focus mode types in a strip under the page bar, never on the paper
           (revision spec section 7, D-199). */}

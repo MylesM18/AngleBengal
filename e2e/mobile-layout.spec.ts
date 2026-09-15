@@ -14,7 +14,7 @@ import {
   type Route,
 } from "./helpers/routes";
 import { servePracticeProblem } from "./helpers/practice";
-import { openSketchMode, setSketchBackground } from "./helpers/sketch";
+import { openPlotSheet, openSketchMode, setSketchBackground } from "./helpers/sketch";
 import { openTutorDrawer } from "./helpers/tutor";
 import { settle } from "./helpers/settle";
 
@@ -152,15 +152,21 @@ for (const width of COMPACT_WIDTHS) {
         width,
       );
 
-      // Then the crowded case: the graph background is the only thing that
-      // mounts GraphRail, another full row of chips and number inputs.
+      // Then the crowded case: the graph background adds the Plot button on
+      // compact (focus mode has no rail; its controls live in the sheet).
       await setSketchBackground(page, "Graph");
       await settle(page);
       await expectNoOverflow(
         page,
-        { ...route, name: "sketch mode, graph background (GraphRail mounted)" },
+        { ...route, name: "sketch mode, graph background (Plot button mounted)" },
         width,
       );
+
+      // And the sheet itself, open.
+      await openPlotSheet(page);
+      await settle(page);
+      await expectNoOverflow(page, { ...route, name: "sketch mode, Plot sheet open" }, width);
+      await page.keyboard.press("Escape");
     });
 
     test("the open tutor drawer has no horizontal overflow", async ({ page }) => {

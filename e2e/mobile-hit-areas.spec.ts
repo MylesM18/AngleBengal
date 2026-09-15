@@ -8,7 +8,7 @@ import {
   reportShortened,
 } from "./helpers/hitArea";
 import { servePracticeProblem } from "./helpers/practice";
-import { graphRailVisible, openSketchMode, setSketchBackground } from "./helpers/sketch";
+import { openSketchMode, setSketchBackground } from "./helpers/sketch";
 import { openTutorDrawer } from "./helpers/tutor";
 import { STATIC_ROUTES, discoverRoutes, type DiscoveredRoutes } from "./helpers/routes";
 import { settle } from "./helpers/settle";
@@ -113,11 +113,12 @@ for (const width of COMPACT_WIDTHS) {
        */
       await setSketchBackground(page, "Graph");
       await settle(page);
-      expect(
-        await graphRailVisible(page),
-        "The graph background did not mount GraphRail, so its five carriers " +
-          "were never probed.",
-      ).toBe(true);
+      // Not the sheet itself: its scrim covers every other control, and
+      // opening it here would leave the toolbar's own carriers unprobed.
+      await expect(
+        page.getByRole("button", { name: "Plot", exact: true }),
+        "The graph background did not mount the Plot button, so focus mode's graph entry was never probed.",
+      ).toBeVisible();
 
       const withRail = await probeHitAreas(page);
       expect(
@@ -125,22 +126,22 @@ for (const width of COMPACT_WIDTHS) {
         `No hit points probed in sketch mode. ${withRail.carriers} carriers, all skipped: ` +
           withRail.skips.map((s) => `${s.selector} (${s.reason})`).join("; "),
       ).toBeGreaterThan(0);
-      reportShortened(withRail, `sketch mode with the graph rail at ${width}px`);
+      reportShortened(withRail, `sketch mode on graph paper at ${width}px`);
       expect(
         withRail.failures,
-        formatHitFailures(withRail, `sketch mode, graph rail, at ${width}px`),
+        formatHitFailures(withRail, `sketch mode, graph paper, at ${width}px`),
       ).toEqual([]);
 
-      // The toolbar on its own. Fewer carriers is the proof that the rail was
-      // genuinely contributing to the run above, not that the probe found the
-      // same set twice.
+      // The toolbar on its own. Fewer carriers is the proof that the Plot
+      // button was genuinely contributing to the run above, not that the
+      // probe found the same set twice.
       await setSketchBackground(page, "Plain");
       await settle(page);
       const plain = await probeHitAreas(page);
       expect(
         plain.carriers,
-        "Switching off the graph background removed no carriers, so GraphRail " +
-          "was never in the measured set.",
+        "Switching off the graph background removed no carriers, so the Plot " +
+          "button was never in the measured set.",
       ).toBeLessThan(withRail.carriers);
       reportShortened(plain, `sketch mode, toolbar only, at ${width}px`);
       expect(

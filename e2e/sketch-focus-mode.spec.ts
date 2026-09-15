@@ -9,6 +9,7 @@ import {
   hideMathKeyboard,
   mathFieldValue,
   openCleanSketch,
+  openPlotSheet,
   recordUnhandledRejections,
   resetSketchPages,
   setSketchBackground,
@@ -334,5 +335,102 @@ test.describe("typed strip", () => {
 
     await hideMathKeyboard(page);
     await wipeActiveSketchSurface(page);
+  });
+});
+
+/** The graph layer's own count, the one signal that an object was placed. */
+function graphPaper(page: Page) {
+  return page.getByRole("application", { name: /^Graph paper\./ });
+}
+
+test.describe("Plot sheet", () => {
+  test("Plot shows only on Graph, opens the sheet, and no rail mounts", async ({ page }) => {
+    await openCleanSketch(page, discovered, "Graph");
+    const overlay = page.locator("[data-sketch-overlay]");
+    const plot = overlay.getByRole("button", { name: "Plot", exact: true });
+    await expect(plot).toBeVisible();
+    await expect(plot).toHaveAttribute("aria-expanded", "false");
+    // No rail: the scale group exists only inside the sheet.
+    await expect(overlay.getByRole("group", { name: "Units per grid square" })).toHaveCount(0);
+
+    const sheet = await openPlotSheet(page);
+    await expect(plot).toHaveAttribute("aria-expanded", "true");
+    const scale = sheet.getByRole("group", { name: "Units per grid square" });
+    await expect(scale).toBeVisible();
+    await scale.getByRole("button", { name: "2", exact: true }).click();
+    await expect(scale.getByRole("button", { name: "2", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(sheet, "A scale pick closed the sheet.").toBeVisible();
+
+    // Every control in the sheet takes a tap at its own center (D-071).
+    for (const button of await sheet.getByRole("button").all()) {
+      expect(
+        await button.evaluate((el) => {
+          const rect = el.getBoundingClientRect();
+          const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+          return hit === el || el.contains(hit);
+        }),
+        `Another element sits on top of the sheet's "${await button.textContent()}" button.`,
+      ).toBe(true);
+    }
+
+    // Leave the shared database as found.
+    await scale.getByRole("button", { name: "1", exact: true }).click();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+    await expect(plot).toHaveAttribute("aria-expanded", "false");
+
+    await setSketchBackground(page, "Plain");
+    await expect(plot).toHaveCount(0);
+    await setSketchBackground(page, "Graph");
+    await expect(plot).toBeVisible();
+  });
+
+  test("a tool armed from the sheet places on the board, the chip names it, Stop placing disarms", async ({
+    page,
+  }) => {
+    await openCleanSketch(page, discovered, "Graph");
+    await expect(graphPaper(page)).toHaveAttribute("aria-label", "Graph paper. 0 objects placed.");
+    const sheet = await openPlotSheet(page);
+    const tools = sheet.getByRole("group", { name: "Tools" });
+    test.skip(
+      (await tools.count()) === 0,
+      "SKIPPED: the served problem's toolset declares no graph tools, so the sheet has no Tools group.",
+    );
+    const plot = page.getByRole("button", { name: "Plot", exact: true });
+
+    await tools.getByRole("button", { name: "Point", exact: true }).click();
+    await expect(sheet).toBeHidden();
+    const chip = page.getByRole("status", { name: "Plot tool" });
+    await expect(chip).toContainText("Point");
+
+    // The chip stays clear of the mode column on a 360px phone.
+    await page.setViewportSize({ width: 360, height: 800 });
+    const chipBox = await chip.boundingBox();
+    const modeBox = await page.getByRole("group", { name: "Mode" }).boundingBox();
+    if (!chipBox || !modeBox) throw new Error("The chip or the mode column has no box.");
+    expect(chipBox.x + chipBox.width, "The armed chip runs into the mode column.").toBeLessThanOrEqual(
+      modeBox.x,
+    );
+
+    // A board tap places through GraphLayer.
+    const paperBox = await graphPaper(page).boundingBox();
+    if (!paperBox) throw new Error("The graph paper has no box.");
+    await page.mouse.click(paperBox.x + paperBox.width / 2, paperBox.y + paperBox.height / 2);
+    await expect(graphPaper(page)).toHaveAttribute("aria-label", "Graph paper. 1 object placed.");
+    await expect(chip, "Placing a point disarmed the tool.").toContainText("Point");
+
+    await chip.getByRole("button", { name: "Stop placing" }).click();
+    await expect(chip).toHaveCount(0);
+    await expect(plot).toHaveAttribute("aria-expanded", "false");
+
+    // Leave the shared database as found.
+    await page
+      .getByRole("group", { name: "History" })
+      .getByRole("button", { name: "Undo", exact: true })
+      .click();
+    await expect(graphPaper(page)).toHaveAttribute("aria-label", "Graph paper. 0 objects placed.");
   });
 });
