@@ -3888,3 +3888,42 @@ as where typed values belong. Shipping the sheet alone would have removed
 the rail and left typing on the paper, the exact state the owner objected
 to twice, so the two sections landed together, each with its own tasks,
 tests and entry.
+
+### D-201. Focus-mode geometry stops leaning on a shell's positioning
+
+Both follow-ups parked by PR 3's whole-branch review, in one entry because
+both are a measurement that only worked by accident of what surrounded it.
+
+useKeepActiveLineInView read the active line with line.offsetTop, which is a
+position inside the scroll content only while the scroller is the line's
+offsetParent. That forced a bare `relative` onto TypedWorkStrip's rows
+scroller, with a five-line comment explaining why, and left the paper
+layer's correctness resting on its `absolute`. The top now comes from rects,
+through the pure typedLineTopInScroller in condense.ts beside
+typedLinesScrollTop: the line's rect top minus the scroller's, divided by the
+scale the pane applies, minus clientTop, plus scrollTop. The division is not
+optional. In split, the layer stack really does render inside
+translate(offset) scale(fit * zoom) (Sketchpad's A15 wrapper), where rect
+deltas are scaled pixels while scrollTop and clientHeight are layout pixels,
+so a rect measurement without it would have regressed the one path offsetTop
+handled correctly. The scale is recovered from the scroller's rect height
+over its offsetHeight and falls back to 1 when there is nothing to divide
+by. clientHeight and the line's offsetHeight are left alone: both are
+already layout pixels. With the coupling gone, the strip's `relative`, its
+comment, and the hook's precondition JSDoc are removed, and the strip's e2e
+pin proves it: with offsetTop put back while `relative` stays gone, the
+pin fails on both mobile projects with its "outside" message.
+
+PlotSheet spent only useKeyboardInset's bottom. The two values are computed
+as a pair and the hook's own type doc says they must be spent as one: iOS
+pans the visual viewport down by `top` to reveal a focused field, so bottom
+alone left the sheet floating `top` px above the keyboard's top edge with
+the board showing through. It now also translates down by top, the pattern
+ChatDrawer has carried since the mobile fix plan, with transform joining
+bottom in the transition list so the two halves of one move stay in step.
+The scrim is a sibling, not a descendant, so it keeps covering the viewport
+and is untouched. Emulation cannot raise a real keyboard, so the e2e fakes
+the visual viewport's height and offsetTop (the condense spec's innerHeight
+technique, moved onto the object that makes the geometry self-consistent)
+and asserts the sheet's bottom edge lands on offsetTop plus height; the real
+keyboard stays an owner device check, per D-165.
