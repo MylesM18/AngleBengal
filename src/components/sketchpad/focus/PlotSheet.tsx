@@ -90,7 +90,9 @@ export function PlotSheet({ onClose }: { onClose: () => void }) {
         // above the keyboard's top edge with the board showing through.
         // ChatDrawer carries the same translate for the same reason. The
         // scrim above is a sibling, not a descendant, so this transform
-        // never becomes its containing block (D-201).
+        // never becomes its containing block; it IS the containing block
+        // for any fixed-positioned descendant, so nothing inside the sheet
+        // may use position: fixed (nothing does today) (D-201).
         style={{
           bottom: inset.bottom,
           transform: inset.top > 0 ? `translateY(${inset.top}px)` : undefined,

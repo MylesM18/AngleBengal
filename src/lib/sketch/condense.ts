@@ -98,8 +98,10 @@ export function typedLinesScrollTop(args: {
  * wrapper (translate(offset) scale(fit * zoom), Sketchpad.tsx) makes the
  * rect delta scaled pixels while scrollTop and clientHeight stay layout
  * pixels. The scale is recovered from the scroller's own two heights (rect
- * height over offsetHeight) and divided back out; an unrendered or
- * unmeasured scroller falls back to 1 rather than dividing by zero.
+ * height over offsetHeight) and divided back out. That recovers a uniform
+ * scale only, which is all the wrapper applies: a rotation or skew would
+ * need a different measurement. An unrendered or unmeasured scroller falls
+ * back to 1 rather than dividing by zero.
  * clientTop is the top border, which the rect includes and the scroll
  * origin does not.
  */

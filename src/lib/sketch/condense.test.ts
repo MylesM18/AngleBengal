@@ -107,6 +107,20 @@ describe("typedLineTopInScroller (rect-measured line top, D-201)", () => {
     ).toBe(20);
   });
 
+  it("subtracts the top border after the scale division, not before", () => {
+    // Same 2x-scaled pane as above with a 2px border: the 10px visual delta
+    // is 20px of content, minus the layout-px border. Dividing after the
+    // subtraction would give 16.
+    expect(
+      typedLineTopInScroller({
+        ...base,
+        lineRectTop: 110,
+        scrollerRectHeight: 58,
+        scrollerClientTop: 2,
+      }),
+    ).toBe(18);
+  });
+
   it("falls back to scale 1 when the scroller has no layout height to divide by", () => {
     expect(
       typedLineTopInScroller({ ...base, scrollerOffsetHeight: 0, scrollerRectHeight: 0 }),
