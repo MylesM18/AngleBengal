@@ -3927,3 +3927,48 @@ the visual viewport's height and offsetTop (the condense spec's innerHeight
 technique, moved onto the object that makes the geometry self-consistent)
 and asserts the sheet's bottom edge lands on offsetTop plus height; the real
 keyboard stays an owner device check, per D-165.
+
+### D-202. The Background radiogroups share one roving helper, and two rig pins
+
+Three items parked by PR 2's final review, all of them about coverage rather
+than behavior the owner can see.
+
+The Background radios rove. SketchToolbar and CondensedToolbar each carried a
+byte-identical private onBackgroundKeyDown (four arrow keys, a modulo wrap,
+focus following the selection) and PR 1's review refused to extract it while
+grep -rn "Arrow" e2e/ was empty, because extracting untested behavior is an
+unverified refactor. The coverage came first: an e2e for the split toolbar in
+the pages spec, and arrow assertions folded into the condensed popover test
+that already opens that group. Only then did both switch to
+rovingRadioKeyDown in the new src/lib/sketch/roving.ts, over the pure,
+vitest-covered nextRovingIndex. The helper takes a select callback rather
+than calling setSurface itself, because the three call sites disagree about
+what selecting means: the focus bar has to drop an untouched typed line first
+(D-199) and an arrow is the same leave as a tap. FocusBar, which had neither
+a roving tabindex nor arrow handling and made keyboard users tab through
+every radio, now has both. The key set is unchanged at exactly four arrows,
+with no Home and no End, because this is an extraction. The five constants
+duplicated between the two toolbars (MODES, TOOLS, WIDTHS, BACKGROUNDS,
+CLEAR_QUESTION) are deliberately left alone: none of them is the roving
+logic.
+
+D-197's override is pinned. The scoping of the inline pointer-events on a
+focused field's container part was proven only by a probe that was then
+deleted, so a revert to always-on would have surfaced as an intermittent
+Delete line failure rather than a red test. The Delete line e2e now asserts
+that container in both directions: "auto" while the field holds focus, which
+also proves the assertion is not vacuous under the emulated projects, and ""
+after hideMathKeyboard blurs it. With the focusout listener disabled the pin
+fails on both mobile projects with its "outlived the field's focus" message.
+MathField itself is unchanged.
+
+openTypedSketch waits for settled focus. Focus mode's Type starts a line
+whose field takes focus asynchronously, and setSketchMode waits only for
+aria-pressed, so the helper's hide could land first, the focus arrive after,
+and the re-raised keyboard intercept the Draw click that follows (seen once
+under load on iphone-webkit as a 90 second hang). It now waits through the
+spec's own waitForSettledMathFieldFocus. A race cannot be pinned
+deterministically, so this ships as a mitigation with its mechanism and its
+runs stated, not as a proven fix. An audit of every other Type then hide then
+click site found the rest already gated, except two inside the two condense
+tests that are out of bounds by standing rule.
