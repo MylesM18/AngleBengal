@@ -169,6 +169,19 @@ async function openTypedSketch(page: Page): Promise<void> {
   // keyboard (revision spec section 7), which would cover the pane a test
   // taps next. Draw drops the untouched line; each test sets Type again
   // from the split toolbar, which only sets the mode.
+  //
+  // Wait for that field to hold SETTLED focus before hiding. setSketchMode
+  // only waits for aria-pressed, and MathfieldElement's autoFocus lands
+  // asynchronously (see waitForSettledMathFieldFocus below), so a hide
+  // dispatched into that window is followed by the focus arriving and the
+  // keyboard raising again, over the Draw button this then clicks. Observed
+  // once under load on iphone-webkit as a 90s intercepted click in "typing
+  // in the bottom pane condenses, the peek swaps, closing restores".
+  await expect(
+    page.locator("math-field"),
+    "Focus mode's Type never started a typed line.",
+  ).toHaveCount(1);
+  await waitForSettledMathFieldFocus(page);
   await hideMathKeyboard(page);
   await setSketchMode(page, "Draw");
 }
