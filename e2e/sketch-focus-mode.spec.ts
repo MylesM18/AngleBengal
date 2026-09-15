@@ -65,6 +65,20 @@ async function deleteLineFromMenu(page: Page): Promise<void> {
   await first.click();
 }
 
+/**
+ * The inline pointer-events D-197's override writes on the live math field's
+ * container part, "" when there is none, and a sentinel when no field is
+ * mounted at all. The container lives in the math-field's open shadow root,
+ * which Playwright's CSS locators pierce (same as the menu toggle above).
+ */
+async function containerPointerEvents(page: Page): Promise<string> {
+  const container = page.locator("math-field").locator('[part="container"]');
+  if ((await container.count()) === 0) return "no live field";
+  return container
+    .first()
+    .evaluate((el) => (el as HTMLElement).style.getPropertyValue("pointer-events"));
+}
+
 test.describe("undo and redo arrows", () => {
   test("round-trip a stroke with the right disabled states, and redo from the keyboard", async ({
     page,
@@ -267,7 +281,36 @@ test.describe("Delete line in the math field menu", () => {
     await expect.poll(() => mathFieldValue(page)).toBe("z");
 
     expect(await unhandled(), "MathLive threw around the menu deletions.").toEqual([]);
+
+    // D-197, the ON half. Not decoration: if the override were never applied
+    // under this project, the OFF assertion below would pass vacuously.
+    await expect
+      .poll(() => containerPointerEvents(page), {
+        message:
+          "D-197's override is not on the focused field's container, so the " +
+          "assertion after hideMathKeyboard would prove nothing.",
+      })
+      .toBe("auto");
+
     await hideMathKeyboard(page);
+
+    // D-197, the OFF half, and the whole point of this pin. Ruling B scoped
+    // the override to while the field holds focus, and that scoping was
+    // proven only by a probe that was then deleted, so a revert to always-on
+    // would show up only as an intermittent Delete line failure. An always-on
+    // override lets the menu toggle take a tap in MathLive's 60ms
+    // mark-focused-then-focus-sink gap, and Delete line then removes a field
+    // MathLive still counts as focused, where D-188's blur cannot settle it.
+    // hideMathKeyboard blurs the active element, so the host's focusout must
+    // have cleared the inline value by now.
+    await expect
+      .poll(() => containerPointerEvents(page), {
+        message:
+          "D-197's override outlived the field's focus. An always-on container " +
+          "override is exactly what PR 2's ruling B rejected.",
+      })
+      .toBe("");
+
     await wipeActiveSketchSurface(page);
   });
 });
