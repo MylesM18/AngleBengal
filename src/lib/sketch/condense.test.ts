@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   condensedLayoutActive,
   swapCondensedPanes,
+  typedLineTopInScroller,
   typedLinesScrollTop,
 } from "@/lib/sketch/condense";
 import { useSketchStore } from "@/lib/sketch/store";
@@ -67,6 +68,67 @@ describe("typedLinesScrollTop (unsplit companion fix, spec section 4)", () => {
 
   it("does nothing when the keyboard covers the whole scroller", () => {
     expect(typedLinesScrollTop({ ...base, insetBottom: 600, lineTop: 500 })).toBe(0);
+  });
+});
+
+describe("typedLineTopInScroller (rect-measured line top, D-201)", () => {
+  const base = {
+    lineRectTop: 120,
+    scrollerRectTop: 100,
+    scrollerRectHeight: 116,
+    scrollerOffsetHeight: 116,
+    scrollerClientTop: 0,
+    scrollTop: 0,
+  };
+
+  it("reports the line's offset from the scroller's own padding box", () => {
+    expect(typedLineTopInScroller(base)).toBe(20);
+  });
+
+  it("adds scrollTop, so the result is a position in the unscrolled content", () => {
+    expect(typedLineTopInScroller({ ...base, scrollTop: 76 })).toBe(96);
+  });
+
+  it("reads a line scrolled above the port as its position in the content", () => {
+    // 38px above the scroller's top edge while scrolled down 76: the line
+    // starts at 38 in the content, which is what scrolling back up needs.
+    expect(typedLineTopInScroller({ ...base, lineRectTop: 62, scrollTop: 76 })).toBe(38);
+  });
+
+  it("subtracts the top border, which the rect includes and scrollTop does not", () => {
+    expect(typedLineTopInScroller({ ...base, scrollerClientTop: 2 })).toBe(18);
+  });
+
+  it("divides the rect delta by the scale a split pane's A15 transform applies", () => {
+    // The pane lays out at refSize and is scaled to fit: 116 layout px
+    // render as 58, so a 10px visual delta is 20px of scroll content.
+    expect(
+      typedLineTopInScroller({ ...base, lineRectTop: 110, scrollerRectHeight: 58 }),
+    ).toBe(20);
+  });
+
+  it("subtracts the top border after the scale division, not before", () => {
+    // Same 2x-scaled pane as above with a 2px border: the 10px visual delta
+    // is 20px of content, minus the layout-px border. Dividing after the
+    // subtraction would give 16.
+    expect(
+      typedLineTopInScroller({
+        ...base,
+        lineRectTop: 110,
+        scrollerRectHeight: 58,
+        scrollerClientTop: 2,
+      }),
+    ).toBe(18);
+  });
+
+  it("falls back to scale 1 when the scroller has no layout height to divide by", () => {
+    expect(
+      typedLineTopInScroller({ ...base, scrollerOffsetHeight: 0, scrollerRectHeight: 0 }),
+    ).toBe(20);
+  });
+
+  it("falls back to scale 1 when the scroller is not rendered (a zero rect)", () => {
+    expect(typedLineTopInScroller({ ...base, scrollerRectHeight: 0 })).toBe(20);
   });
 });
 

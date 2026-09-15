@@ -88,6 +88,40 @@ export function typedLinesScrollTop(args: {
 }
 
 /**
+ * The active line's top as a position inside the scroller's scroll content,
+ * measured from rects rather than offsetTop (D-201). offsetTop answers a
+ * different question (the offset from the nearest POSITIONED ancestor), so
+ * it was only ever correct while the scroller happened to be that ancestor,
+ * and the strip had to carry a `relative` class to arrange it.
+ *
+ * getBoundingClientRect reports the VISUAL box, so a split pane's A15
+ * wrapper (translate(offset) scale(fit * zoom), Sketchpad.tsx) makes the
+ * rect delta scaled pixels while scrollTop and clientHeight stay layout
+ * pixels. The scale is recovered from the scroller's own two heights (rect
+ * height over offsetHeight) and divided back out. That recovers a uniform
+ * scale only, which is all the wrapper applies: a rotation or skew would
+ * need a different measurement. An unrendered or unmeasured scroller falls
+ * back to 1 rather than dividing by zero.
+ * clientTop is the top border, which the rect includes and the scroll
+ * origin does not.
+ */
+export function typedLineTopInScroller(args: {
+  lineRectTop: number;
+  scrollerRectTop: number;
+  scrollerRectHeight: number;
+  scrollerOffsetHeight: number;
+  scrollerClientTop: number;
+  scrollTop: number;
+}): number {
+  const ratio =
+    args.scrollerOffsetHeight > 0 ? args.scrollerRectHeight / args.scrollerOffsetHeight : 1;
+  const scale = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+  return (
+    (args.lineRectTop - args.scrollerRectTop) / scale - args.scrollerClientTop + args.scrollTop
+  );
+}
+
+/**
  * The peek-strip swap (spec section 4): the peeked (top) page drops into the
  * editing position, the edited page becomes the peek, and the incoming
  * page's trailing typed line receives focus so typing continues without the

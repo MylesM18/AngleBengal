@@ -333,8 +333,9 @@ test.describe("typed strip", () => {
     );
     await expectActiveLineInStrip(page);
 
-    // A non-append activation must scroll the cursor line fully into view:
-    // the scroller, not the sketchpad root, is the rows' offsetParent.
+    // A non-append activation must scroll the cursor line fully into view.
+    // The line's top is measured from rects inside the scroller, so this
+    // holds without the strip positioning anything (D-201).
     await hideMathKeyboard(page);
     await rows(page).getByRole("button", { name: "Edit solution line 1" }).click();
     await expect(rows(page).nth(0)).toHaveAttribute("data-active-line", "");
@@ -460,5 +461,121 @@ test.describe("Plot sheet", () => {
       .getByRole("button", { name: "Undo", exact: true })
       .click();
     await expect(graphPaper(page)).toHaveAttribute("aria-label", "Graph paper. 0 objects placed.");
+  });
+
+  /**
+   * Follow-up from PR 3's review (D-201). The sheet used to spend only
+   * useKeyboardInset's bottom, so an iOS visual-viewport pan left it
+   * floating `top` px above the keyboard with the board showing through.
+   *
+   * Emulation cannot raise a real OS keyboard, so this fakes the one pair
+   * of numbers the hook's OS branch reads, the same technique the condense
+   * spec uses for innerHeight. It fakes the visual viewport instead:
+   * height reports KEYBOARD_PX less than innerHeight, and offsetTop reports
+   * a pan of PAN_PX. That keeps the geometry self-consistent, because the
+   * keyboard's top edge in layout coordinates is then exactly
+   * visualViewport.offsetTop + visualViewport.height, which is where the
+   * sheet's bottom edge has to land. scale is left untouched (still 1, well
+   * under useKeyboardInset's 1.02 zoomed threshold), and the hook's own
+   * focus gate means nothing moves until an input actually takes focus.
+   * A real keyboard on a real iPhone stays on the owner's checklist
+   * (D-165 precedent).
+   */
+  test("the sheet sits on the keyboard's top edge while an input holds focus", async ({
+    page,
+  }) => {
+    const KEYBOARD_PX = 300;
+    const PAN_PX = 96;
+
+    await page.addInitScript(
+      ({ keyboard, pan }) => {
+        const viewport = window.visualViewport;
+        if (!viewport) return;
+        // Lazy getters, so a viewport resize mid-test cannot strand a
+        // stale number, and so osBottom is always exactly `keyboard`.
+        Object.defineProperty(viewport, "height", {
+          configurable: true,
+          get: () => window.innerHeight - keyboard,
+        });
+        Object.defineProperty(viewport, "offsetTop", {
+          configurable: true,
+          get: () => pan,
+        });
+      },
+      { keyboard: KEYBOARD_PX, pan: PAN_PX },
+    );
+
+    await openCleanSketch(page, discovered, "Graph");
+
+    // The fake has to actually take in this engine before anything below
+    // means anything. If this throws, do NOT weaken the test: fall back to
+    // the pure helper route described in the plan's Task 2.
+    const probe = await page.evaluate(() => {
+      const viewport = window.visualViewport;
+      if (!viewport) return null;
+      return {
+        innerHeight: window.innerHeight,
+        height: viewport.height,
+        offsetTop: viewport.offsetTop,
+      };
+    });
+    if (probe === null) throw new Error("No window.visualViewport to fake against.");
+    expect(
+      probe.innerHeight - probe.height,
+      "Faking visualViewport.height did not take in this engine.",
+    ).toBe(KEYBOARD_PX);
+    expect(
+      probe.offsetTop,
+      "Faking visualViewport.offsetTop did not take in this engine.",
+    ).toBe(PAN_PX);
+
+    const sheet = await openPlotSheet(page);
+    // Exact point only renders when the served problem declares graph tools
+    // (PlotSheet.tsx's hasTools), the same guard the sibling test uses.
+    test.skip(
+      (await sheet.getByRole("group", { name: "Exact point" }).count()) === 0,
+      "SKIPPED: the served problem's toolset declares no graph tools, so the " +
+        "sheet has no Exact point input to focus.",
+    );
+
+    // Nothing editable holds focus yet (the dialog focuses its own div, which
+    // the hook's gate does not count), so this is the true at-rest bottom.
+    const resting = await sheet.boundingBox();
+    if (!resting) throw new Error("The Plot sheet has no box at rest.");
+
+    // A plain INPUT is what useKeyboardInset's default gate counts, and no
+    // math field is involved, so mlBottom stays 0 and the OS branch wins.
+    const x = sheet.getByLabel("X coordinate");
+    await x.click();
+    await expect(x).toBeFocused();
+
+    await expect
+      .poll(
+        async () => {
+          const reading = await sheet.evaluate((el) => {
+            const viewport = window.visualViewport;
+            return {
+              bottom: el.getBoundingClientRect().bottom,
+              keyboardTop: viewport ? viewport.offsetTop + viewport.height : Number.NaN,
+            };
+          });
+          return Math.abs(reading.bottom - reading.keyboardTop) <= 1
+            ? "on the keyboard"
+            : `sheet bottom ${Math.round(reading.bottom)} vs keyboard top ${Math.round(
+                reading.keyboardTop,
+              )} (resting bottom ${Math.round(resting.y + resting.height)})`;
+        },
+        {
+          message:
+            "The Plot sheet never settled onto the faked keyboard's top edge: it " +
+            "is spending inset.bottom without the matching inset.top translate.",
+        },
+      )
+      .toBe("on the keyboard");
+
+    // Leave the shared database as found: nothing was placed, so closing is
+    // enough. Escape reaches the dialog's own handler from inside the input.
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
   });
 });

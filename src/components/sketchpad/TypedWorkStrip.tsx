@@ -46,15 +46,10 @@ export function TypedWorkStrip() {
       data-keep-math-keyboard=""
       className="shrink-0 border-b border-hairline bg-paper-1"
     >
-      {/* relative: the rows' offsetParent must be this scroller, because
-          useKeepActiveLineInView reads line.offsetTop as a position inside
-          the scroll content (the paper layer gets the same from its
-          absolute positioning). Without it the offsets carry the bars above
-          and the cursor line clips or hides on a non-append activation. */}
       <div
         ref={scrollerRef}
         data-typed-work-rows=""
-        className="relative overflow-y-auto overscroll-contain px-3 py-1"
+        className="overflow-y-auto overscroll-contain px-3 py-1"
         style={{ maxHeight: MAX_ROWS_HEIGHT }}
       >
         <TypedLineList

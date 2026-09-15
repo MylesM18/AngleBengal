@@ -17,8 +17,9 @@ import { useKeyboardInset } from "@/lib/useKeyboardInset";
  * (parseCoordinate plus commitGraphPoint, the rail's hints), and the
  * "1 sq =" scale. Arming a tool closes the sheet; disarming, Exact point
  * placements and scale changes keep it open, since several in a row are
- * common. The sheet lifts above the OS keyboard while one of its inputs
- * holds focus (useKeyboardInset's default document-wide gate).
+ * common. The sheet sits on the OS keyboard's top edge while one of its
+ * inputs holds focus, spending both halves of the keyboard inset
+ * (useKeyboardInset's default document-wide gate, D-201).
  */
 export function PlotSheet({ onClose }: { onClose: () => void }) {
   const toolset = useSketchStore((state) => state.toolset);
@@ -81,8 +82,21 @@ export function PlotSheet({ onClose }: { onClose: () => void }) {
             onClose();
           }
         }}
-        className="absolute inset-x-0 z-30 outline-none transition-[bottom] duration-200 ease-out"
-        style={{ bottom: inset.bottom }}
+        className="absolute inset-x-0 z-30 outline-none transition-[bottom,transform] duration-200 ease-out"
+        // useKeyboardInset's two values are computed as a pair and have to
+        // be spent as one (useKeyboardInset.ts): iOS pans the visual
+        // viewport down by `top` to reveal a focused field it cannot
+        // scroll to, so bottom alone leaves the sheet floating `top` px
+        // above the keyboard's top edge with the board showing through.
+        // ChatDrawer carries the same translate for the same reason. The
+        // scrim above is a sibling, not a descendant, so this transform
+        // never becomes its containing block; it IS the containing block
+        // for any fixed-positioned descendant, so nothing inside the sheet
+        // may use position: fixed (nothing does today) (D-201).
+        style={{
+          bottom: inset.bottom,
+          transform: inset.top > 0 ? `translateY(${inset.top}px)` : undefined,
+        }}
       >
         <Sheet
           tone="paper-0"
