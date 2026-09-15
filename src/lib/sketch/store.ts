@@ -15,6 +15,8 @@ import {
   type PaneViewport,
 } from "./paneViewport";
 
+import { nextTypedLineAction } from "./typedLines";
+
 // Type-only for the same reason: workState imports this store's types.
 import type { ProblemWorkState } from "@/lib/resume/workState";
 
@@ -241,6 +243,14 @@ export type SketchState = {
   /** Inserts an empty line after afterId (null appends at the end), activates
    *  it, and returns the new id. */
   addTypedLineAfter: (pageId: string, afterId: string | null) => string;
+  /** Puts the page in type mode and applies the paper's tap rule to its
+   *  ACTIVE surface (revision spec section 7): no lines, start line 1; the
+   *  last line has content, open a trailing line; it is empty, activate it. */
+  startTyping: (pageId: string) => void;
+  /** Drops every blank typed line from that page's ACTIVE surface, so an
+   *  untouched Type tap leaves nothing behind when Draw follows it. Clears
+   *  activeLineId when it named a dropped line. */
+  discardEmptyTypedLines: (pageId: string) => void;
   /**
    * Ordered append used by the handwriting conversion (spec §5). The
    * optional trailing surface pins the write to THAT surface document; when
@@ -813,6 +823,33 @@ export const useSketchStore = create<SketchState>((set, get) => {
       }));
       return id;
     },
+
+    startTyping: (pageId) => {
+      const page: SketchPage | undefined = get().pages[pageId];
+      if (!page) return;
+      get().setMode(pageId, "type");
+      const action = nextTypedLineAction(page.content[page.surface].typedLines);
+      if (action.kind === "start") get().addTypedLineAfter(pageId, null);
+      else if (action.kind === "append") get().addTypedLineAfter(pageId, action.afterId);
+      else get().setActiveLine(action.id);
+    },
+
+    discardEmptyTypedLines: (pageId) =>
+      set((state) => {
+        const page: SketchPage | undefined = state.pages[pageId];
+        if (!page) return state;
+        const lines = page.content[page.surface].typedLines;
+        const kept = lines.filter((line) => line.latex.trim() !== "");
+        if (kept.length === lines.length) return state;
+        const activeDropped =
+          state.activeLineId !== null &&
+          lines.some((line) => line.id === state.activeLineId) &&
+          !kept.some((line) => line.id === state.activeLineId);
+        return {
+          ...withActiveSurface(state, pageId, (content) => ({ ...content, typedLines: kept })),
+          ...(activeDropped ? { activeLineId: null } : {}),
+        };
+      }),
 
     appendTypedLines: (pageId, latexes, surface) =>
       set((state) => {

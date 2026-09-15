@@ -6,6 +6,7 @@ import { discoverRoutes, type DiscoveredRoutes, type Route } from "./helpers/rou
 import {
   activateSketchPage,
   addSketchPage,
+  expectActiveLineInStrip,
   hideMathKeyboard,
   openSketchMode,
   resetSketchPages,
@@ -150,7 +151,7 @@ async function waitForSettledCondenseState(page: Page): Promise<void> {
     .toBeGreaterThanOrEqual(5);
 }
 
-/** Practice served, overlay open, one clean empty "Page 1", Type mode. */
+/** Practice served, overlay open, one clean empty "Page 1", Draw mode with Type proven available. */
 async function openTypedSketch(page: Page): Promise<void> {
   test.skip(
     discovered.practice === null,
@@ -164,6 +165,12 @@ async function openTypedSketch(page: Page): Promise<void> {
   await resetSketchPages(page);
   await wipeActiveSketchSurface(page);
   await setSketchMode(page, "Type");
+  // Focus mode's Type starts line 1 with a live field and raises the
+  // keyboard (revision spec section 7), which would cover the pane a test
+  // taps next. Draw drops the untouched line; each test sets Type again
+  // from the split toolbar, which only sets the mode.
+  await hideMathKeyboard(page);
+  await setSketchMode(page, "Draw");
 }
 
 /**
@@ -216,6 +223,10 @@ async function condense(page: Page) {
     bottomBox.y + bottomBox.height / 2,
   );
   await expect(sketchPageChips(page).nth(1)).toHaveAttribute("aria-checked", "true");
+
+  // The split toolbar's Type sets the active (bottom) page's mode; the
+  // paper tap in startTypedLine starts the line.
+  await setSketchMode(page, "Type");
 
   // Second tap starts line 1 in the bottom pane and mounts the math field.
   await startTypedLine(page, 1);
@@ -330,6 +341,7 @@ test("the peek header's page select keeps the keyboard and the condensed layout"
     bottomBox.y + bottomBox.height / 2,
   );
   await expect(sketchPageChips(page).nth(1)).toHaveAttribute("aria-checked", "true");
+  await setSketchMode(page, "Type");
   await startTypedLine(page, 1);
   await showMathKeyboard(page);
   const more = page.getByRole("button", { name: "More", exact: true });
@@ -362,6 +374,7 @@ test("typing in the top pane leaves the layout alone", async ({ page }) => {
 
   // The split fills from the active page, so Page 1 is already active in
   // the TOP pane; one tap starts its line.
+  await setSketchMode(page, "Type");
   await startTypedLine(page, 0);
   await showMathKeyboard(page);
 
@@ -374,27 +387,14 @@ test("typing in the top pane leaves the layout alone", async ({ page }) => {
   await hideMathKeyboard(page);
 });
 
-test("unsplit typing pads the layer and keeps the active line above the keyboard", async ({
+test("unsplit typing fills the strip and keeps the active line in view above the keyboard", async ({
   page,
 }) => {
   await openTypedSketch(page);
-  // Pinned, and pinned to GRAPH specifically (D-190). Normalization manages
-  // page count and surface CONTENT but never surface CHOICE, and
-  // servePracticeProblem serves whichever of the pooled problems the API
-  // returns, so this test used to inherit whatever background that problem
-  // was last left on. That decided the result outright rather than jittering
-  // it: on graph the rail costs 141px, leaving the layer exactly as tall as
-  // the keyboard, and the assertion below is then UNSATISFIABLE, not slow
-  // (measured 664 against a 447 ceiling, with the scroll a correct no-op
-  // over a zero band). Off graph it passed. With 3 of the 4 pooled problems
-  // sitting on graph, and this file's first test flipping another one onto
-  // graph every run, it read as a 1-in-4 flake that was quietly ratcheting
-  // toward always failing.
-  //
-  // Graph is the right pin because it is the case that was broken: the rail
-  // now yields its height to the keyboard (Sketchpad.tsx), so this covers
-  // that fix rather than steering around it. Plain would have been green
-  // for the wrong reason.
+  // The strip (revision spec section 7) sits under the page bar, so the
+  // keyboard cannot cover it, and this test proves the strip rather than
+  // the retired paper padding. The Graph pin and the re-wipe after the
+  // switch stay (content is per surface).
   //
   // Wiped AFTER the switch, unlike the first test in this file, which sets
   // Graph and stops because it never counts lines. Content is per SURFACE
@@ -410,31 +410,12 @@ test("unsplit typing pads the layer and keeps the active line above the keyboard
   // as its own last step.
   await setSketchMode(page, "Type");
 
-  await startTypedLine(page);
-  // Grow the stack line by line so the fix has something to scroll. Each
-  // Enter commits through the math field and activates the new line, so the
-  // count assertion also serializes the presses.
-  //
-  // startTypedLine's own postcondition only waits for the math-field
-  // element to EXIST (math-field count 1), not for it to hold real DOM
-  // focus: MathfieldElement's autoFocus lands actual focus asynchronously,
-  // confirmed by direct polling of document.activeElement during diagnosis
-  // to land roughly 100ms after the element appears. This is not one-time
-  // startup cost, either: it recurs on EVERY new active line, because each
-  // one mounts a fresh MathField instance (a new line.id, hence a new React
-  // key, hence a new autoFocus mount) as the previous one unmounts. A
-  // physical Enter sent into that gap lands on the surrounding
-  // [data-sketchpad] container (tabIndex -1, no Enter handling) and is
-  // silently swallowed rather than committing a line, and nothing else will
-  // retry it: the loop only sends its NEXT key after the count assertion
-  // passes, so a swallowed Enter deadlocks the wait rather than slowing it
-  // down. Waiting for real focus before every press (not just the first)
-  // closes the race without changing startTypedLine's own contract, which
-  // the other four tests still rely on as originally specified.
+  const rows = page.locator("[data-typed-work-strip] li");
+  await expect(rows).toHaveCount(1);
   for (let count = 2; count <= 12; count += 1) {
     await expect(page.locator("math-field")).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(page.locator("[data-typed-lines] li")).toHaveCount(count);
+    await expect(rows).toHaveCount(count);
   }
   await showMathKeyboard(page);
 
@@ -447,41 +428,15 @@ test("unsplit typing pads the layer and keeps the active line above the keyboard
   });
   expect(kbHeight).toBeGreaterThan(0);
 
-  // The scroller carries the inset as bottom padding...
-  await expect
-    .poll(
-      () =>
-        page.evaluate(() => {
-          const layer = document.querySelector("[data-typed-lines]");
-          return layer ? Number.parseFloat(getComputedStyle(layer).paddingBottom) : -1;
-        }),
-      { message: "The typed-lines layer never picked up the keyboard inset." },
-    )
-    .toBeGreaterThanOrEqual(kbHeight - 1);
-
-  // ...and the active line sits fully above the keyboard's top edge. Polled,
-  // not a one-shot read: the padding above lands synchronously with React's
-  // render, but the SCROLL position is a separate effect driven off a
-  // ResizeObserver callback (TypedLinesLayer.tsx), which settles on its own
-  // later tick. A bare boundingBox() taken the instant the padding poll
-  // resolves can catch the scroll mid-flight (observed: 787px against a
-  // 622px ceiling on an otherwise passing run), which is a race in reading
-  // the assertion, not evidence the rescroll itself is wrong; the mutation
-  // table below already proves this exact condition catches a genuinely
-  // broken rescroll (the no-op mutation left the line at 844px, same
-  // symptom, for the real reason).
-  const activeLine = page.locator("[data-active-line]");
+  // The whole strip sits above the keyboard's top edge...
   const viewport = page.viewportSize();
   if (!viewport) throw new Error("No viewport size to measure against.");
-  await expect
-    .poll(
-      async () => {
-        const box = await activeLine.boundingBox();
-        return box ? box.y + box.height : Number.POSITIVE_INFINITY;
-      },
-      { message: "The active line never settled above the keyboard's top edge." },
-    )
-    .toBeLessThanOrEqual(viewport.height - kbHeight + 1);
+  const stripBox = await page.locator("[data-typed-work-strip]").boundingBox();
+  if (!stripBox) throw new Error("The strip has no box.");
+  expect(stripBox.y + stripBox.height).toBeLessThanOrEqual(viewport.height - kbHeight + 1);
+
+  // ...and the active line sits inside the rows scroller's visible band.
+  await expectActiveLineInStrip(page);
 
   await hideMathKeyboard(page);
 });
@@ -522,6 +477,9 @@ test("a simulated OS keyboard ignores the rename field but still condenses for a
   }, OS_KEYBOARD_PX);
 
   await openTypedSketch(page);
+  // Direction (a) needs no field yet, so the helper's own Draw mode and
+  // hidden keyboard already satisfy it; the split toolbar's Type below sets
+  // the mode without starting a line for direction (b).
   await setSketchSplit(page, 2);
   const canvases = page.getByRole("img", { name: /^Scratch canvas/ });
   await expect(canvases).toHaveCount(2);
@@ -580,6 +538,10 @@ test("a simulated OS keyboard ignores the rename field but still condenses for a
   // unconditional mlBottom branch regardless of this task's change, so it
   // is explicitly hidden first: any condense observed after that can only
   // be the OS branch itself recognizing MATH-FIELD.
+  //
+  // In split, the toolbar's Type only sets the active (bottom) page's mode;
+  // the paper tap in startTypedLine starts the line.
+  await setSketchMode(page, "Type");
   await startTypedLine(page, 1);
   await waitForSettledMathFieldFocus(page);
   await page.evaluate(() => {

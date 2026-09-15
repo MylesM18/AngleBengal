@@ -4,24 +4,27 @@ import { STORAGE_STATE } from "./constants";
 import { discoverRoutes, type DiscoveredRoutes } from "./helpers/routes";
 import {
   drawSketchStroke,
+  expectActiveLineInStrip,
   expectSketchStrokeCount,
   hideMathKeyboard,
   mathFieldValue,
   openCleanSketch,
+  openPlotSheet,
   recordUnhandledRejections,
   resetSketchPages,
+  setSketchBackground,
   setSketchMode,
   sketchCanvas,
-  startTypedLine,
   wipeActiveSketchSurface,
 } from "./helpers/sketch";
 
 /**
  * Board focus mode, revision PR 2 (docs/superpowers/specs/
- * 2026-09-12-board-focus-mode-revision-design.md sections 4, 5 and 8): the
- * compact unsplit overlay's Undo and Redo arrows, the Background group in
- * the focus bar, and Delete line in a typed line's math field menu. Runs on
- * both mobile projects (the desktop project matches desktop-*.spec.ts only).
+ * 2026-09-12-board-focus-mode-revision-design.md sections 4, 5, 6, 7 and 8):
+ * the compact unsplit overlay's Undo and Redo arrows, the Background group
+ * in the focus bar, Delete line in a typed line's math field menu, and the
+ * typed-work strip under the page bar. Runs on both mobile projects (the
+ * desktop project matches desktop-*.spec.ts only).
  *
  * Every test starts from a served problem, one clean "Page 1" and a wiped
  * surface, because pages and their content are per-problem persisted work
@@ -160,16 +163,15 @@ test.describe("background in the focus bar", () => {
 });
 
 test.describe("Delete line in the math field menu", () => {
-  test("removes the active line, hands the cursor up, and typing still works after", async ({
+  test("removes the active line, hands the cursor up, returns to Draw on the last one, and typing still works after", async ({
     page,
   }) => {
     const unhandled = await recordUnhandledRejections(page);
-    const lines = page.locator("[data-typed-lines] ol li");
+    const lines = page.locator("[data-typed-work-strip] li");
     const field = page.locator("math-field");
 
     await openCleanSketch(page, discovered, "Plain");
     await setSketchMode(page, "Type");
-    await startTypedLine(page);
     await expect(field).toBeFocused();
     await page.keyboard.type("x=1");
     await expect.poll(() => mathFieldValue(page)).toBe("x=1");
@@ -184,15 +186,17 @@ test.describe("Delete line in the math field menu", () => {
     await expect(lines).toHaveCount(1);
     await expect.poll(() => mathFieldValue(page)).toBe("x=1");
 
-    // Deleting the only line leaves the empty-page hint and no live field.
+    // Deleting the only line hands the page back to Draw and unmounts the strip.
     await deleteLineFromMenu(page);
-    await expect(lines).toHaveCount(0);
+    await expect(page.locator("[data-typed-work-strip]")).toHaveCount(0);
     await expect(field).toHaveCount(0);
-    await expect(page.getByText("Tap the paper to start line 1")).toBeVisible();
+    await expect(
+      page.getByRole("group", { name: "Mode" }).getByRole("button", { name: "Draw", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
 
     // MathLive lowers its keyboard 300ms after the last field's focusout, and
-    // until then the keyboard covers the paper where startTypedLine taps, for
-    // a finger as much as for the rig. Wait for MathLive's own hide.
+    // until then the keyboard covers the Type button the re-entry below taps,
+    // for a finger as much as for the rig. Wait for MathLive's own hide.
     await expect
       .poll(
         () =>
@@ -206,7 +210,7 @@ test.describe("Delete line in the math field menu", () => {
 
     // The D-188 failure mode: after the teardowns, a new field still takes
     // focus and input.
-    await startTypedLine(page);
+    await setSketchMode(page, "Type");
     await expect(field).toBeFocused();
     await page.keyboard.type("z");
     await expect.poll(() => mathFieldValue(page)).toBe("z");
@@ -214,5 +218,247 @@ test.describe("Delete line in the math field menu", () => {
     expect(await unhandled(), "MathLive threw around the menu deletions.").toEqual([]);
     await hideMathKeyboard(page);
     await wipeActiveSketchSurface(page);
+  });
+});
+
+test.describe("typed strip", () => {
+  const strip = (page: Page) => page.locator("[data-typed-work-strip]");
+  const rows = (page: Page) => page.locator("[data-typed-work-strip] li");
+  const modeButton = (page: Page, label: "Draw" | "Type") =>
+    page.getByRole("group", { name: "Mode" }).getByRole("button", { name: label, exact: true });
+
+  test("typing lands in the strip and never on the paper, on every background", async ({
+    page,
+  }) => {
+    const unhandled = await recordUnhandledRejections(page);
+    const field = page.locator("math-field");
+    await openCleanSketch(page, discovered, "Plain");
+
+    for (const background of ["Plain", "Grid", "Graph"] as const) {
+      await setSketchBackground(page, background);
+      // Content is per surface: empty the one this pass types on.
+      await wipeActiveSketchSurface(page);
+      await expect(strip(page)).toHaveCount(0);
+
+      // Type starts line 1 itself; there is no paper layer to tap.
+      await setSketchMode(page, "Type");
+      await expect(rows(page)).toHaveCount(1);
+      await expect(page.locator("[data-typed-lines]")).toHaveCount(0);
+      await expect(field).toBeFocused();
+      await page.keyboard.type("x=1");
+      await expect.poll(() => mathFieldValue(page)).toBe("x=1");
+      await page.keyboard.press("Enter");
+      await expect(rows(page)).toHaveCount(2);
+      await expect(field).toBeFocused();
+
+      // Draw keeps the line with content, drops the untouched trailing line,
+      // and leaves no live field.
+      await hideMathKeyboard(page);
+      await setSketchMode(page, "Draw");
+      await expect(rows(page)).toHaveCount(1);
+      await expect(field).toHaveCount(0);
+      await expect(rows(page).getByRole("button", { name: "Edit solution line 1" })).toBeEnabled();
+
+      // Type again: the last line has content, so a new trailing line opens.
+      await setSketchMode(page, "Type");
+      await expect(rows(page)).toHaveCount(2);
+      await expect(field).toBeFocused();
+      await expect.poll(() => mathFieldValue(page)).toBe("");
+
+      // A static line tapped from Draw mode re-enters typing on that line.
+      await hideMathKeyboard(page);
+      await setSketchMode(page, "Draw");
+      await rows(page).getByRole("button", { name: "Edit solution line 1" }).click();
+      await expect(modeButton(page, "Type")).toHaveAttribute("aria-pressed", "true");
+      await expect.poll(() => mathFieldValue(page)).toBe("x=1");
+
+      await hideMathKeyboard(page);
+      await wipeActiveSketchSurface(page);
+      await expect(strip(page)).toHaveCount(0);
+    }
+
+    expect(await unhandled(), "MathLive threw around the strip.").toEqual([]);
+  });
+
+  test("an untouched Type tap leaves nothing behind", async ({ page }) => {
+    await openCleanSketch(page, discovered, "Grid");
+    await setSketchMode(page, "Type");
+    await expect(rows(page)).toHaveCount(1);
+    await expect(page.locator("math-field")).toBeFocused();
+    await hideMathKeyboard(page);
+    await setSketchMode(page, "Draw");
+    await expect(strip(page)).toHaveCount(0);
+    await expect(page.locator("math-field")).toHaveCount(0);
+  });
+
+  test("Backspace keeps a lone empty line and removes an empty second one", async ({ page }) => {
+    const field = page.locator("math-field");
+    await openCleanSketch(page, discovered, "Plain");
+    await setSketchMode(page, "Type");
+    await expect(field).toBeFocused();
+    await page.keyboard.press("Backspace");
+    await expect(rows(page)).toHaveCount(1);
+    await expect(field).toBeFocused();
+
+    await page.keyboard.type("a");
+    await expect.poll(() => mathFieldValue(page)).toBe("a");
+    await page.keyboard.press("Enter");
+    await expect(rows(page)).toHaveCount(2);
+    await expect(field).toBeFocused();
+    await page.keyboard.press("Backspace");
+    await expect(rows(page)).toHaveCount(1);
+    await expect.poll(() => mathFieldValue(page)).toBe("a");
+
+    await hideMathKeyboard(page);
+    await wipeActiveSketchSurface(page);
+  });
+
+  test("shows at most three rows and keeps the active line in view", async ({ page }) => {
+    const field = page.locator("math-field");
+    await openCleanSketch(page, discovered, "Plain");
+    await setSketchMode(page, "Type");
+    for (let count = 2; count <= 6; count += 1) {
+      // Each new line mounts a fresh field whose focus lands asynchronously;
+      // an Enter sent before that is swallowed (condense spec precedent).
+      await expect(field).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(rows(page)).toHaveCount(count);
+    }
+
+    const scroller = page.locator("[data-typed-work-rows]");
+    const scrollerBox = await scroller.boundingBox();
+    if (!scrollerBox) throw new Error("The strip's rows scroller has no box.");
+    expect(scrollerBox.height, "The strip shows more than three rows.").toBeLessThanOrEqual(
+      3 * 38 + 8 + 1,
+    );
+    await expectActiveLineInStrip(page);
+
+    // A non-append activation must scroll the cursor line fully into view:
+    // the scroller, not the sketchpad root, is the rows' offsetParent.
+    await hideMathKeyboard(page);
+    await rows(page).getByRole("button", { name: "Edit solution line 1" }).click();
+    await expect(rows(page).nth(0)).toHaveAttribute("data-active-line", "");
+    await expectActiveLineInStrip(page);
+    await expect(field).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(rows(page)).toHaveCount(7);
+    await expect(rows(page).nth(1)).toHaveAttribute("data-active-line", "");
+    await expectActiveLineInStrip(page);
+
+    // Deleting a line at the top of the band hands the cursor to the line
+    // above it, which must scroll into view rather than sit hidden above
+    // the band: line 7 at the bottom shows 5 to 7, then line 5 goes.
+    await hideMathKeyboard(page);
+    await rows(page).getByRole("button", { name: "Edit solution line 7" }).click();
+    await expect(rows(page).nth(6)).toHaveAttribute("data-active-line", "");
+    await expectActiveLineInStrip(page);
+    await hideMathKeyboard(page);
+    await rows(page).getByRole("button", { name: "Edit solution line 5" }).click();
+    await expect(rows(page).nth(4)).toHaveAttribute("data-active-line", "");
+    await expectActiveLineInStrip(page);
+    await deleteLineFromMenu(page);
+    await expect(rows(page)).toHaveCount(6);
+    await expect(rows(page).nth(3)).toHaveAttribute("data-active-line", "");
+    await expectActiveLineInStrip(page);
+
+    await hideMathKeyboard(page);
+    await wipeActiveSketchSurface(page);
+  });
+});
+
+/** The graph layer's own count, the one signal that an object was placed. */
+function graphPaper(page: Page) {
+  return page.getByRole("application", { name: /^Graph paper\./ });
+}
+
+test.describe("Plot sheet", () => {
+  test("Plot shows only on Graph, opens the sheet, and no rail mounts", async ({ page }) => {
+    await openCleanSketch(page, discovered, "Graph");
+    const overlay = page.locator("[data-sketch-overlay]");
+    const plot = overlay.getByRole("button", { name: "Plot", exact: true });
+    await expect(plot).toBeVisible();
+    await expect(plot).toHaveAttribute("aria-expanded", "false");
+    // No rail: the scale group exists only inside the sheet.
+    await expect(overlay.getByRole("group", { name: "Units per grid square" })).toHaveCount(0);
+
+    const sheet = await openPlotSheet(page);
+    await expect(plot).toHaveAttribute("aria-expanded", "true");
+    const scale = sheet.getByRole("group", { name: "Units per grid square" });
+    await expect(scale).toBeVisible();
+    await scale.getByRole("button", { name: "2", exact: true }).click();
+    await expect(scale.getByRole("button", { name: "2", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(sheet, "A scale pick closed the sheet.").toBeVisible();
+
+    // Every control in the sheet takes a tap at its own center (D-071).
+    for (const button of await sheet.getByRole("button").all()) {
+      expect(
+        await button.evaluate((el) => {
+          const rect = el.getBoundingClientRect();
+          const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+          return hit === el || el.contains(hit);
+        }),
+        `Another element sits on top of the sheet's "${await button.textContent()}" button.`,
+      ).toBe(true);
+    }
+
+    // Leave the shared database as found.
+    await scale.getByRole("button", { name: "1", exact: true }).click();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+    await expect(plot).toHaveAttribute("aria-expanded", "false");
+
+    await setSketchBackground(page, "Plain");
+    await expect(plot).toHaveCount(0);
+    await setSketchBackground(page, "Graph");
+    await expect(plot).toBeVisible();
+  });
+
+  test("a tool armed from the sheet places on the board, the chip names it, Stop placing disarms", async ({
+    page,
+  }) => {
+    await openCleanSketch(page, discovered, "Graph");
+    await expect(graphPaper(page)).toHaveAttribute("aria-label", "Graph paper. 0 objects placed.");
+    const sheet = await openPlotSheet(page);
+    const tools = sheet.getByRole("group", { name: "Tools" });
+    test.skip(
+      (await tools.count()) === 0,
+      "SKIPPED: the served problem's toolset declares no graph tools, so the sheet has no Tools group.",
+    );
+    const plot = page.getByRole("button", { name: "Plot", exact: true });
+
+    await tools.getByRole("button", { name: "Point", exact: true }).click();
+    await expect(sheet).toBeHidden();
+    const chip = page.getByRole("status", { name: "Plot tool" });
+    await expect(chip).toContainText("Point");
+
+    // The chip stays clear of the mode column on a 360px phone.
+    await page.setViewportSize({ width: 360, height: 800 });
+    const chipBox = await chip.boundingBox();
+    const modeBox = await page.getByRole("group", { name: "Mode" }).boundingBox();
+    if (!chipBox || !modeBox) throw new Error("The chip or the mode column has no box.");
+    expect(chipBox.x + chipBox.width, "The armed chip runs into the mode column.").toBeLessThanOrEqual(
+      modeBox.x,
+    );
+
+    // A board tap places through GraphLayer.
+    const paperBox = await graphPaper(page).boundingBox();
+    if (!paperBox) throw new Error("The graph paper has no box.");
+    await page.mouse.click(paperBox.x + paperBox.width / 2, paperBox.y + paperBox.height / 2);
+    await expect(graphPaper(page)).toHaveAttribute("aria-label", "Graph paper. 1 object placed.");
+    await expect(chip, "Placing a point disarmed the tool.").toContainText("Point");
+
+    await chip.getByRole("button", { name: "Stop placing" }).click();
+    await expect(chip).toHaveCount(0);
+    await expect(plot).toHaveAttribute("aria-expanded", "false");
+
+    // Leave the shared database as found.
+    await page
+      .getByRole("group", { name: "History" })
+      .getByRole("button", { name: "Undo", exact: true })
+      .click();
+    await expect(graphPaper(page)).toHaveAttribute("aria-label", "Graph paper. 0 objects placed.");
   });
 });

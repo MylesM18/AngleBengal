@@ -635,6 +635,105 @@ describe("typed solution lines", () => {
   });
 });
 
+describe("startTyping", () => {
+  it("flips the page to type mode and starts line 1 on an empty surface", () => {
+    const store_ref = useSketchStore.getState();
+    const pageId = store_ref.activePageId;
+    store().setMode(pageId, "draw");
+    store().startTyping(pageId);
+    const state = useSketchStore.getState();
+    const page_ref = state.pages[pageId];
+    expect(page_ref.mode).toBe("type");
+    expect(page_ref.content[page_ref.surface].typedLines).toHaveLength(1);
+    expect(state.activeLineId).toBe(page_ref.content[page_ref.surface].typedLines[0].id);
+  });
+
+  it("opens a new trailing line when the last line has content", () => {
+    const store_ref = useSketchStore.getState();
+    const pageId = store_ref.activePageId;
+    const first = store().addTypedLineAfter(pageId, null);
+    store().updateTypedLine(pageId, first, "x=1");
+    store().startTyping(pageId);
+    const page_ref = useSketchStore.getState().pages[pageId];
+    const lines = page_ref.content[page_ref.surface].typedLines;
+    expect(lines.map((line) => line.latex)).toEqual(["x=1", ""]);
+    expect(useSketchStore.getState().activeLineId).toBe(lines[1].id);
+  });
+
+  it("re-activates an empty last line instead of adding another", () => {
+    const store_ref = useSketchStore.getState();
+    const pageId = store_ref.activePageId;
+    const only = store().addTypedLineAfter(pageId, null);
+    store().setActiveLine(null);
+    store().startTyping(pageId);
+    const page_ref = useSketchStore.getState().pages[pageId];
+    expect(page_ref.content[page_ref.surface].typedLines).toHaveLength(1);
+    expect(useSketchStore.getState().activeLineId).toBe(only);
+  });
+
+  it("is a no-op for an unknown page", () => {
+    const before = useSketchStore.getState();
+    before.startTyping("nope");
+    expect(useSketchStore.getState()).toBe(before);
+  });
+});
+
+describe("discardEmptyTypedLines", () => {
+  it("drops blank and whitespace-only lines and keeps the rest in order", () => {
+    const store_ref = useSketchStore.getState();
+    const pageId = store_ref.activePageId;
+    const a = store().addTypedLineAfter(pageId, null);
+    const b = store().addTypedLineAfter(pageId, a);
+    const c = store().addTypedLineAfter(pageId, b);
+    store().updateTypedLine(pageId, a, "x=1");
+    store().updateTypedLine(pageId, b, "   ");
+    store().updateTypedLine(pageId, c, "y=2");
+    store().discardEmptyTypedLines(pageId);
+    const page_ref = useSketchStore.getState().pages[pageId];
+    expect(page_ref.content[page_ref.surface].typedLines.map((line) => line.id)).toEqual([a, c]);
+  });
+
+  it("clears activeLineId when it named a dropped line, and keeps it otherwise", () => {
+    const store_ref = useSketchStore.getState();
+    const pageId = store_ref.activePageId;
+    const kept = store().addTypedLineAfter(pageId, null);
+    store().updateTypedLine(pageId, kept, "x=1");
+    const dropped = store().addTypedLineAfter(pageId, kept);
+    expect(useSketchStore.getState().activeLineId).toBe(dropped);
+    store().discardEmptyTypedLines(pageId);
+    expect(useSketchStore.getState().activeLineId).toBeNull();
+
+    store().setActiveLine(kept);
+    store().addTypedLineAfter(pageId, kept);
+    store().setActiveLine(kept);
+    store().discardEmptyTypedLines(pageId);
+    expect(useSketchStore.getState().activeLineId).toBe(kept);
+  });
+
+  it("returns the same state when nothing is blank", () => {
+    const store_ref = useSketchStore.getState();
+    const pageId = store_ref.activePageId;
+    const a = store().addTypedLineAfter(pageId, null);
+    store().updateTypedLine(pageId, a, "x=1");
+    const before = useSketchStore.getState();
+    before.discardEmptyTypedLines(pageId);
+    expect(useSketchStore.getState()).toBe(before);
+  });
+
+  it("touches only the page's ACTIVE surface", () => {
+    const store_ref = useSketchStore.getState();
+    const pageId = store_ref.activePageId;
+    store().setSurface(pageId, "grid");
+    store().addTypedLineAfter(pageId, null);
+    store().setSurface(pageId, "blank");
+    store().addTypedLineAfter(pageId, null);
+    store().discardEmptyTypedLines(pageId);
+    const page_ref = useSketchStore.getState().pages[pageId];
+    expect(page_ref.content.blank.typedLines).toHaveLength(0);
+    expect(page_ref.content.grid.typedLines).toHaveLength(1);
+  });
+});
+
 describe("setCanvasSize and refSize (A15)", () => {
   it("records the size by page id and updates refSize while unsplit", () => {
     const id = activeId();

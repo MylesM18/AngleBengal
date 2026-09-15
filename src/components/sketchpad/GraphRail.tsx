@@ -4,31 +4,9 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { commitGraphPoint, useJsxGraph } from "@/components/sketchpad/GraphLayer";
 import { parseCoordinate } from "@/lib/sketch/graphCoords";
+import { GRAPH_STEPS, GRAPH_TOOL_LABELS } from "@/lib/sketch/graphTools";
 import { activePage, useSketchStore, type GraphRailTool } from "@/lib/sketch/store";
 import { cx } from "@/lib/cx";
-
-const TOOL_LABELS: Record<GraphRailTool, string> = {
-  point: "Point",
-  line: "Line",
-  ray: "Ray",
-  segment: "Segment",
-  circle: "Circle",
-  parabola: "Parabola",
-  dashed: "Dashed",
-  shade: "Shade",
-  eraser: "Eraser",
-};
-
-/** Units per grid square (D-127). A finer step zooms in: snap, click-to-place,
- *  and axis labels all follow, which is the owner's post-launch request for
- *  adjustable coordinate accuracy. */
-const GRAPH_STEPS: { value: number; label: string }[] = [
-  { value: 0.25, label: "1/4" },
-  { value: 0.5, label: "1/2" },
-  { value: 1, label: "1" },
-  { value: 2, label: "2" },
-  { value: 5, label: "5" },
-];
 
 /**
  * The graph second row (spec Q4): the owner's explicit, scoped bend of the
@@ -131,7 +109,7 @@ export function GraphRail() {
             graphTool === tool ? "border-ink bg-paper-0 text-ink" : "border-ink-faint text-ink",
           )}
         >
-          {TOOL_LABELS[tool]}
+          {GRAPH_TOOL_LABELS[tool]}
         </button>
       ))}
       {hasTools && (

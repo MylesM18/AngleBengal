@@ -39,6 +39,7 @@ export function FocusBar({
   const activePageId = useSketchStore((state) => state.activePageId);
   const background = useSketchStore((state) => activePage(state).surface);
   const setSurface = useSketchStore((state) => state.setSurface);
+  const discardEmptyTypedLines = useSketchStore((state) => state.discardEmptyTypedLines);
   const [open, setOpen] = useState<"problem" | "overflow" | null>(null);
   const problemTitleId = useId();
   const problemPanelRef = useRef<HTMLDivElement>(null);
@@ -78,7 +79,12 @@ export function FocusBar({
               type="button"
               role="radio"
               aria-checked={checked}
-              onClick={() => setSurface(activePageId, value)}
+              onClick={() => {
+                // Leaving a surface drops its untouched line the way Draw does,
+                // so a blank row never waits behind the user's back (D-199).
+                discardEmptyTypedLines(activePageId);
+                setSurface(activePageId, value);
+              }}
               className={chipClasses({ variant: "toggle", active: checked })}
             >
               {label}

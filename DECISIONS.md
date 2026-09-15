@@ -3843,3 +3843,48 @@ line left MathLive counting a removed field as focused, where D-188's blur
 cannot settle it, so the keyboard stayed up over an empty page. With the
 override tied to focusin, the container stays inert under a coarse pointer
 until the sink holds focus, so a tap cannot open the menu in that gap.
+
+### D-198. Focus mode's graph tools live in a Plot sheet, and the rail's keyboard rule retires
+
+On the compact unsplit overlay the kraft GraphRail no longer mounts. A Plot
+button joins Draw and Type at the bottom right while the active page is on
+graph paper; it opens a bottom sheet under a scrim holding the served
+problem's tools plus Eraser, the Exact point inputs, and the "1 sq =" scale,
+with the rail's labels, gating and hints. Arming a tool closes the sheet and
+an armed chip names the tool with a Stop placing button; the chip sits
+centered above the bottom row rather than on it, because the Undo and Redo
+arrows and the mode column already own both corners and a chip that also
+carries the "First point set" hint does not fit between them on a 360px
+phone. Desktop and split keep the rail unchanged. D-190's
+railYieldsToKeyboard rule only ever applied to compact unsplit, which is
+focus mode, so with the rail gone there it became unreachable and is
+removed; its test now proves the typed strip (D-199). Owner feedback items
+1 and 2 of the revision spec.
+
+### D-199. Typed work lives in a strip under the page bar in focus mode
+
+TypedLinesLayer does not mount in focus mode on any background. A TypedWorkStrip
+renders between PageBar and the board while the active surface holds at least one
+typed line: at most three rows visible, more scrolling inside with the active line
+kept in view, the symbol palette below the rows while a line is live. The line
+rows, the palette and the keep-in-view scrolling moved into a shared
+TypedLineList, so the paper shell's DOM on desktop and split is unchanged. With no
+paper to tap, the Type button applies the paper's tap rule through the store's
+startTyping (no lines, start line 1; the last line has content, open a trailing
+line; it is empty, activate it), and Draw drops blank lines first through
+discardEmptyTypedLines so an untouched Type tap leaves nothing behind. Backspace
+on a lone empty line keeps it, so one press too many cannot close the keyboard;
+Delete line on the last line hands the page back to Draw. Switching background
+from the focus bar drops the blank line the same way, so a surface never keeps an
+untouched line behind the user's back. Owner feedback item 1 of the revision spec,
+in the top strip the owner chose.
+
+### D-200. Revision PR 3 and PR 4 ship as one PR
+
+The revision rollout planned the Plot sheet (PR 3) and the typed strip (PR
+4) as separate PRs, each planned only after its predecessor merged. On
+2026-09-14 the owner asked for both at once, pointing at the rail's space
+as where typed values belong. Shipping the sheet alone would have removed
+the rail and left typing on the paper, the exact state the owner objected
+to twice, so the two sections landed together, each with its own tasks,
+tests and entry.
