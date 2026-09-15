@@ -152,12 +152,30 @@ with:
     "true",
   );
   await expect(plain).toBeFocused();
-  await page.keyboard.press("ArrowLeft");
-  await expect(graph).toHaveAttribute("aria-checked", "true");
-  await expect(graph).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  const grid = backgrounds.getByRole("radio", { name: "Grid", exact: true });
+  await expect(grid).toHaveAttribute("aria-checked", "true");
+  await expect(grid).toBeFocused();
+  // Deliberately NOT arrowed back to Graph: re-mounting graph paper while
+  // this popover is open makes the Escape below close the whole sketch or
+  // drop focus instead of restoring it to More (a real race, bisected in
+  // the rig hardening ledger and filed for the owner; the split toolbar
+  // does not show it). The page goes back to Graph after the keyboard
+  // hides, at the end of this test, so the tests after it see what they
+  // saw before.
 ```
 
 Graph is the checked value here because this test's `openTypedSketch` path leaves the page on whatever it hydrated with, so do NOT assume it. If the `toHaveAttribute("aria-checked", "true")` on `graph` fails at the first assertion, the page was not on Graph: set it explicitly by inserting `await setSketchBackground(page, "Graph");` between `await openTypedSketch(page);` and `await condense(page);` (the sibling test at `:242` already does exactly that, with its reasoning at `:246-256`), then re-run. `setSketchBackground` is already imported in this file (`:13`).
+
+Then, at the very END of the same test, directly after its final `await hideMathKeyboard(page);` and before the closing `});`, add:
+
+```ts
+  // Back to Graph now that the popover is closed and the layout restored,
+  // so the rest of the file starts from the surface it always started from.
+  await setSketchBackground(page, "Graph");
+```
+
+Why the sequence ends on Grid rather than arrowing back to Graph: the first implementer ran the brief-exact block (ArrowRight to Plain, ArrowLeft back to Graph) four times and it failed every time, never on the new assertions, always on the test's pre-existing Escape and focus-restore assertions that follow (`[data-sketch-overlay]` gone, or the More button `inactive`). A controlled bisection on pixel-chromium showed the single trigger is arrowing BACK to the starting value, which re-mounts graph paper while the popover is open: focus alone passes, one arrow to Plain passes, two arrows ending on Grid pass, only the round trip fails. That is a pre-existing product race, out of this PR's scope, recorded in the ledger and filed for the owner; this test must not paper over it, so it avoids the round trip and states why.
 
 - [ ] **Step 3: Run both and see them GREEN (characterization, not TDD red).**
 
