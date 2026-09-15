@@ -91,7 +91,7 @@ for (const width of COMPACT_WIDTHS) {
       ).toEqual([]);
     });
 
-    test("compact sketch mode: the toolbar and graph rail own their hit areas", async ({
+    test("compact sketch mode: the toolbar and Plot button own their hit areas", async ({
       page,
     }) => {
       test.skip(
