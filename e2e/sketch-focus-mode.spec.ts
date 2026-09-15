@@ -333,8 +333,9 @@ test.describe("typed strip", () => {
     );
     await expectActiveLineInStrip(page);
 
-    // A non-append activation must scroll the cursor line fully into view:
-    // the scroller, not the sketchpad root, is the rows' offsetParent.
+    // A non-append activation must scroll the cursor line fully into view.
+    // The line's top is measured from rects inside the scroller, so this
+    // holds without the strip positioning anything (D-201).
     await hideMathKeyboard(page);
     await rows(page).getByRole("button", { name: "Edit solution line 1" }).click();
     await expect(rows(page).nth(0)).toHaveAttribute("data-active-line", "");

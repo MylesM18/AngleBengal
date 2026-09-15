@@ -7,7 +7,7 @@ import { MathField, useMathLive } from "@/components/math/MathField";
 import { SymbolPalette } from "@/components/math/SymbolPalette";
 import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { TYPED_LINE_HEIGHT } from "@/lib/sketch/render";
-import { typedLinesScrollTop } from "@/lib/sketch/condense";
+import { typedLineTopInScroller, typedLinesScrollTop } from "@/lib/sketch/condense";
 import { useSketchStore, useSurfaceContent } from "@/lib/sketch/store";
 
 /**
@@ -153,9 +153,9 @@ export function TypedLinePalette({
  * assignment, not smooth scrolling: deterministic for the e2e rig and never
  * fights the user's own scroll.
  *
- * Precondition: the scroller is positioned (relative or absolute), so it is
- * the rows' offsetParent and line.offsetTop is measured inside its scroll
- * content.
+ * The line's top comes from rects through typedLineTopInScroller, so the
+ * shells are free to position their scroller or not; a scroller inside a
+ * split pane's scaled wrapper is handled there too (D-201).
  */
 export function useKeepActiveLineInView({
   scrollerRef,
@@ -172,11 +172,22 @@ export function useKeepActiveLineInView({
     if (!scroller || !line) return;
 
     const sync = () => {
+      const lineRect = line.getBoundingClientRect();
+      const scrollerRect = scroller.getBoundingClientRect();
       const next = typedLinesScrollTop({
         scrollTop: scroller.scrollTop,
         clientHeight: scroller.clientHeight,
         insetBottom,
-        lineTop: line.offsetTop,
+        lineTop: typedLineTopInScroller({
+          lineRectTop: lineRect.top,
+          scrollerRectTop: scrollerRect.top,
+          scrollerRectHeight: scrollerRect.height,
+          scrollerOffsetHeight: scroller.offsetHeight,
+          scrollerClientTop: scroller.clientTop,
+          scrollTop: scroller.scrollTop,
+        }),
+        // Layout px already, and a transform does not change either: only
+        // the top needed converting.
         lineHeight: line.offsetHeight,
       });
       if (next !== scroller.scrollTop) scroller.scrollTop = next;
