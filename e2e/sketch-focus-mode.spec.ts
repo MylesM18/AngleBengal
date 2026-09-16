@@ -65,6 +65,20 @@ async function deleteLineFromMenu(page: Page): Promise<void> {
   await first.click();
 }
 
+/**
+ * The inline pointer-events D-197's override writes on the live math field's
+ * container part, "" when there is none, and a sentinel when no field is
+ * mounted at all. The container lives in the math-field's open shadow root,
+ * which Playwright's CSS locators pierce (same as the menu toggle above).
+ */
+async function containerPointerEvents(page: Page): Promise<string> {
+  const container = page.locator("math-field").locator('[part="container"]');
+  if ((await container.count()) === 0) return "no live field";
+  return container
+    .first()
+    .evaluate((el) => (el as HTMLElement).style.getPropertyValue("pointer-events"));
+}
+
 test.describe("undo and redo arrows", () => {
   test("round-trip a stroke with the right disabled states, and redo from the keyboard", async ({
     page,
@@ -160,6 +174,90 @@ test.describe("background in the focus bar", () => {
       )
       .toBe("fits");
   });
+
+  test("the Background radios are one tab stop and rove with the arrow keys", async ({ page }) => {
+    await openCleanSketch(page, discovered, "Plain");
+    const overlay = page.locator("[data-sketch-overlay]");
+    const group = overlay.getByRole("radiogroup", { name: "Background" });
+    const radio = (name: "Plain" | "Grid" | "Graph") =>
+      group.getByRole("radio", { name, exact: true });
+    // Plot mounts only while the active page is on graph paper (revision spec
+    // section 6), so it is the paper's own tell: an arrow that moved only
+    // aria-checked and not the surface would leave this hidden.
+    const plot = overlay.getByRole("button", { name: "Plot", exact: true });
+
+    // One tab stop. Asserted through tabindex rather than a literal Tab
+    // press: whether a <button> takes Tab focus is engine and OS dependent
+    // (WebKit honors Full Keyboard Access), so a traversal assertion would
+    // measure the browser rather than the component.
+    await expect(radio("Plain")).toHaveAttribute("tabindex", "0");
+    await expect(radio("Grid")).toHaveAttribute("tabindex", "-1");
+    await expect(radio("Graph")).toHaveAttribute("tabindex", "-1");
+
+    // ArrowRight moves the check, the focus, and the paper.
+    await radio("Plain").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(radio("Grid")).toHaveAttribute("aria-checked", "true");
+    await expect(radio("Grid")).toBeFocused();
+    await expect(radio("Plain")).toHaveAttribute("tabindex", "-1");
+    await expect(radio("Grid")).toHaveAttribute("tabindex", "0");
+    await expect(plot).toBeHidden();
+
+    await page.keyboard.press("ArrowRight");
+    await expect(radio("Graph")).toHaveAttribute("aria-checked", "true");
+    await expect(radio("Graph")).toBeFocused();
+    await expect(plot, "Arrowing to Graph checked the radio but not the paper.").toBeVisible();
+
+    // Past the end it wraps to the start, and the paper follows back off Graph.
+    await page.keyboard.press("ArrowRight");
+    await expect(radio("Plain")).toHaveAttribute("aria-checked", "true");
+    await expect(radio("Plain")).toBeFocused();
+    await expect(plot).toBeHidden();
+
+    // And backwards off the start wraps to the end.
+    await page.keyboard.press("ArrowLeft");
+    await expect(radio("Graph")).toHaveAttribute("aria-checked", "true");
+    await expect(radio("Graph")).toBeFocused();
+
+    // ArrowDown and ArrowUp fold into the same two steps.
+    await page.keyboard.press("ArrowDown");
+    await expect(radio("Plain")).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("ArrowUp");
+    await expect(radio("Graph")).toHaveAttribute("aria-checked", "true");
+  });
+
+  test("arrowing off a fresh empty line drops it, like a tap does (D-199)", async ({ page }) => {
+    await openCleanSketch(page, discovered, "Plain");
+    const overlay = page.locator("[data-sketch-overlay]");
+    const group = overlay.getByRole("radiogroup", { name: "Background" });
+    const radio = (name: "Plain" | "Grid" | "Graph") =>
+      group.getByRole("radio", { name, exact: true });
+    const strip = page.locator("[data-typed-work-strip]");
+
+    // Type starts line 1 with a live, focused field. Blurring it keeps the
+    // empty line (only Draw or a surface change drops it), which is the state
+    // an arrow has to clean up after.
+    await setSketchMode(page, "Type");
+    await expect(strip.locator("li")).toHaveCount(1);
+    await expect(page.locator("math-field")).toBeFocused();
+    await hideMathKeyboard(page);
+    await expect(strip.locator("li")).toHaveCount(1);
+
+    // Leave Plain with an arrow, then come straight back. Content is per
+    // surface, so the strip being empty on Grid proves nothing; the strip
+    // being empty back on Plain proves selectBackground discarded the line
+    // on the way out, exactly as a tap on Grid would have.
+    await radio("Plain").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(radio("Grid")).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("ArrowLeft");
+    await expect(radio("Plain")).toHaveAttribute("aria-checked", "true");
+    await expect(
+      strip,
+      "The empty typed line survived an arrow off its surface: D-199's discard is not on the arrow path.",
+    ).toHaveCount(0);
+    await expect(page.locator("math-field")).toHaveCount(0);
+  });
 });
 
 test.describe("Delete line in the math field menu", () => {
@@ -216,7 +314,36 @@ test.describe("Delete line in the math field menu", () => {
     await expect.poll(() => mathFieldValue(page)).toBe("z");
 
     expect(await unhandled(), "MathLive threw around the menu deletions.").toEqual([]);
+
+    // D-197, the ON half. Not decoration: if the override were never applied
+    // under this project, the OFF assertion below would pass vacuously.
+    await expect
+      .poll(() => containerPointerEvents(page), {
+        message:
+          "D-197's override is not on the focused field's container, so the " +
+          "assertion after hideMathKeyboard would prove nothing.",
+      })
+      .toBe("auto");
+
     await hideMathKeyboard(page);
+
+    // D-197, the OFF half, and the whole point of this pin. Ruling B scoped
+    // the override to while the field holds focus, and that scoping was
+    // proven only by a probe that was then deleted, so a revert to always-on
+    // would show up only as an intermittent Delete line failure. An always-on
+    // override lets the menu toggle take a tap in MathLive's 60ms
+    // mark-focused-then-focus-sink gap, and Delete line then removes a field
+    // MathLive still counts as focused, where D-188's blur cannot settle it.
+    // hideMathKeyboard blurs the active element, so the host's focusout must
+    // have cleared the inline value by now.
+    await expect
+      .poll(() => containerPointerEvents(page), {
+        message:
+          "D-197's override outlived the field's focus. An always-on container " +
+          "override is exactly what PR 2's ruling B rejected.",
+      })
+      .toBe("");
+
     await wipeActiveSketchSurface(page);
   });
 });

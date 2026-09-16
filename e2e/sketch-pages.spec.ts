@@ -169,6 +169,67 @@ test("split 2 shows two pages and drawing in a pane activates its page", async (
   await expect(chips.first()).toHaveAttribute("aria-checked", "false");
 });
 
+/**
+ * The split toolbar's Background group is a roving radiogroup: one tab stop,
+ * arrows move both the checked state and focus, and the ends wrap. Shipped in
+ * SketchToolbar since PR 1 with zero e2e coverage (`grep -rn "Arrow" e2e/` was
+ * empty), which is why PR 1's final review refused to extract the handler.
+ * This is that coverage, so the extraction has something to be measured
+ * against. On the two mobile projects the split toolbar is the ONLY way to
+ * reach this component: unsplit and compact renders the focus bar instead.
+ */
+test("the split toolbar's Background radios rove with the arrow keys", async ({ page }) => {
+  await openNormalizedSketch(page);
+  // Plain BEFORE splitting, so the arrow sequence below starts from a known
+  // radio. Surface CONTENT is irrelevant here and deliberately not wiped:
+  // this test reads radios, and a wipe would drag the overflow sheet and a
+  // throwaway stroke into a test that needs neither.
+  await setSketchBackground(page, "Plain");
+  await setSketchSplit(page, 2);
+
+  const group = page.getByRole("radiogroup", { name: "Background" });
+  const radio = (name: "Plain" | "Grid" | "Graph") =>
+    group.getByRole("radio", { name, exact: true });
+
+  // One tab stop: the checked radio, and only it, is reachable with Tab.
+  // Asserted through tabindex rather than a literal Tab press, because
+  // whether a <button> takes Tab focus at all is engine and OS dependent
+  // (WebKit honors the Full Keyboard Access setting), which would make a
+  // traversal assertion measure the browser instead of the component.
+  await expect(radio("Plain")).toHaveAttribute("tabindex", "0");
+  await expect(radio("Grid")).toHaveAttribute("tabindex", "-1");
+  await expect(radio("Graph")).toHaveAttribute("tabindex", "-1");
+
+  // ArrowRight moves the check AND the focus, one step at a time.
+  await radio("Plain").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(radio("Grid")).toHaveAttribute("aria-checked", "true");
+  await expect(radio("Grid")).toBeFocused();
+  await expect(radio("Plain")).toHaveAttribute("tabindex", "-1");
+  await expect(radio("Grid")).toHaveAttribute("tabindex", "0");
+
+  await page.keyboard.press("ArrowRight");
+  await expect(radio("Graph")).toHaveAttribute("aria-checked", "true");
+  await expect(radio("Graph")).toBeFocused();
+
+  // Past the end it wraps to the start, not stops.
+  await page.keyboard.press("ArrowRight");
+  await expect(radio("Plain")).toHaveAttribute("aria-checked", "true");
+  await expect(radio("Plain")).toBeFocused();
+
+  // And backwards off the start wraps to the end.
+  await page.keyboard.press("ArrowLeft");
+  await expect(radio("Graph")).toHaveAttribute("aria-checked", "true");
+  await expect(radio("Graph")).toBeFocused();
+
+  // ArrowDown and ArrowUp are the same two steps (the handler folds them in
+  // with Right and Left), proven here once each so all four keys are live.
+  await page.keyboard.press("ArrowDown");
+  await expect(radio("Plain")).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("ArrowUp");
+  await expect(radio("Graph")).toHaveAttribute("aria-checked", "true");
+});
+
 test("the page bar fits at 375px with no horizontal body scroll", async ({ page }) => {
   test.skip(
     discovered.practice === null,

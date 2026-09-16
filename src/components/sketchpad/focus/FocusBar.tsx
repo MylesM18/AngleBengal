@@ -6,6 +6,7 @@ import { MarkdownMath } from "@/components/shared/MarkdownMath";
 import { Chip, chipClasses } from "@/components/ui/Chip";
 import { Sheet } from "@/components/ui/Sheet";
 import { activePage, useSketchStore, type Background } from "@/lib/sketch/store";
+import { rovingRadioKeyDown } from "@/lib/sketch/roving";
 
 import { OverflowSheet } from "./OverflowSheet";
 
@@ -52,6 +53,14 @@ export function FocusBar({
     if (open === "problem") problemPanelRef.current?.focus();
   }, [open]);
 
+  // Leaving a surface drops its untouched line the way Draw does, so a blank
+  // row never waits behind the user's back (D-199). The arrow keys are the
+  // same leave as a tap, so both paths go through this one function.
+  function selectBackground(value: Background) {
+    discardEmptyTypedLines(activePageId);
+    setSurface(activePageId, value);
+  }
+
   return (
     <div className="relative flex h-11 shrink-0 items-center gap-2 border-b border-hairline bg-paper-1 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]">
       {onDone && (
@@ -70,7 +79,16 @@ export function FocusBar({
           Problem
         </Chip>
       )}
-      <div className="flex gap-1" role="radiogroup" aria-label="Background">
+      <div
+        className="flex gap-1"
+        role="radiogroup"
+        aria-label="Background"
+        onKeyDown={rovingRadioKeyDown(
+          BACKGROUNDS.map((item) => item.value),
+          background,
+          selectBackground,
+        )}
+      >
         {BACKGROUNDS.map(({ value, label }) => {
           const checked = background === value;
           return (
@@ -79,12 +97,8 @@ export function FocusBar({
               type="button"
               role="radio"
               aria-checked={checked}
-              onClick={() => {
-                // Leaving a surface drops its untouched line the way Draw does,
-                // so a blank row never waits behind the user's back (D-199).
-                discardEmptyTypedLines(activePageId);
-                setSurface(activePageId, value);
-              }}
+              tabIndex={checked ? 0 : -1}
+              onClick={() => selectBackground(value)}
               className={chipClasses({ variant: "toggle", active: checked })}
             >
               {label}

@@ -169,6 +169,26 @@ async function openTypedSketch(page: Page): Promise<void> {
   // keyboard (revision spec section 7), which would cover the pane a test
   // taps next. Draw drops the untouched line; each test sets Type again
   // from the split toolbar, which only sets the mode.
+  //
+  // Wait for that field to hold SETTLED focus before hiding. setSketchMode
+  // only waits for aria-pressed, and MathfieldElement's autoFocus lands
+  // asynchronously (see waitForSettledMathFieldFocus below), so a hide
+  // dispatched into that window is followed by the focus arriving and the
+  // keyboard raising again, over the Draw button this then clicks. Observed
+  // once under load on iphone-webkit as a 90s intercepted click in "typing
+  // in the bottom pane condenses, the peek swaps, closing restores".
+  // The wait is bounded, see below.
+  await expect(
+    page.locator("math-field"),
+    "Focus mode's Type never started a typed line.",
+  ).toHaveCount(1);
+  // Bounded, and allowed to fall through. On Chromium the mount churn can end
+  // with the live field genuinely unfocused (waitForSettledMathFieldFocus
+  // documents it); then no late focus is left to race the hide, and a strict
+  // wait only times out, which a full run on pixel-chromium showed (0 settled
+  // reads in 15 s). Settle the focus if it is coming; otherwise carry on as
+  // this helper always did, hiding with the field unfocused.
+  await waitForSettledMathFieldFocus(page, 8_000).catch(() => {});
   await hideMathKeyboard(page);
   await setSketchMode(page, "Draw");
 }
@@ -191,7 +211,7 @@ async function openTypedSketch(page: Page): Promise<void> {
  * expect.poll's own ticks so this spans real wall-clock time rather than a
  * handful of back-to-back synchronous reads, confirms it actually has.
  */
-async function waitForSettledMathFieldFocus(page: Page): Promise<void> {
+async function waitForSettledMathFieldFocus(page: Page, timeout?: number): Promise<void> {
   let consecutive = 0;
   await expect
     .poll(
@@ -200,7 +220,7 @@ async function waitForSettledMathFieldFocus(page: Page): Promise<void> {
         consecutive = tag === "MATH-FIELD" ? consecutive + 1 : 0;
         return consecutive;
       },
-      { message: "The typed line's math field never settled into stable focus." },
+      { message: "The typed line's math field never settled into stable focus.", timeout },
     )
     .toBeGreaterThanOrEqual(5);
 }
@@ -291,8 +311,20 @@ test("typing in the bottom pane condenses, the peek swaps, closing restores", as
   await expect(page.getByRole("button", { name: /^Switch to / })).toBeHidden();
 });
 
+// This test changes the persisted surface CHOICE (Grid via the arrows), which
+// D-169 keeps per problem across tests, and restores Graph only on success.
 test("the condensed overflow popover holds the parked controls", async ({ page }) => {
   await openTypedSketch(page);
+  // Explicit, not assumed: normalization (resetSketchPages, wipeActiveSketchSurface)
+  // manages page count and surface CONTENT, never surface CHOICE, so a page
+  // recycled from an earlier run can persist on a non-graph background
+  // (D-169, per-problem persisted work, same cause as the sibling test at
+  // "typing in the bottom pane condenses, the peek swaps, closing restores").
+  // This test reads the Background group itself, so a leftover
+  // non-Graph start does not just skew an unrelated assertion, it fails the
+  // group's own first check outright. Reproduced live: iphone-webkit landed
+  // on a non-Graph background here in one run of this suite.
+  await setSketchBackground(page, "Graph");
   await condense(page);
 
   await page.getByRole("button", { name: "More", exact: true }).click();
@@ -301,7 +333,39 @@ test("the condensed overflow popover holds the parked controls", async ({ page }
   await expect(dialog.getByRole("group", { name: "Tool" })).toBeVisible();
   await expect(dialog.getByRole("group", { name: "Stroke width" })).toBeVisible();
   await expect(dialog.getByRole("group", { name: "Ink color" })).toBeVisible();
-  await expect(dialog.getByRole("radiogroup", { name: "Background" })).toBeVisible();
+  const backgrounds = dialog.getByRole("radiogroup", { name: "Background" });
+  await expect(backgrounds).toBeVisible();
+
+  // The condensed popover is the only reachable rendering of
+  // CondensedToolbar's Background group, which shares rovingRadioKeyDown
+  // (src/lib/sketch/roving.ts) with the split toolbar and the focus bar.
+  // Covered here, inside the test that already has the popover open, so the
+  // shared helper has a pin on this call site beside the split toolbar's in
+  // sketch-pages.spec.ts, without a second condense().
+  const graph = backgrounds.getByRole("radio", { name: "Graph", exact: true });
+  await expect(graph).toHaveAttribute("aria-checked", "true");
+  await expect(graph).toHaveAttribute("tabindex", "0");
+  await graph.focus();
+  await page.keyboard.press("ArrowRight");
+  const plain = backgrounds.getByRole("radio", { name: "Plain", exact: true });
+  await expect(plain, "The condensed Background arrows did not wrap.").toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  await expect(plain).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  const grid = backgrounds.getByRole("radio", { name: "Grid", exact: true });
+  await expect(grid).toHaveAttribute("aria-checked", "true");
+  await expect(grid).toBeFocused();
+  // Deliberately NOT arrowed back to Graph: re-mounting graph paper while
+  // this popover is open makes the Escape below close the whole sketch or
+  // drop focus instead of restoring it to More. Pre-existing, reproduced
+  // 4 of 4 with the round trip on both engines and isolated to exactly that
+  // round trip (focus alone, one arrow, and two arrows ending on Grid all
+  // pass); recorded in the rig hardening ledger and filed for the owner.
+  // The split toolbar does not show it. The page goes back to Graph after
+  // the keyboard hides, at the end of this test, so the tests after it see
+  // what they saw before.
   await expect(dialog.getByRole("button", { name: "Clear", exact: true })).toBeVisible();
 
   // Escape closes the popover WITHOUT tearing down sketch mode (the nested
@@ -312,6 +376,9 @@ test("the condensed overflow popover holds the parked controls", async ({ page }
   await expect(page.getByRole("button", { name: "More", exact: true })).toBeFocused();
 
   await hideMathKeyboard(page);
+  // Back to Graph now that the popover is closed and the layout restored,
+  // so the rest of the file starts from the surface it always started from.
+  await setSketchBackground(page, "Graph");
 });
 
 test("the peek header's page select keeps the keyboard and the condensed layout", async ({
