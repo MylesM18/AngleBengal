@@ -3972,3 +3972,36 @@ deterministically, so this ships as a mitigation with its mechanism and its
 runs stated, not as a proven fix. An audit of every other Type then hide then
 click site found the rest already gated, except two inside the two condense
 tests that are out of bounds by standing rule.
+
+### D-203. The graph board host declares its size
+
+Plotted objects only appeared after a page reload, on every graph tool the
+plot controls offer.
+
+GraphLayer rebuilds its JSXGraph board whenever the drawn objects change: the
+effect frees the old board and calls initBoard on the same host element. The
+host was styled `absolute inset-0`, with no size of its own, so it measured
+whatever the layer stack measured. JSXGraph's SVG renderer writes
+`position: relative` onto its container the first time a board mounts there
+(node_modules/jsxgraph/src/renderer/svg.js), and an inline declaration beats
+a class, so the host stopped being stretched by `inset-0` and started taking
+its height from its content. That was invisible while the first board's SVG
+sat inside it. On the next rebuild `freeBoard` empties the host first, so the
+following initBoard measured an empty, relatively positioned box as zero high,
+JSXGraph sized the new SVG to match, and every object it drew was clipped.
+Reloading mounted a fresh host with no inline style, which is why the work
+reappeared then.
+
+The host now carries `width` and `height` from the same measured canvas size
+the effect already reads. A declared size does not depend on the element's
+positioning or on what is inside it, so the rebuild measures the paper rather
+than the emptied box, and the board is pinned to exactly the pixel box the
+pxToWorld conversions use. JSXGraph still writes its `position: relative`; it
+no longer matters.
+
+The count in the graph paper's aria-label comes from the store, not from the
+board, so the existing exact-coordinates specs rose to "1 object placed" all
+through this and stayed green. The new desktop spec measures the board's own
+SVG box and the shapes inside it instead, and it places two objects because
+the first board of a session renders correctly and only the rebuild after it
+is broken.

@@ -285,7 +285,23 @@ export function GraphLayer() {
   return (
     <div className="pointer-events-none absolute inset-0">
       <canvas ref={shadeCanvasRef} className="absolute inset-0" aria-hidden />
-      <div ref={boardHostRef} className="absolute inset-0" aria-hidden />
+      {/* The board host carries its measured size explicitly (D-203). The
+          first initBoard here makes JSXGraph's SVG renderer write
+          `position: relative` onto this element (jsxgraph
+          src/renderer/svg.js), which beats the `absolute` class: the box then
+          takes its height from its CONTENT instead of from `inset-0`. Every
+          rebuild frees the old board first, so the next initBoard measured an
+          emptied relative box as 0 high and sized the new SVG to match,
+          clipping every plotted object until a reload mounted a fresh host.
+          A declared size is independent of both the positioning and the
+          content, and it pins the board to the same pixel box the pxToWorld
+          conversions above use. */}
+      <div
+        ref={boardHostRef}
+        className="absolute inset-0"
+        style={{ width: canvasSize.width, height: canvasSize.height }}
+        aria-hidden
+      />
       {/* Pointer events only while a rail tool is armed: with no tool
           selected the pen and typed lines keep working over graph paper,
           which is what lets Graph live on the background instead of being a
