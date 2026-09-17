@@ -557,18 +557,48 @@ function SketchPane({
   }, []);
   useEffect(() => () => cleanupRef.current?.(), []);
 
-  // A15: r = min(paneW/refW, paneH/refH, 1). With no reference size (a page
-  // never yet rendered unsplit) the layers simply size to the pane and the
-  // scale must stay 1, or pointer math would divide by a scale that no
-  // transform applied.
+  // D-204 reverses D-172's first rule for ordinary panes: a pane is a
+  // natural-scale window onto its page, not a shrunk copy of it. A15's fit
+  // scale survives only for the peek strip (PR 1 spec section 4), where a
+  // width-fit sliver of the TOP of the page is the whole point. Everywhere
+  // else r is 1, so pointer math divides by the pane zoom alone.
   const refSize = page.refSize;
   const r =
-    refSize && refSize.width > 0 && refSize.height > 0 && paneSize.width > 0
-      ? peek
-        ? // Width-fit only: the strip's height must clip, not shrink.
-          Math.min(paneSize.width / refSize.width, 1)
-        : Math.min(paneSize.width / refSize.width, paneSize.height / refSize.height, 1)
+    peek && refSize && refSize.width > 0 && refSize.height > 0 && paneSize.width > 0
+      ? // Width-fit only: the strip's height must clip, not shrink.
+        Math.min(paneSize.width / refSize.width, 1)
       : 1;
+
+  // What the layer stack lays out at: the page's reference size or the pane,
+  // whichever is larger on each axis. Larger-than-refSize is what makes the
+  // paper cover the whole pane (the fit scale used to letterbox it, drawing a
+  // 696x549 page as 343x271 in a 343x513 pane and leaving the rest blank, and
+  // worse the narrower the pane got). Larger-than-pane is a page too big to
+  // fit, which the body below scrolls to instead of shrinking it away. The
+  // canvas reports this size back, so a pane bigger than the page grows
+  // refSize through setCanvasSize's existing split branch. The peek strip is
+  // excluded: it lays out at refSize under its fit scale, as before.
+  const rawContentWidth =
+    refSize && refSize.width > 0
+      ? peek || paneSize.width === 0
+        ? refSize.width
+        : Math.max(refSize.width, paneSize.width)
+      : 0;
+  const rawContentHeight =
+    refSize && refSize.height > 0
+      ? peek || paneSize.height === 0
+        ? refSize.height
+        : Math.max(refSize.height, paneSize.height)
+      : 0;
+  // Memoized so the effects and the wheel listener below see a stable
+  // reference between renders that did not change the size.
+  const contentSize = useMemo(
+    () =>
+      rawContentWidth > 0 && rawContentHeight > 0
+        ? { width: rawContentWidth, height: rawContentHeight }
+        : null,
+    [rawContentWidth, rawContentHeight],
+  );
 
   // PR 2: the pane's session viewport composes onto the A15 fit transform
   // above (r stays peek-aware, PR 1's shipped condensed/normal/peek
@@ -577,10 +607,12 @@ function SketchPane({
   const viewport = usePaneViewport(paneIndex);
   const gestureLive = useSketchStore((state) => state.viewportGesturePane === paneIndex);
   const zoomed = !isDefaultViewport(viewport);
-  // The transform wrapper mounts when the fit scale shrinks the page (as
-  // before) OR the viewport has left its default. refSize is required either
-  // way, because the wrapper lays out at exactly refSize (A15).
-  const wrapperActive = refSize !== null && refSize.width > 0 && (r < 1 || zoomed);
+  // The wrapper mounts for any page that has a measured size, because it is
+  // what lays the stack out at contentSize (D-204); it still carries the peek
+  // fit scale and any pane zoom. Without it the stack would size itself to
+  // the pane, and a page larger than the pane would be cropped with no way to
+  // reach the rest.
+  const wrapperActive = contentSize !== null;
   const composed = wrapperActive ? composedScale(r, viewport.zoom) : 1;
   const pane = useMemo<PaneInfo>(
     () => ({
@@ -601,9 +633,11 @@ function SketchPane({
   // timing is equivalent.
   const fitRef = useRef(r);
   const paneSizeRef = useRef(paneSize);
+  const contentSizeRef = useRef(contentSize);
   useEffect(() => {
     fitRef.current = r;
     paneSizeRef.current = paneSize;
+    contentSizeRef.current = contentSize;
   });
   const wheelSettle = useRef<number | null>(null);
 
@@ -664,7 +698,7 @@ function SketchPane({
     // late-landing palm and the stroke in progress keeps its owner.
     if (now - first.downAt > GESTURE_WINDOW_MS) return;
     // No reference space to zoom yet (page never measured): stay inert.
-    if (!refSize || refSize.width <= 0) return;
+    if (!contentSize) return;
     const state = useSketchStore.getState();
     const current: PaneViewport | undefined = state.paneViewports[paneIndex];
     pinchRef.current = {
@@ -691,15 +725,17 @@ function SketchPane({
     tracked.x = point.x;
     tracked.y = point.y;
     const live = pinchRef.current;
-    if (!live || !refSize) return;
+    if (!live || !contentSize) return;
     const a = paneTouches.current.get(live.ids[0]);
     const b = paneTouches.current.get(live.ids[1]);
     if (!a || !b) return;
     const next = pinchViewport(live.start, { x: a.x, y: a.y }, { x: b.x, y: b.y });
-    // Soft bounds while the fingers are down; the end handler snaps.
+    // Soft bounds while the fingers are down; the end handler snaps. Bounded
+    // by contentSize, not refSize: contentSize is what the wrapper lays out
+    // at, so it is the box the pan range has to be measured against (D-204).
     useSketchStore
       .getState()
-      .setPaneViewport(paneIndex, rubberBandViewport(next, refSize, live.start.fit, paneSize));
+      .setPaneViewport(paneIndex, rubberBandViewport(next, contentSize, live.start.fit, paneSize));
   }
 
   function onPanePointerEnd(event: ReactPointerEvent<HTMLDivElement>) {
@@ -709,11 +745,11 @@ function SketchPane({
     if (!live || !live.ids.includes(event.pointerId)) return;
     pinchRef.current = null;
     const state = useSketchStore.getState();
-    if (refSize) {
+    if (contentSize) {
       const current: PaneViewport | undefined = state.paneViewports[paneIndex];
       const settled = clampViewport(
         current ?? DEFAULT_PANE_VIEWPORT,
-        refSize,
+        contentSize,
         live.start.fit,
         paneSize,
       );
@@ -731,11 +767,11 @@ function SketchPane({
   // Maximize, restore, and pane resizes change the legal pan range; snap a
   // committed viewport back inside it. Never fights a live gesture.
   useEffect(() => {
-    if (!refSize || refSize.width <= 0 || paneSize.width === 0) return;
+    if (!contentSize || paneSize.width === 0) return;
     if (isDefaultViewport(viewport)) return;
     const state = useSketchStore.getState();
     if (state.viewportGesturePane === paneIndex) return;
-    const clamped = clampViewport(viewport, refSize, r, paneSize);
+    const clamped = clampViewport(viewport, contentSize, r, paneSize);
     if (
       clamped.zoom !== viewport.zoom ||
       clamped.offsetX !== viewport.offsetX ||
@@ -748,7 +784,7 @@ function SketchPane({
       // isDefaultViewport-then-branch idiom.
       state.commitPaneViewport(paneIndex, clamped);
     }
-  }, [viewport, refSize, r, paneSize, paneIndex]);
+  }, [viewport, contentSize, r, paneSize, paneIndex]);
 
   // Desktop parity (spec section 6): trackpad pinch and ctrl+wheel are the
   // same DOM event and zoom the pane under the cursor, anchored at the
@@ -761,7 +797,11 @@ function SketchPane({
     if (!element || collapsed || peek) return;
     const onWheel = (event: WheelEvent) => {
       const state = useSketchStore.getState();
-      const ref = state.pages[pageId]?.refSize;
+      // contentSize, not the page's refSize: the wrapper lays out at
+      // contentSize, so that is the box the zoom and pan ranges clamp
+      // against (D-204). Read through a ref because this is a native
+      // listener bound once per pane.
+      const ref = contentSizeRef.current;
       if (!ref || ref.width <= 0) return;
       const fit = fitRef.current;
       const paneBox = paneSizeRef.current;
@@ -941,26 +981,35 @@ function SketchPane({
           onPointerMove={onPanePointerMove}
           onPointerUp={onPanePointerEnd}
           onPointerCancel={onPanePointerEnd}
-          className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
+          className={cx(
+            "relative flex min-h-0 flex-1 flex-col",
+            // D-204: the pane scrolls to whatever of the page does not fit
+            // inside it, instead of shrinking the page until it does. The
+            // peek strip still clips (its sliver is the point, and a
+            // scrollbar would fight the swap button covering it), and so does
+            // a collapsed pane, which is only a header strip tall.
+            peek || collapsed ? "overflow-hidden" : "overflow-auto",
+          )}
         >
-          {wrapperActive && refSize ? (
-            // The layer stack lays out at the page's reference size and is
-            // scaled visually, so canvas backing stores, stroke coordinates,
-            // and the graph board all stay in one space per page (A15). The
-            // wrapper sits ABOVE SketchCanvas's own wrapper: offsetWidth
-            // reports layout size, so the canvas keeps measuring refSize.
+          {wrapperActive && contentSize ? (
+            // The layer stack lays out at contentSize, so canvas backing
+            // stores, stroke coordinates, and the graph board all stay in one
+            // space per page (A15's rule, now measured against contentSize
+            // rather than refSize alone: D-204). The wrapper sits ABOVE
+            // SketchCanvas's own wrapper: offsetWidth reports layout size, so
+            // the canvas measures contentSize and reports it back.
             // flex-none matters: this wrapper is a flex child of the pane's
             // measured column, and the default flex-shrink:1 would collapse
-            // its layout height to the pane height whenever refH exceeds it,
-            // laying the stack out at refW x paneH instead of refSize and
-            // making the bottom of the page unreachable. It must lay out at
-            // exactly refSize; the pane's overflow-hidden plus the transform
-            // do the clipping (A15).
+            // its layout height to the pane height whenever the content
+            // exceeds it, laying the stack out at contentW x paneH and making
+            // the bottom of the page unreachable. It must lay out at exactly
+            // contentSize; the pane's scrolling and the transform take it
+            // from there.
             <div
               className="flex flex-none flex-col"
               style={{
-                width: refSize.width,
-                height: refSize.height,
+                width: contentSize.width,
+                height: contentSize.height,
                 // PR 2: pan offset and zoom ride the SAME wrapper that
                 // carried the A15 fit scale, so there is one coordinate
                 // system: translate(offset) scale(fit * zoom), origin top

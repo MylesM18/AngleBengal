@@ -30,9 +30,13 @@ test("ctrl+wheel zooms a pane and the chip resets it", async ({ page }) => {
 
   await setSketchSplit(page, 2);
 
-  const firstCanvas = page.getByRole("img", { name: /^Scratch canvas/ }).first();
-  const box = await firstCanvas.boundingBox();
-  if (!box) throw new Error("The first pane's canvas has no bounding box.");
+  // The pane body, not the canvas inside it. A pane renders its page at
+  // natural scale (D-204), so a page bigger than the pane reaches past it and
+  // the canvas's own centre can land outside the pane, or in the gap between
+  // panes, where the wheel would zoom nothing.
+  const firstPane = page.locator("[data-sketch-pane-body]").first();
+  const box = await firstPane.boundingBox();
+  if (!box) throw new Error("The first pane's body has no bounding box.");
 
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.keyboard.down("Control");

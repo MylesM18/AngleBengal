@@ -4005,3 +4005,42 @@ through this and stayed green. The new desktop spec measures the board's own
 SVG box and the shapes inside it instead, and it places two objects because
 the first board of a session renders correctly and only the rebuild after it
 is broken.
+
+### D-204. A split pane is a window onto its page, not a shrunk copy of it
+
+This reverses the first rule of D-172 for ordinary panes, at the owner's
+request. Split screen drew the graph and grid into a small area pinned to a
+corner of the pane, with the rest of the pane blank.
+
+D-172 made a pane a scaled view: the layer stack laid out at the page's
+refSize inside scale(min(paneW/refW, paneH/refH, 1)), anchored top left. One
+scale for both axes means any pane shaped differently from the page gets
+letterboxed, and nothing centered or stretched the result. Measured on
+b929c66 with a 696x549 page: at 1280 CSS px the paper covered the pane's full
+width and 53 percent of its height; at 820 px it covered 35 percent of the
+width; at 390 px, 20 percent, a sliver against the left edge. A page that had
+never been measured unsplit had no refSize, so it filled its pane, which is
+why one pane could look right beside a broken one.
+
+A pane now renders its page at natural scale. The stack lays out at
+contentSize, the page's reference size or the pane, whichever is larger on
+each axis, and the pane body scrolls to whatever does not fit. Larger than
+refSize is what makes the paper cover the pane, and it grows the page through
+setCanvasSize's existing split branch, which already anticipated exactly this
+case (a pane at least as large as refSize in both dimensions renders unscaled,
+so the reported size must grow refSize or composites would crop). Larger than
+the pane is a page too big to fit, which scrolling reaches instead of shrinking
+it away. The pane viewport (D-175) composes on the same wrapper as before, with
+the fit factor now 1, and its clamps measure against contentSize because that
+is what the wrapper lays out at.
+
+Two things deliberately unchanged. The peek strip keeps its width-fit sliver
+(PR 1 spec section 4), since a natural-scale view of the top of the page is
+already what it wants, and it keeps clipping rather than scrolling so no
+scrollbar fights the swap button covering it. The compact split arrangement is
+untouched: two full-width panes stacked, as D-171 has it. The owner asked for
+the panes to keep their current layout and only fill properly.
+
+Consequence worth knowing: a pane opens at the top left of its page, so a page
+taller than the pane shows its top first and the graph origin can start below
+the fold. The old behavior showed the whole page at once because it shrank it.
